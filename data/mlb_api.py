@@ -237,4 +237,10 @@ def get_player_recent_stats(player_id, group="hitting", num_games=10, season=Non
     tb   = totals.get("totalBases", 0)
 
     if ab > 0:
-  
+        totals["avg_recent"]  = round(hits / ab, 3)
+        totals["slg_recent"]  = round(tb / ab, 3)
+    if (ab + bb + hbp) > 0:
+        totals["obp_recent"]  = round((hits + bb + hbp) / (ab + bb + hbp), 3)
+
+    totals["games_found"] = len(recent)
+    return totals

@@ -149,4 +149,9 @@ def main():
 
     # ── DONE ──────────────────────────────────────────────────────
     print_section("DONE — Data pipeline confirmed working!")
-    print("  Next step: build the Monte Car
+    print("  Next step: build the Monte Carlo simulation engine.")
+    print()
+
+
+if __name__ == "__main__":
+    main()
