@@ -14,12 +14,16 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dotenv import load_dotenv
 load_dotenv()   # loads ODDS_API_KEY from .env file
 
-from flask import Flask, render_template, abort, request
+import os
+from flask import Flask, render_template, abort, request, redirect, url_for, jsonify
+from flask_login import (LoginManager, UserMixin, login_user,
+                         logout_user, login_required, current_user)
 
 from data.odds_api import get_mlb_odds, get_mlb_events, get_player_props, format_odds, calc_edge, get_requests_remaining, get_mlb_totals, get_mlb_runline, calc_ev, calc_kelly, get_line_movement
 from data.tracker import log_prediction, update_results, get_accuracy_stats, get_all_predictions
 from data.my_picks import add_pick, update_pick_results, get_all_picks, get_pick_stats
 from data.bet_tracker import log_bet, settle_bets, get_bet_stats, get_all_bets
+from data.auth import create_user, check_password, get_user_by_id
 from data.mlb_api import (
     get_today_schedule,
     get_game_lineup,
@@ -37,10 +41,49 @@ from data.mlb_api import (
     get_savant_stats_all,
     get_game_umpire,
     get_team_bullpen_usage,
+    get_team_il_players,
+    get_recent_transactions,
+    get_series_game_number,
+    get_catcher_cs_rate,
+    get_bullpen_depth_score,
+    get_lineup_status,
+    get_team_streak,
+    get_live_scores,
 )
 from simulation.engine import run_simulation, predict_pitcher_ks, detect_pitcher_form
 
 app = Flask(__name__, template_folder="app/templates")
+app.secret_key = os.environ.get("SECRET_KEY", "mlb-sim-secret-change-in-prod-2026")
+
+# ── Flask-Login setup ─────────────────────────────────────────────
+login_manager = LoginManager(app)
+login_manager.login_view = "login_page"
+login_manager.login_message = "Please sign in to access the simulator."
+
+
+class User(UserMixin):
+    def __init__(self, data):
+        self.id       = str(data["id"])
+        self.username = data["username"]
+
+    def get_id(self):
+        return self.id
+
+
+@login_manager.user_loader
+def load_user(user_id):
+    data = get_user_by_id(int(user_id))
+    return User(data) if data else None
+
+
+def _uid():
+    """Return the current user's ID for Supabase queries."""
+    return int(current_user.id) if current_user.is_authenticated else None
+
+# Backwards-compat alias used in older route code
+def _user_bets_csv():
+    return None  # deprecated — use user_id=_uid() instead
+
 
 N_SIMS_SINGLE = 100_000   # simulations for one-game view
 N_SIMS_ALL    =  25_000   # simulations per game in simulate-all (faster)
@@ -609,11 +652,59 @@ def build_game_result(game, n_sims, use_splits=True):
         "home_batters":       home_display,
         "weather":            weather,
         "use_recent":         use_splits,   # flag for template to show/hide recent form column
+        "game_time_utc":      game.get("game_time", ""),
     })
     return result
 
 
 # ── Routes ────────────────────────────────────────────────────────
+
+# ── Auth routes ───────────────────────────────────────────────────
+
+@app.route("/login", methods=["GET", "POST"])
+def login_page():
+    if current_user.is_authenticated:
+        return redirect(url_for("simulate_all"))
+    error = None
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+        user_data = check_password(username, password)
+        if user_data:
+            login_user(User(user_data), remember=True)
+            return redirect(request.args.get("next") or url_for("simulate_all"))
+        error = "Invalid username or password."
+    return render_template("login.html", error=error)
+
+
+@app.route("/register", methods=["GET", "POST"])
+def register_page():
+    if current_user.is_authenticated:
+        return redirect(url_for("simulate_all"))
+    error = None
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+        confirm  = request.form.get("confirm", "")
+        if password != confirm:
+            error = "Passwords don't match."
+        else:
+            ok, result = create_user(username, password)
+            if ok:
+                user_data = get_user_by_id(result)
+                login_user(User(user_data), remember=True)
+                return redirect(url_for("simulate_all"))
+            else:
+                error = result
+    return render_template("register.html", error=error)
+
+
+@app.route("/logout")
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for("login_page"))
+
 
 @app.route("/")
 def index():
@@ -787,6 +878,7 @@ def load_props(game_pk):
 
 
 @app.route("/simulate-all")
+@login_required
 def simulate_all():
     """
     Simulate every active game on today's slate.
@@ -920,13 +1012,31 @@ def simulate_all():
             "away_batters": lu["away_batters"],
             "home_batters": lu["home_batters"],
             "weather":   weather,
+            "game_time_utc": game.get("game_time", ""),
         })
         results.append(result)
 
     results.sort(key=lambda r: r["gamePk"])
 
-    # Sort results by gamePk to keep a consistent order
-    results.sort(key=lambda r: r["gamePk"])
+    # ── Log predictions for accuracy tracking ─────────────────
+    try:
+        for r in results:
+            predicted_winner = r["away_team"] if r["away_win_pct"] >= r["home_win_pct"] else r["home_team"]
+            predicted_win_pct = max(r["away_win_pct"], r["home_win_pct"])
+            predicted_total   = r.get("avg_away_runs", 0) + r.get("avg_home_runs", 0)
+            log_prediction(
+                game_pk          = r["gamePk"],
+                game_date        = date.today().isoformat(),
+                away_team        = r["away_team"],
+                home_team        = r["home_team"],
+                away_win_pct     = r["away_win_pct"],
+                home_win_pct     = r["home_win_pct"],
+                away_avg_runs    = r.get("avg_away_runs", 0),
+                home_avg_runs    = r.get("avg_home_runs", 0),
+                n_sims           = N_SIMS_ALL,
+            )
+    except Exception:
+        pass
 
     # ── Build the Best Parlay ──────────────────────────────────
     # A parlay is a bet where you pick multiple games and all must win.
@@ -1107,59 +1217,54 @@ def simulate_all():
         best_bets     = best_bets,
         date          = today,
         n_sims        = N_SIMS_ALL,
+        api_remaining = get_requests_remaining(),
+        username      = current_user.username,
     )
 
 
 @app.route("/my-picks", methods=["GET", "POST"])
+@login_required
 def my_picks():
-    """Personal picks log — enter your pick, see simulator's take, track results."""
-    from flask import request as freq, jsonify
-
+    """Personal picks log."""
+    from flask import request as freq
     if freq.method == "POST":
-        # Submitted a new pick via the form
         data = freq.get_json() or {}
         add_pick(
-            game_pk       = data.get("game_pk"),
-            game_date     = data.get("game_date"),
-            away_team     = data.get("away_team"),
-            home_team     = data.get("home_team"),
-            my_pick       = data.get("my_pick"),
-            my_notes      = data.get("my_notes", ""),
-            sim_away_pct  = data.get("sim_away_pct"),
-            sim_home_pct  = data.get("sim_home_pct"),
-            sim_away_runs = data.get("sim_away_runs"),
-            sim_home_runs = data.get("sim_home_runs"),
+            game_pk   = data.get("game_pk"),
+            game_date = data.get("game_date", date.today().isoformat()),
+            away_team = data.get("away_team", ""),
+            home_team = data.get("home_team", ""),
+            pick      = data.get("pick", ""),
+            sim_pct   = data.get("sim_pct"),
+            user_id   = _uid(),
         )
-        return jsonify({"ok": True})
-
-    # GET — show the page
-    stats  = get_pick_stats()
-    games  = get_today_schedule()
-    return render_template("my_picks.html", games=games, **stats)
+        return jsonify({"status": "ok"})
+    update_pick_results(user_id=_uid())
+    picks = get_all_picks(user_id=_uid())
+    stats = get_pick_stats(user_id=_uid())
+    return render_template("my_picks.html", picks=picks, stats=stats,
+                           username=current_user.username)
 
 
 @app.route("/my-picks/update", methods=["POST"])
+@login_required
 def update_my_picks():
-    from flask import jsonify
-    updated = update_pick_results()
-    stats   = get_pick_stats()
+    updated = update_pick_results(user_id=_uid())
+    stats   = get_pick_stats(user_id=_uid())
     return jsonify({"updated": updated, "my_pct": stats["my_pct"], "sim_pct": stats["sim_pct"]})
 
 
 @app.route("/accuracy")
-def accuracy():
-    """Model accuracy dashboard — how often are we right?"""
+@login_required
+def accuracy_page():
+    update_results()
     stats = get_accuracy_stats()
-    return render_template("accuracy.html", **stats)
+    return render_template("accuracy.html", **stats, username=current_user.username)
 
 
 @app.route("/update-results", methods=["POST"])
+@login_required
 def trigger_update():
-    """
-    Check the MLB API for final scores on any logged predictions
-    that don't have results yet. Called from the accuracy page.
-    """
-    from flask import jsonify
     updated = update_results()
     stats   = get_accuracy_stats()
     return jsonify({
@@ -1170,34 +1275,64 @@ def trigger_update():
     })
 
 
+@app.route("/api/live-scores")
+def api_live_scores():
+    """Public JSON endpoint — live/final/scheduled scores."""
+    from datetime import date as _date
+    game_date = request.args.get("date", _date.today().isoformat())
+    try:
+        scores = get_live_scores(game_date)
+    except Exception:
+        scores = []
+    return jsonify(scores)
+
+
+@app.route("/api/bets")
+@login_required
+def api_bets():
+    """JSON: all bets for the logged-in user (bankroll page)."""
+    return jsonify(get_all_bets(user_id=_uid()))
+
+
+@app.route("/bankroll")
+@login_required
+def bankroll_page():
+    return render_template("bankroll.html", username=current_user.username)
+
+
+@app.route("/calculator")
+@login_required
+def calculator_page():
+    return render_template("calculator.html", username=current_user.username)
+
+
 @app.route("/bets")
+@login_required
 def bets_dashboard():
-    """ROI tracker — shows all placed bets, win rate, and total P&L."""
-    settle_bets()   # auto-settle any finished games
-    stats = get_bet_stats()
-    from datetime import date as _d
-    stats["today"] = _d.today().isoformat()
-    return render_template("bets.html", **stats)
+    settle_bets(user_id=_uid())
+    stats = get_bet_stats(user_id=_uid())
+    stats["today"] = date.today().isoformat()
+    return render_template("bets.html", **stats, username=current_user.username)
 
 
 @app.route("/bets/log", methods=["POST"])
+@login_required
 def log_bet_route():
-    """AJAX endpoint — log a new bet from the game card."""
-    from flask import jsonify, request as req
-    data = req.get_json() or req.form
+    data = request.get_json() or request.form
     try:
         log_bet(
-            game_pk   = data["game_pk"],
-            game_date = data.get("game_date", ""),
-            away_team = data["away_team"],
-            home_team = data["home_team"],
-            bet_on    = data["bet_on"],
-            bet_type  = data.get("bet_type", "ML"),
-            odds      = int(data["odds"]),
-            amount    = float(data.get("amount", 100)),
-            model_edge= data.get("model_edge"),
-            ev        = data.get("ev"),
-            kelly     = data.get("kelly"),
+            game_pk    = data["game_pk"],
+            game_date  = data.get("game_date", ""),
+            away_team  = data["away_team"],
+            home_team  = data["home_team"],
+            bet_on     = data["bet_on"],
+            bet_type   = data.get("bet_type", "ML"),
+            odds       = int(data["odds"]),
+            amount     = float(data.get("amount", 100)),
+            model_edge = data.get("model_edge"),
+            ev         = data.get("ev"),
+            kelly      = data.get("kelly"),
+            user_id    = _uid(),
         )
         return jsonify({"status": "ok"})
     except Exception as e:
@@ -1205,17 +1340,62 @@ def log_bet_route():
 
 
 @app.route("/bets/settle", methods=["POST"])
+@login_required
 def settle_bets_route():
-    from flask import jsonify
-    n = settle_bets()
+    n = settle_bets(user_id=_uid())
     return jsonify({"settled": n})
 
 
+# ── Auth routes ───────────────────────────────────────────────────
+
+@app.route("/login", methods=["GET", "POST"])
+def login_page():
+    if current_user.is_authenticated:
+        return redirect(url_for("simulate_all"))
+    error = None
+    if request.method == "POST":
+        username  = request.form.get("username", "").strip()
+        password  = request.form.get("password", "")
+        user_data = check_password(username, password)
+        if user_data:
+            login_user(User(user_data), remember=True)
+            return redirect(request.args.get("next") or url_for("simulate_all"))
+        error = "Invalid username or password."
+    return render_template("login.html", error=error)
+
+
+@app.route("/register", methods=["GET", "POST"])
+def register_page():
+    if current_user.is_authenticated:
+        return redirect(url_for("simulate_all"))
+    error = None
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+        confirm  = request.form.get("confirm", "")
+        if password != confirm:
+            error = "Passwords don't match."
+        else:
+            ok, result = create_user(username, password)
+            if ok:
+                login_user(User(get_user_by_id(result)), remember=True)
+                return redirect(url_for("simulate_all"))
+            else:
+                error = result
+    return render_template("register.html", error=error)
+
+
+@app.route("/logout")
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for("login_page"))
+
+
 if __name__ == "__main__":
-    import os
-    port = int(os.environ.get("PORT", 5000))
+    port  = int(os.environ.get("PORT", 5000))
     debug = os.environ.get("FLASK_ENV") != "production"
-    print("\n  MLB Simulator is running!")
+    print("\n  ⚾ MLB Simulator is running!")
     if debug:
-        print(f"  Open this in your browser:  http://127.0.0.1:{port}\n")
+        print(f"  Open:  http://127.0.0.1:{port}\n")
     app.run(host="0.0.0.0", port=port, debug=debug)

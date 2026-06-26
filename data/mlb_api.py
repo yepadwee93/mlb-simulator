@@ -1179,3 +1179,90 @@ def get_team_streak(team_id: int, days_back: int = 10) -> dict:
         }
     except Exception:
         return {"streak": 0, "type": "", "label": "", "hot": False, "cold": False}
+
+
+# ──────────────────────────────────────────────
+# LIVE SCORES — scoreboard strip
+# ──────────────────────────────────────────────
+
+def get_live_scores(game_date=None):
+    """
+    Returns live/final/scheduled scores for today's games.
+    Used for the scoreboard strip at the top of the main page.
+    Each dict has:
+      gamePk, away_team, home_team, away_abbr, home_abbr,
+      away_score, home_score, inning, inning_half,
+      status, abstract_state, game_time_utc
+    """
+    from datetime import date as _date
+    if game_date is None:
+        game_date = _date.today().isoformat()
+
+    try:
+        data = _get("/schedule", params={
+            "sportId": 1,
+            "date":    game_date,
+            "hydrate": "team,linescore",
+        })
+    except Exception:
+        return []
+
+    # Short team name → abbreviation mapping (common ones)
+    _ABBR = {
+        "Arizona Diamondbacks": "ARI", "Atlanta Braves": "ATL",
+        "Baltimore Orioles": "BAL", "Boston Red Sox": "BOS",
+        "Chicago Cubs": "CHC", "Chicago White Sox": "CWS",
+        "Cincinnati Reds": "CIN", "Cleveland Guardians": "CLE",
+        "Colorado Rockies": "COL", "Detroit Tigers": "DET",
+        "Houston Astros": "HOU", "Kansas City Royals": "KC",
+        "Los Angeles Angels": "LAA", "Los Angeles Dodgers": "LAD",
+        "Miami Marlins": "MIA", "Milwaukee Brewers": "MIL",
+        "Minnesota Twins": "MIN", "New York Mets": "NYM",
+        "New York Yankees": "NYY", "Oakland Athletics": "OAK",
+        "Philadelphia Phillies": "PHI", "Pittsburgh Pirates": "PIT",
+        "San Diego Padres": "SD", "San Francisco Giants": "SF",
+        "Seattle Mariners": "SEA", "St. Louis Cardinals": "STL",
+        "Tampa Bay Rays": "TB", "Texas Rangers": "TEX",
+        "Toronto Blue Jays": "TOR", "Washington Nationals": "WSH",
+        "Athletics": "OAK",
+    }
+
+    scores = []
+    for day in data.get("dates", []):
+        for game in day.get("games", []):
+            away   = game["teams"]["away"]
+            home   = game["teams"]["home"]
+            ls     = game.get("linescore", {})
+            status = game.get("status", {})
+            abstract = status.get("abstractGameState", "Preview")  # Preview/Live/Final
+            detailed = status.get("detailedState", "Scheduled")
+
+            away_name = away["team"]["name"]
+            home_name = home["team"]["name"]
+
+            # Linescore scores (0 if not started)
+            away_score = ls.get("teams", {}).get("away", {}).get("runs", 0) or 0
+            home_score = ls.get("teams", {}).get("home", {}).get("runs", 0) or 0
+
+            # Inning info
+            inning      = ls.get("currentInning", 0)
+            inning_half = ls.get("inningHalf", "")   # "Top" | "Bottom" | ""
+            outs        = ls.get("outs", 0)
+
+            scores.append({
+                "gamePk":       game["gamePk"],
+                "away_team":    away_name,
+                "home_team":    home_name,
+                "away_abbr":    _ABBR.get(away_name, away_name[:3].upper()),
+                "home_abbr":    _ABBR.get(home_name, home_name[:3].upper()),
+                "away_score":   away_score,
+                "home_score":   home_score,
+                "inning":       inning,
+                "inning_half":  inning_half,
+                "outs":         outs,
+                "status":       detailed,
+                "abstract_state": abstract,
+                "game_time_utc": game.get("gameDate", ""),
+            })
+
+    return scores

@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bankroll — MLB Simulator</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0f1117; color: #e8eaf0; font-family: 'Segoe UI', Arial, sans-serif; padding: 32px 20px; }
+    a { color: #64b5f6; text-decoration: none; } a:hover { text-decoration: underline; }
+    .back { display: inline-block; margin-bottom: 24px; font-size: 0.9rem; }
+    h1 { font-size: 1.6rem; font-weight: 800; margin-bottom: 6px; }
+    .subtitle { color: #8890a4; font-size: 0.9rem; margin-bottom: 28px; }
+    .green { color: #4caf50; } .red { color: #ef5350; } .blue { color: #64b5f6; } .gold { color: #ffa726; }
+    .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 28px; }
+    .stat-card { background: #161923; border: 1px solid #252836; border-radius: 12px; padding: 14px 16px; }
+    .stat-label { font-size: 0.68rem; color: #8890a4; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
+    .stat-val { font-size: 1.4rem; font-weight: 800; }
+    .section { background: #161923; border: 1px solid #252836; border-radius: 14px; padding: 20px 24px; margin-bottom: 24px; }
+    .section-title { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: #8890a4; margin-bottom: 14px; }
+    .setup-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+    .setup-row label { font-size: 0.8rem; color: #8890a4; }
+    .setup-row input { background: #0f1117; border: 1px solid #333650; border-radius: 8px; color: #e8eaf0; padding: 8px 12px; font-size: 0.9rem; width: 120px; }
+    .btn { background: #1a3a5a; color: #64b5f6; border: 1px solid #1565c0; border-radius: 8px; padding: 8px 18px; font-size: 0.85rem; font-weight: 700; cursor: pointer; }
+    .btn:hover { background: #1e4a70; }
+    nav { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+    nav a { font-size: 0.82rem; color: #8890a4; padding: 5px 12px; border-radius: 6px; border: 1px solid #252836; }
+    nav a:hover { color: #e8eaf0; border-color: #555870; text-decoration: none; }
+    .proj-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-top: 16px; }
+    .proj-card { background: #0f1117; border-radius: 10px; padding: 14px; text-align: center; }
+    .proj-period { font-size: 0.7rem; color: #8890a4; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+    .proj-val { font-size: 1.2rem; font-weight: 800; }
+    .drawdown-bar-wrap { background: #0f1117; border-radius: 4px; height: 10px; overflow: hidden; margin-top: 6px; }
+    .drawdown-bar { height: 100%; background: #ef5350; border-radius: 4px; }
+  </style>
+</head>
+<body>
+
+<a class="back" href="/simulate-all">← Back to Games</a>
+<h1>📈 Bankroll Tracker</h1>
+<p class="subtitle">Track your betting bankroll over time, measure drawdown, and project growth.</p>
+
+<nav>
+  <a href="/simulate-all">🎯 Games</a>
+  <a href="/bets">💰 Bet Tracker</a>
+  <a href="/accuracy">📊 Accuracy</a>
+  <a href="/bankroll">📈 Bankroll</a>
+  <a href="/calculator">🧮 Calculator</a>
+</nav>
+
+<!-- Starting bankroll input -->
+<div class="section">
+  <div class="section-title">Setup</div>
+  <div class="setup-row">
+    <label>Starting Bankroll:</label>
+    <span style="color:#8890a4;">$</span>
+    <input id="start-br" type="number" value="1000" min="1">
+    <button class="btn" onclick="saveBankroll()">Save & Recalculate</button>
+    <span id="br-msg" style="font-size:0.78rem;color:#4caf50;"></span>
+  </div>
+</div>
+
+<!-- Summary stats (computed from bet_tracker data) -->
+<div class="summary-grid" id="br-stats">
+  <!-- filled by JS -->
+</div>
+
+<!-- Balance over time chart -->
+<div class="section">
+  <div class="section-title">📊 Balance Over Time</div>
+  <canvas id="br-chart" style="width:100%;height:260px;"></canvas>
+</div>
+
+<!-- Projections -->
+<div class="section">
+  <div class="section-title">🔮 Projected Growth (at current ROI)</div>
+  <div class="proj-grid" id="projections"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script>
+const BR_KEY   = 'mlb_starting_bankroll';
+const BETS_KEY = 'mlb_bets_cache';
+let brChart = null;
+
+function saveBankroll() {
+  const v = parseFloat(document.getElementById('start-br').value) || 1000;
+  localStorage.setItem(BR_KEY, v);
+  const msg = document.getElementById('br-msg');
+  msg.textContent = 'Saved!';
+  setTimeout(() => msg.textContent = '', 1500);
+  recalculate(v);
+}
+
+function loadBankroll() {
+  const v = parseFloat(localStorage.getItem(BR_KEY)) || 1000;
+  document.getElementById('start-br').value = v;
+  return v;
+}
+
+async function fetchBets() {
+  try {
+    const r = await fetch('/api/bets');
+    if (!r.ok) return [];
+    return await r.json();
+  } catch(e) { return []; }
+}
+
+function recalculate(startBR) {
+  fetchBets().then(bets => {
+    // Filter settled bets only, sort by date
+    const settled = bets
+      .filter(b => b.result === 'WIN' || b.result === 'LOSS' || b.result === 'PUSH')
+      .sort((a, b) => a.game_date > b.game_date ? 1 : -1);
+
+    // Build balance curve
+    let balance = startBR;
+    let peak = startBR;
+    let maxDrawdown = 0;
+    let totalWagered = 0;
+    const dates = ['Start'];
+    const balances = [startBR];
+
+    settled.forEach(b => {
+      const pl = parseFloat(b.profit_loss) || 0;
+      const amt = parseFloat(b.amount) || 0;
+      balance += pl;
+      totalWagered += amt;
+      if (balance > peak) peak = balance;
+      const dd = (peak - balance) / peak * 100;
+      if (dd > maxDrawdown) maxDrawdown = dd;
+      dates.push(b.game_date);
+      balances.push(parseFloat(balance.toFixed(2)));
+    });
+
+    const totalPL = balance - startBR;
+    const roi = totalWagered > 0 ? totalPL / totalWagered * 100 : 0;
+    const wins = settled.filter(b => b.result === 'WIN').length;
+    const losses = settled.filter(b => b.result === 'LOSS').length;
+
+    // Update summary cards
+    document.getElementById('br-stats').innerHTML = `
+      <div class="stat-card"><div class="stat-label">Current Balance</div>
+        <div class="stat-val ${balance >= startBR ? 'green' : 'red'}">$${balance.toFixed(0)}</div></div>
+      <div class="stat-card"><div class="stat-label">Total P&L</div>
+        <div class="stat-val ${totalPL >= 0 ? 'green' : 'red'}">${totalPL >= 0 ? '+' : ''}$${totalPL.toFixed(2)}</div></div>
+      <div class="stat-card"><div class="stat-label">ROI</div>
+        <div class="stat-val ${roi >= 0 ? 'green' : 'red'}">${roi >= 0 ? '+' : ''}${roi.toFixed(1)}%</div></div>
+      <div class="stat-card"><div class="stat-label">Peak Balance</div>
+        <div class="stat-val gold">$${peak.toFixed(0)}</div></div>
+      <div class="stat-card"><div class="stat-label">Max Drawdown</div>
+        <div class="stat-val red">${maxDrawdown.toFixed(1)}%</div></div>
+      <div class="stat-card"><div class="stat-label">Record</div>
+        <div class="stat-val">${wins}-${losses}</div></div>
+    `;
+
+    // Build chart
+    if (brChart) brChart.destroy();
+    brChart = new Chart(document.getElementById('br-chart'), {
+      type: 'line',
+      data: {
+        labels: dates,
+        datasets: [{
+          label: 'Balance',
+          data: balances,
+          borderColor: '#4caf50',
+          backgroundColor: 'rgba(76,175,80,0.08)',
+          fill: true,
+          tension: 0.3,
+          pointRadius: balances.length < 30 ? 4 : 2,
+          pointBackgroundColor: '#4caf50',
+        }, {
+          label: 'Starting Bankroll',
+          data: Array(balances.length).fill(startBR),
+          borderColor: '#555870',
+          borderDash: [4,4],
+          pointRadius: 0,
+          fill: false,
+        }]
+      },
+      options: {
+        responsive: true,
+        interaction: { mode: 'index' },
+        scales: {
+          y: { grid: { color: '#1a1d28' }, ticks: { color: '#8890a4', callback: v => '$' + v } },
+          x: { ticks: { color: '#8890a4', font: { size: 9 }, maxRotation: 45, maxTicksLimit: 12 }, grid: { display: false } }
+        },
+        plugins: { legend: { labels: { color: '#8890a4' } } }
+      }
+    });
+
+    // Projections
+    const betsPerMonth = settled.length > 0 ? settled.length / Math.max(1, (settled.length / 10)) * 30 : 30;
+    const roiPerBet = totalWagered > 0 ? roi / 100 / Math.max(settled.length, 1) : 0;
+    const unitSize = parseFloat(localStorage.getItem('mlb_unit_size')) || 100;
+
+    const periods = [
+      { label: '1 Month',  bets: 30 },
+      { label: '3 Months', bets: 90 },
+      { label: '6 Months', bets: 180 },
+      { label: '1 Year',   bets: 365 },
+    ];
+
+    document.getElementById('projections').innerHTML = periods.map(p => {
+      const proj = roi > 0
+        ? balance * Math.pow(1 + roiPerBet, p.bets)
+        : balance + (totalPL / Math.max(settled.length, 1)) * p.bets;
+      const diff = proj - balance;
+      return `<div class="proj-card">
+        <div class="proj-period">${p.label}</div>
+        <div class="proj-val ${diff >= 0 ? 'green' : 'red'}">$${proj.toFixed(0)}</div>
+        <div style="font-size:0.7rem;color:#8890a4;margin-top:3px;">${diff >= 0 ? '+' : ''}$${diff.toFixed(0)}</div>
+      </div>`;
+    }).join('');
+
+    if (settled.length === 0) {
+      document.getElementById('br-stats').innerHTML += `<div style="grid-column:1/-1;color:#555870;font-size:0.82rem;padding:8px 0;">Log settled bets in the Bet Tracker to see your bankroll curve.</div>`;
+    }
+  });
+}
+
+window.addEventListener('load', () => {
+  const br = loadBankroll();
+  recalculate(br);
+});
+</script>
+</body>
+</html>

@@ -1,277 +1,205 @@
 """
 bet_tracker.py
 --------------
-Tracks actual bets placed: team, bet type, odds, amount, result, P&L.
-Storage: data/bets.csv
+Stores and retrieves per-user bets in Supabase.
 
-Bet types: ML (moneyline), RL (run line -1.5), OVER, UNDER, F5
+All public functions accept user_id (Supabase users.id) to scope queries.
+csv_path is accepted as a no-op keyword arg for backwards compatibility.
 """
 
-import csv
-import os
-from datetime import datetime, date as _date
-
-from data.mlb_api import _get
-
-CSV_PATH = os.path.join(os.path.dirname(__file__), "bets.csv")
-
-FIELDNAMES = [
-    "logged_at",
-    "game_date",
-    "game_pk",
-    "away_team",
-    "home_team",
-    "bet_on",        # team name, "OVER", or "UNDER"
-    "bet_type",      # ML | RL | OVER | UNDER | F5
-    "odds",          # American odds as int (e.g. -110, +145)
-    "amount",        # dollars wagered
-    "model_edge",    # edge % at time of bet (e.g. 7.2)
-    "ev",            # expected value at time of bet
-    "kelly",         # Kelly % used
-    # Filled after game finishes
-    "result",        # "WIN" | "LOSS" | "PUSH" | ""
-    "profit_loss",   # dollars won (positive) or lost (negative)
-    "actual_score",  # e.g. "3-5"
-    "closing_odds",  # final Vegas closing line (American)
-    "clv",           # closing line value: odds at bet - closing odds (positive = beat the close)
-]
+from datetime import datetime
+from data.db import supa
 
 
-def _ensure_csv():
-    if not os.path.exists(CSV_PATH):
-        with open(CSV_PATH, "w", newline="") as f:
-            csv.DictWriter(f, fieldnames=FIELDNAMES).writeheader()
-
-
-def _read_all():
-    if not os.path.exists(CSV_PATH):
-        return []
-    with open(CSV_PATH, newline="") as f:
-        return list(csv.DictReader(f))
-
-
-def _write_all(rows):
-    with open(CSV_PATH, "w", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=FIELDNAMES)
-        w.writeheader()
-        w.writerows(rows)
-
+# ── Write ────────────────────────────────────────────────────────
 
 def log_bet(game_pk, game_date, away_team, home_team,
-            bet_on, bet_type, odds, amount,
-            model_edge=None, ev=None, kelly=None):
-    """
-    Log a new bet. Duplicate game_pk + bet_type entries are overwritten.
-    """
-    _ensure_csv()
+            bet_on, bet_type="ML", odds=None, amount=100.0,
+            model_edge=None, ev=None, kelly=None,
+            user_id=None, csv_path=None):
+    """Insert one bet row for this user."""
+    if not user_id:
+        raise ValueError("user_id is required to log a bet.")
+
     row = {
-        "logged_at":  datetime.now().isoformat(timespec="seconds"),
-        "game_date":  game_date,
-        "game_pk":    game_pk,
-        "away_team":  away_team,
-        "home_team":  home_team,
-        "bet_on":     bet_on,
-        "bet_type":   bet_type,
-        "odds":       int(odds),
-        "amount":     float(amount),
-        "model_edge": model_edge or "",
-        "ev":         ev or "",
-        "kelly":      kelly or "",
-        "result":       "",
-        "profit_loss":  "",
-        "actual_score": "",
-        "closing_odds": "",
-        "clv":          "",
+        "user_id":   int(user_id),
+        "game_pk":   str(game_pk),
+        "game_date": str(game_date),
+        "away_team": away_team,
+        "home_team": home_team,
+        "bet_on":    bet_on,
+        "bet_type":  bet_type,
+        "odds":      int(odds) if odds is not None else None,
+        "amount":    float(amount),
+        "result":    "pending",
     }
-    rows = _read_all()
-    for i, r in enumerate(rows):
-        if str(r["game_pk"]) == str(game_pk) and r["bet_type"] == bet_type and r["bet_on"] == bet_on:
-            rows[i] = row
-            _write_all(rows)
-            return
-    rows.append(row)
-    _write_all(rows)
+    for key, val in [("model_edge", model_edge), ("ev", ev), ("kelly", kelly)]:
+        if val is not None:
+            try:
+                row[key] = float(val)
+            except (ValueError, TypeError):
+                pass
+
+    supa().table("bets").insert(row).execute()
 
 
-def settle_bets():
+def settle_bets(user_id=None, csv_path=None):
     """
-    Auto-settle open bets by checking MLB API for final scores.
-    Returns count of bets settled.
+    Auto-settle pending bets by checking the MLB API for final scores.
+    Returns count of newly settled bets.
     """
-    _ensure_csv()
-    rows    = _read_all()
+    if not user_id:
+        return 0
+
+    from data.mlb_api import _get
+
+    res = supa().table("bets").select("*") \
+        .eq("user_id", int(user_id)) \
+        .eq("result", "pending") \
+        .execute()
+    pending = res.data or []
     settled = 0
-    today   = _date.today().isoformat()
 
-    for row in rows:
-        if row.get("result"):   # already settled
-            continue
-        game_pk = row.get("game_pk")
+    for bet in pending:
+        game_pk = bet.get("game_pk")
         if not game_pk:
             continue
-        # Skip games from today — might not be finished
-        if row.get("game_date") == today:
-            continue
         try:
-            live = _get(f"/game/{game_pk}/feed/live")
+            live  = _get(f"/game/{game_pk}/feed/live")
             state = live.get("gameData", {}).get("status", {}).get("abstractGameState", "")
             if state != "Final":
                 continue
-            ls = live["liveData"]["linescore"]["teams"]
-            away_r = int(ls["away"].get("runs", 0))
-            home_r = int(ls["home"].get("runs", 0))
-            row["actual_score"] = f"{away_r}-{home_r}"
 
-            bet_on   = row["bet_on"]
-            bet_type = row["bet_type"]
-            away_t   = row["away_team"]
-            home_t   = row["home_team"]
-            amount   = float(row["amount"])
-            odds_val = int(row["odds"])
+            ls   = live["liveData"]["linescore"]["teams"]
+            away = ls["away"].get("runs", 0)
+            home = ls["home"].get("runs", 0)
 
-            # Determine result
-            result     = "LOSS"
-            profit_loss = -amount
+            actual_winner = bet["away_team"] if away > home else bet["home_team"]
+            bet_won = (bet["bet_on"] == actual_winner)
 
-            if bet_type in ("ML", "F5"):
-                winner = away_t if away_r > home_r else home_t
-                if bet_on == winner:
-                    result = "WIN"
-            elif bet_type == "RL":
-                # bet_on wins if they cover -1.5
-                if bet_on == away_t:
-                    result = "WIN" if (away_r - home_r) >= 2 else "LOSS"
-                else:
-                    result = "WIN" if (home_r - away_r) >= 2 else "LOSS"
-            elif bet_type == "OVER":
-                try:
-                    line = float(bet_on.replace("OVER ", ""))
-                    result = "WIN" if (away_r + home_r) > line else "LOSS"
-                except Exception:
-                    result = "WIN" if (away_r + home_r) > 8.5 else "LOSS"
-            elif bet_type == "UNDER":
-                try:
-                    line = float(bet_on.replace("UNDER ", ""))
-                    result = "WIN" if (away_r + home_r) < line else "LOSS"
-                except Exception:
-                    result = "WIN" if (away_r + home_r) < 8.5 else "LOSS"
+            odds   = bet.get("odds") or -110
+            amount = float(bet.get("amount") or 100)
+            if bet_won:
+                payout = (amount * odds / 100) if odds > 0 else (amount * 100 / abs(odds))
+                result = "win"
+            else:
+                payout = -amount
+                result = "loss"
 
-            if result == "WIN":
-                if odds_val > 0:
-                    profit_loss = amount * odds_val / 100
-                else:
-                    profit_loss = amount * 100 / abs(odds_val)
-            elif result == "PUSH":
-                profit_loss = 0.0
-
-            row["result"]      = result
-            row["profit_loss"] = round(profit_loss, 2)
+            supa().table("bets").update({
+                "result":     result,
+                "payout":     round(payout, 2),
+                "settled_at": datetime.utcnow().isoformat(),
+            }).eq("id", bet["id"]).execute()
             settled += 1
+
         except Exception:
             continue
 
-    if settled:
-        _write_all(rows)
     return settled
 
 
-def get_bet_stats():
+def update_closing_lines(odds_map, user_id=None, csv_path=None):
     """
-    Full ROI dashboard stats.
-    Returns dict with totals, win rate, ROI %, by bet type breakdown, recent bets.
+    odds_map: {game_pk: {"away": int_odds, "home": int_odds}}
+    Fills in closing_line and CLV for pending bets in those games.
     """
-    _ensure_csv()
-    rows     = _read_all()
-    settled  = [r for r in rows if r.get("result") in ("WIN", "LOSS", "PUSH")]
-    pending  = [r for r in rows if not r.get("result")]
+    if not user_id or not odds_map:
+        return
 
-    total_wagered = sum(float(r["amount"]) for r in settled)
-    total_pl      = sum(float(r["profit_loss"]) for r in settled if r.get("profit_loss") not in ("", None))
-    wins          = sum(1 for r in settled if r["result"] == "WIN")
-    losses        = sum(1 for r in settled if r["result"] == "LOSS")
-    pushes        = sum(1 for r in settled if r["result"] == "PUSH")
-    non_push      = wins + losses
-    win_rate      = round(wins / non_push * 100, 1) if non_push else None
-    roi           = round(total_pl / total_wagered * 100, 1) if total_wagered else None
+    def _to_prob(o):
+        o = int(o)
+        return abs(o) / (abs(o) + 100) if o < 0 else 100 / (o + 100)
 
-    # Breakdown by bet type
-    by_type = {}
-    for r in settled:
-        bt = r.get("bet_type", "ML")
-        if bt not in by_type:
-            by_type[bt] = {"w": 0, "l": 0, "pl": 0.0, "wagered": 0.0}
-        by_type[bt]["wagered"] += float(r["amount"])
-        pl = float(r["profit_loss"]) if r.get("profit_loss") not in ("", None) else 0
-        by_type[bt]["pl"] += pl
-        if r["result"] == "WIN":
-            by_type[bt]["w"] += 1
-        elif r["result"] == "LOSS":
-            by_type[bt]["l"] += 1
+    for game_pk, lines in odds_map.items():
+        res = supa().table("bets").select("id, bet_on, away_team, odds") \
+            .eq("user_id", int(user_id)) \
+            .eq("game_pk", str(game_pk)) \
+            .eq("result", "pending") \
+            .execute()
+        for bet in (res.data or []):
+            is_away = (bet["bet_on"] == bet["away_team"])
+            cl = lines.get("away" if is_away else "home")
+            if cl is None:
+                continue
+            clv = None
+            if bet.get("odds"):
+                clv = round((_to_prob(cl) - _to_prob(bet["odds"])) * 100, 2)
+            supa().table("bets").update({
+                "closing_line": int(cl),
+                "clv": clv,
+            }).eq("id", bet["id"]).execute()
+
+
+# ── Read ─────────────────────────────────────────────────────────
+
+def get_all_bets(user_id=None, csv_path=None):
+    """Return all bets for this user, newest first."""
+    if not user_id:
+        return []
+    res = supa().table("bets").select("*") \
+        .eq("user_id", int(user_id)) \
+        .order("logged_at", desc=True) \
+        .execute()
+    return res.data or []
+
+
+def get_bet_stats(user_id=None, csv_path=None):
+    """Summary stats dict for the bets dashboard."""
+    bets = get_all_bets(user_id=user_id)
+
+    total_bet = total_payout = win_amount = loss_amount = 0.0
+    wins = losses = pushes = pending_count = 0
+    by_type: dict = {}
+
+    for b in bets:
+        amount = float(b.get("amount") or 0)
+        payout = float(b.get("payout") or 0)
+        result = b.get("result", "pending")
+        btype  = b.get("bet_type", "ML")
+
+        if result == "pending":
+            pending_count += 1
+            continue
+
+        total_bet    += amount
+        total_payout += payout
+
+        if result == "win":
+            wins += 1
+            win_amount += payout
+        elif result == "loss":
+            losses += 1
+            loss_amount += amount
+        elif result == "push":
+            pushes += 1
+
+        bt = by_type.setdefault(btype, {"wins": 0, "losses": 0, "profit": 0.0})
+        bt["profit"] += payout
+        if result == "win":
+            bt["wins"] += 1
+        elif result == "loss":
+            bt["losses"] += 1
+
+    settled = wins + losses + pushes
+    roi     = round((total_payout / total_bet * 100) if total_bet else 0, 1)
+    win_pct = round(wins / settled * 100, 1) if settled else None
+
+    clv_vals = [float(b["clv"]) for b in bets if b.get("clv") is not None]
+    avg_clv  = round(sum(clv_vals) / len(clv_vals), 2) if clv_vals else None
 
     return {
-        "total_bets":    len(rows),
-        "settled":       len(settled),
-        "pending":       len(pending),
+        "bets":          bets,
+        "total_bets":    len(bets),
+        "settled":       settled,
+        "pending":       pending_count,
         "wins":          wins,
         "losses":        losses,
         "pushes":        pushes,
-        "win_rate":      win_rate,
-        "total_wagered": round(total_wagered, 2),
-        "total_pl":      round(total_pl, 2),
+        "win_pct":       win_pct,
+        "total_wagered": round(total_bet, 2),
+        "total_profit":  round(total_payout, 2),
         "roi":           roi,
+        "avg_clv":       avg_clv,
         "by_type":       by_type,
-        "recent_bets":   list(reversed(rows))[:20],
     }
-
-
-def update_closing_lines(closing_odds_map: dict):
-    """
-    Store closing odds for settled bets and compute CLV.
-    closing_odds_map: {game_pk: {"away": int, "home": int}}
-    CLV = (implied prob at bet time) - (implied prob at close)
-    Positive CLV = you got a better number than closing line = long-term profitable.
-    """
-    rows = _read_all()
-    updated = 0
-    for row in rows:
-        if row.get("closing_odds"):
-            continue
-        gk = str(row.get("game_pk", ""))
-        if gk not in closing_odds_map:
-            continue
-        bet_on   = row.get("bet_on", "")
-        away_t   = row.get("away_team", "")
-        co_dict  = closing_odds_map[gk]
-        # Match to away or home closing line
-        if bet_on == away_t:
-            close = co_dict.get("away")
-        else:
-            close = co_dict.get("home")
-        if close is None:
-            continue
-
-        def _to_prob(american):
-            american = int(american)
-            if american > 0:
-                return 100 / (american + 100)
-            else:
-                return abs(american) / (abs(american) + 100)
-
-        try:
-            open_prob  = _to_prob(row["odds"])
-            close_prob = _to_prob(close)
-            clv = round((open_prob - close_prob) * 100, 2)  # pp better than close
-            row["closing_odds"] = close
-            row["clv"]          = clv
-            updated += 1
-        except Exception:
-            continue
-
-    if updated:
-        _write_all(rows)
-    return updated
-
-
-def get_all_bets():
-    _ensure_csv()
-    return list(reversed(_read_all()))

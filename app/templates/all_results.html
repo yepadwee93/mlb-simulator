@@ -518,6 +518,51 @@
       color: #555870;
       font-size: 0.78rem;
     }
+
+    /* ── Live scoreboard strip ── */
+    #scoreboard-strip {
+      width: 100%; overflow-x: auto; white-space: nowrap;
+      background: #0d1018; border-bottom: 1px solid #1e2230;
+      padding: 8px 16px; margin-bottom: 0;
+      scrollbar-width: thin; scrollbar-color: #333650 transparent;
+      position: sticky; top: 0; z-index: 200;
+    }
+    #scoreboard-strip::-webkit-scrollbar { height: 4px; }
+    #scoreboard-strip::-webkit-scrollbar-thumb { background: #333650; border-radius: 2px; }
+    .sb-game {
+      display: inline-flex; align-items: center; gap: 10px;
+      background: #161923; border: 1px solid #252836;
+      border-radius: 10px; padding: 6px 12px;
+      margin-right: 8px; font-size: 0.78rem; cursor: default;
+      vertical-align: middle; min-width: 170px;
+      transition: border-color .2s;
+    }
+    .sb-game:hover { border-color: #64b5f6; }
+    .sb-game.live { border-color: #ef5350; }
+    .sb-game.final { opacity: .7; }
+    .sb-teams { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+    .sb-team { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .sb-abbr { font-weight: 700; color: #c8cdd8; width: 28px; }
+    .sb-score { font-weight: 800; font-size: 0.9rem; color: #fff; width: 20px; text-align: right; }
+    .sb-score.winning { color: #4caf50; }
+    .sb-status {
+      font-size: 0.62rem; text-transform: uppercase; letter-spacing: .4px;
+      color: #8890a4; text-align: center; min-width: 36px;
+    }
+    .sb-status.live { color: #ef5350; font-weight: 700; animation: blink 1.4s infinite; }
+    .sb-status.final-txt { color: #555870; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.4} }
+    .sb-time { font-size: 0.65rem; color: #64b5f6; font-weight: 600; }
+    #scoreboard-loading { color: #555870; font-size: 0.78rem; padding: 8px 16px; }
+
+    /* ── Game start time badge ── */
+    .game-time-badge {
+      display: inline-block; font-size: 0.65rem; font-weight: 600;
+      color: #64b5f6; background: #0d1f35; border: 1px solid #1a3a5a;
+      padding: 2px 7px; border-radius: 5px; margin-left: 6px;
+      vertical-align: middle;
+    }
+    .game-time-badge.soon { color: #ffa726; border-color: #5a3a1a; background: #2a1f0d; }
   </style>
 </head>
 <body>
@@ -538,6 +583,22 @@
 } -%}
 
 
+<!-- ── User bar ── -->
+<div style="background:#0a0d14;border-bottom:1px solid #1a1d28;padding:6px 16px;display:flex;align-items:center;justify-content:flex-end;gap:14px;font-size:0.78rem;color:#8890a4;">
+  <span>👤 <strong style="color:#c8cdd8;">{{ username }}</strong></span>
+  <a href="/bets" style="color:#64b5f6;">💰 My Bets</a>
+  <a href="/accuracy" style="color:#64b5f6;">📊 Accuracy</a>
+  <a href="/bankroll" style="color:#64b5f6;">📈 Bankroll</a>
+  <a href="/calculator" style="color:#64b5f6;">🧮 Calculator</a>
+  <a href="/logout" style="color:#ef5350;">Sign Out</a>
+</div>
+
+<!-- ── Live scoreboard strip ── -->
+<div id="scoreboard-strip">
+  <span id="scoreboard-loading" style="color:#555870;font-size:0.78rem;">⚾ Loading scores…</span>
+</div>
+
+<div style="padding: 32px 20px 0;">
 <a class="back" href="/">← Back to game picker</a>
 
 <header>
@@ -707,11 +768,16 @@
 
       <!-- IL / injury alerts -->
       <div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;flex-wrap:wrap;gap:4px;">
+        <span style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
         {%- if r.lineup_status == "confirmed" %}
         <span class="lineup-confirmed">✓ Lineup Confirmed</span>
         {%- elif r.lineup_status == "projected" %}
         <span class="lineup-projected">⚡ Lineup Projected</span>
         {%- endif %}
+        {%- if r.game_time_utc %}
+          <span class="game-time-badge" data-utc="{{ r.game_time_utc }}">🕐 …</span>
+        {%- endif %}
+        </span>
         <span style="display:flex;gap:4px;">
           {%- if r.away_streak and r.away_streak.label %}
             {%- if r.away_streak.hot %}
@@ -1310,5 +1376,138 @@ function toggleMode() {
 })();
 </script>
 
+<!-- ── Live scoreboard JS ── -->
+<script>
+(function() {
+  // Ordinal suffix for inning (1st, 2nd, 3rd, 4th…)
+  function ordinal(n) {
+    if (n === 1) return '1st';
+    if (n === 2) return '2nd';
+    if (n === 3) return '3rd';
+    return n + 'th';
+  }
+
+  // Convert UTC ISO string to local time (ET display)
+  function fmtTime(utc) {
+    if (!utc) return '';
+    try {
+      const d = new Date(utc);
+      return d.toLocaleTimeString('en-US', {
+        hour: 'numeric', minute: '2-digit',
+        timeZone: 'America/New_York', hour12: true
+      }) + ' ET';
+    } catch(e) { return ''; }
+  }
+
+  // Is start time within 60 min from now?
+  function isSoon(utc) {
+    if (!utc) return false;
+    try {
+      const diff = (new Date(utc) - Date.now()) / 60000;
+      return diff > 0 && diff <= 60;
+    } catch(e) { return false; }
+  }
+
+  function buildStrip(games) {
+    const strip = document.getElementById('scoreboard-strip');
+    strip.innerHTML = '';
+    if (!games || !games.length) {
+      strip.innerHTML = '<span style="color:#555870;font-size:0.78rem;padding:8px 16px;">No games found for today.</span>';
+      return;
+    }
+
+    games.forEach(g => {
+      const isLive  = g.abstract_state === 'Live';
+      const isFinal = g.abstract_state === 'Final';
+      const isPreview = g.abstract_state === 'Preview';
+
+      // Determine score leaders for green highlight
+      const awayWin = g.away_score > g.home_score;
+      const homeWin = g.home_score > g.away_score;
+
+      // Status label
+      let statusHtml = '';
+      if (isLive) {
+        const half = g.inning_half === 'Top' ? '▲' : g.inning_half === 'Bottom' ? '▼' : '';
+        statusHtml = `<div class="sb-status live">${half}${g.inning ? ordinal(g.inning) : 'LIVE'}</div>`;
+      } else if (isFinal) {
+        statusHtml = `<div class="sb-status final-txt">Final</div>`;
+      } else {
+        // Scheduled — show time
+        const t = fmtTime(g.game_time_utc);
+        const soon = isSoon(g.game_time_utc);
+        statusHtml = `<div class="sb-time${soon ? ' soon' : ''}">${t}</div>`;
+      }
+
+      const scoreOrDash = (sc, isPreview) => isPreview ? '-' : sc;
+
+      const div = document.createElement('div');
+      div.className = 'sb-game' + (isLive ? ' live' : '') + (isFinal ? ' final' : '');
+      div.title = g.away_team + ' @ ' + g.home_team + (isFinal ? ` — Final: ${g.away_score}-${g.home_score}` : '');
+      div.innerHTML = `
+        <div class="sb-teams">
+          <div class="sb-team">
+            <span class="sb-abbr">${g.away_abbr}</span>
+            <span class="sb-score${(!isPreview && awayWin) ? ' winning' : ''}">${scoreOrDash(g.away_score, isPreview)}</span>
+          </div>
+          <div class="sb-team">
+            <span class="sb-abbr">${g.home_abbr}</span>
+            <span class="sb-score${(!isPreview && homeWin) ? ' winning' : ''}">${scoreOrDash(g.home_score, isPreview)}</span>
+          </div>
+        </div>
+        ${statusHtml}`;
+      strip.appendChild(div);
+    });
+  }
+
+  async function fetchScores() {
+    try {
+      const r = await fetch('/api/live-scores');
+      const games = await r.json();
+      buildStrip(games);
+    } catch(e) {
+      document.getElementById('scoreboard-strip').innerHTML =
+        '<span style="color:#555870;font-size:0.78rem;padding:8px 16px;">Scores unavailable.</span>';
+    }
+  }
+
+  fetchScores();
+  setInterval(fetchScores, 30000); // refresh every 30 seconds
+
+  // ── Game start time badges on each card ──
+  function renderTimeBadges() {
+    document.querySelectorAll('.game-time-badge[data-utc]').forEach(el => {
+      const utc = el.dataset.utc;
+      if (!utc) return;
+      try {
+        const d = new Date(utc);
+        const now = Date.now();
+        const diffMin = (d - now) / 60000;
+        const timeStr = d.toLocaleTimeString('en-US', {
+          hour: 'numeric', minute: '2-digit',
+          timeZone: 'America/New_York', hour12: true
+        }) + ' ET';
+        if (diffMin < 0) {
+          // Game already started
+          el.textContent = '🔴 Live';
+          el.style.color = '#ef5350';
+          el.style.borderColor = '#5a1a1a';
+          el.style.background = '#2a0d0d';
+        } else if (diffMin <= 60) {
+          el.textContent = '⏰ ' + timeStr;
+          el.classList.add('soon');
+        } else {
+          el.textContent = '🕐 ' + timeStr;
+        }
+      } catch(e) { el.style.display = 'none'; }
+    });
+  }
+  renderTimeBadges();
+  setInterval(renderTimeBadges, 60000);
+})();
+</script>
+
+<!-- close the padding wrapper opened after scoreboard strip -->
+</div>
 </body>
 </html>
