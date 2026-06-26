@@ -213,6 +213,69 @@
       letter-spacing: 0.3px;
     }
 
+    /* ── Best bets section ── */
+    .best-bets-box {
+      max-width: 820px;
+      margin: 0 auto 28px auto;
+      background: #1a1d27;
+      border: 1px solid #2a2d3a;
+      border-radius: 16px;
+      padding: 24px 28px;
+    }
+
+    .best-bets-title {
+      font-size: 1.1rem;
+      font-weight: 800;
+      margin-bottom: 16px;
+    }
+
+    .bet-tier-group { margin-bottom: 16px; }
+    .bet-tier-label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: #8890a4;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .bet-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      background: #0f1117;
+      border-radius: 8px;
+      margin-bottom: 6px;
+    }
+
+    .bet-row:last-child { margin-bottom: 0; }
+
+    .bet-team  { font-weight: 700; font-size: 0.95rem; }
+    .bet-opp   { font-size: 0.78rem; color: #8890a4; margin-top: 2px; }
+    .bet-pct   { font-size: 1.3rem; font-weight: 800; }
+    .bet-badge {
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 10px;
+      margin-left: 12px;
+    }
+
+    .conf-strong   { background: #3b1f1f; color: #ef5350; border: 1px solid #ef5350; }
+    .conf-good     { background: #1b3a2a; color: #4caf50; border: 1px solid #4caf50; }
+    .conf-moderate { background: #3a3010; color: #ffd54f; border: 1px solid #ffd54f; }
+
+    .no-bets { color: #8890a4; font-style: italic; text-align: center; padding: 12px 0; }
+
+    .bet-rule {
+      margin-top: 14px;
+      font-size: 0.72rem;
+      color: #555870;
+      border-top: 1px solid #2a2d3a;
+      padding-top: 12px;
+    }
+
     footer {
       text-align: center;
       margin-top: 50px;
@@ -229,6 +292,77 @@
   <h1>⚾ Today's Predictions</h1>
   <p>{{ date }} · {{ results|length }} games · {{ n_sims|int // 1000 }}k simulations each</p>
 </header>
+
+<!-- ── Best Bets — confidence tiers ── -->
+<div class="best-bets-box">
+  <div class="best-bets-title">🎯 Today's Best Bets</div>
+
+  {% if best_bets %}
+    {% set strong   = best_bets | selectattr("tier", "eq", "strong")   | list %}
+    {% set good     = best_bets | selectattr("tier", "eq", "good")     | list %}
+    {% set moderate = best_bets | selectattr("tier", "eq", "moderate") | list %}
+
+    {% if strong %}
+    <div class="bet-tier-group">
+      <div class="bet-tier-label">🔥 Strong lean — 70%+</div>
+      {% for b in strong %}
+      <div class="bet-row">
+        <div>
+          <div class="bet-team">{{ b.team }}</div>
+          <div class="bet-opp">vs {{ b.opponent }} · {{ b.venue }}</div>
+        </div>
+        <div style="display:flex; align-items:center;">
+          <div class="bet-pct" style="color:#ef5350;">{{ b.win_pct }}%</div>
+          <span class="bet-badge conf-strong">STRONG</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if good %}
+    <div class="bet-tier-group">
+      <div class="bet-tier-label">✅ Good value — 65-69%</div>
+      {% for b in good %}
+      <div class="bet-row">
+        <div>
+          <div class="bet-team">{{ b.team }}</div>
+          <div class="bet-opp">vs {{ b.opponent }} · {{ b.venue }}</div>
+        </div>
+        <div style="display:flex; align-items:center;">
+          <div class="bet-pct" style="color:#4caf50;">{{ b.win_pct }}%</div>
+          <span class="bet-badge conf-good">GOOD</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if moderate %}
+    <div class="bet-tier-group">
+      <div class="bet-tier-label">💛 Moderate edge — 62-64%</div>
+      {% for b in moderate %}
+      <div class="bet-row">
+        <div>
+          <div class="bet-team">{{ b.team }}</div>
+          <div class="bet-opp">vs {{ b.opponent }} · {{ b.venue }}</div>
+        </div>
+        <div style="display:flex; align-items:center;">
+          <div class="bet-pct" style="color:#ffd54f;">{{ b.win_pct }}%</div>
+          <span class="bet-badge conf-moderate">MODERATE</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="bet-rule">
+      💡 <strong>Betting guide:</strong> Focus on Strong and Good picks — skip anything below 62% (too close to call). Never bet more than you can afford to lose.
+    </div>
+  {% else %}
+    <div class="no-bets">No game cleared 62% today — every matchup is too close to call. Consider sitting this slate out.</div>
+  {% endif %}
+</div>
 
 <!-- ── Best Parlay Box ── -->
 <div class="parlay-box">
@@ -330,7 +464,16 @@
         </span>
       </div>
 
-      {% if is_parlay %}
+      <!-- Confidence badge -->
+      {% set top_pct = [r.away_win_pct, r.home_win_pct] | max %}
+      {% set top_team = r.away_team if r.away_win_pct >= r.home_win_pct else r.home_team %}
+      {% if top_pct >= 70 %}
+        <div><span class="parlay-tag" style="background:#b91c1c;">🔥 {{ top_team }} — Strong ({{ top_pct }}%)</span></div>
+      {% elif top_pct >= 65 %}
+        <div><span class="parlay-tag" style="background:#15803d;">✅ {{ top_team }} — Good ({{ top_pct }}%)</span></div>
+      {% elif top_pct >= 62 %}
+        <div><span class="parlay-tag" style="background:#854d0e;">💛 {{ top_team }} — Moderate ({{ top_pct }}%)</span></div>
+      {% elif is_parlay %}
         <div><span class="parlay-tag">🎯 PARLAY PICK</span></div>
       {% endif %}
 

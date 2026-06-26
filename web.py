@@ -707,12 +707,48 @@ def simulate_all():
         combined_prob *= pick["win_pct"] / 100.0
     combined_prob_pct = round(combined_prob * 100, 1)
 
+    # ── Confidence-tiered best bets ───────────────────────────────────
+    # Only show games where the model has enough conviction to matter.
+    # 62-64% = moderate edge, 65-69% = good, 70%+ = strong lean
+    best_bets = []
+    for r in results:
+        fav_team = None
+        fav_pct  = None
+        fav_opp  = None
+
+        if r["away_win_pct"] >= r["home_win_pct"] and r["away_win_pct"] >= BET_THRESHOLD:
+            fav_team, fav_pct, fav_opp = r["away_team"], r["away_win_pct"], r["home_team"]
+        elif r["home_win_pct"] > r["away_win_pct"] and r["home_win_pct"] >= BET_THRESHOLD:
+            fav_team, fav_pct, fav_opp = r["home_team"], r["home_win_pct"], r["away_team"]
+
+        if fav_team:
+            if fav_pct >= 70:
+                tier, tier_label, tier_color = "strong",   "🔥 Strong (70%+)",    "#ef5350"
+            elif fav_pct >= 65:
+                tier, tier_label, tier_color = "good",     "✅ Good (65-69%)",    "#4caf50"
+            else:
+                tier, tier_label, tier_color = "moderate", "💛 Moderate (62-64%)", "#ffd54f"
+
+            best_bets.append({
+                "team":       fav_team,
+                "opponent":   fav_opp,
+                "win_pct":    fav_pct,
+                "tier":       tier,
+                "tier_label": tier_label,
+                "tier_color": tier_color,
+                "venue":      r["venue"],
+                "gamePk":     r["gamePk"],
+            })
+
+    best_bets.sort(key=lambda b: b["win_pct"], reverse=True)
+
     today = date.today().strftime("%A, %B %d %Y")
     return render_template(
         "all_results.html",
         results       = results,
         parlay_picks  = parlay_picks,
         combined_prob = combined_prob_pct,
+        best_bets     = best_bets,
         date          = today,
         n_sims        = N_SIMS_ALL,
     )
