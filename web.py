@@ -20,7 +20,7 @@ from flask_login import (LoginManager, UserMixin, login_user,
                          logout_user, login_required, current_user)
 
 from data.odds_api import get_mlb_odds, get_mlb_events, get_player_props, format_odds, calc_edge, get_requests_remaining, get_mlb_totals, get_mlb_runline, calc_ev, calc_kelly, get_line_movement, get_public_betting_pcts
-from data.tracker import log_prediction, update_results, get_accuracy_stats, get_all_predictions
+from data.tracker import log_prediction, update_results, get_accuracy_stats, get_all_predictions, log_odds, get_odds_history
 from data.my_picks import add_pick, update_pick_results, get_all_picks, get_pick_stats
 from data.bet_tracker import log_bet, settle_bets, get_bet_stats, get_all_bets
 from data.auth import create_user, check_password, get_user_by_id
@@ -858,6 +858,25 @@ def simulate(game_pk):
         result["home_kelly"]       = None
         result["books_used"]       = 0
 
+    # ── Log odds snapshot to history ─────────────────────────────────
+    if game_odds:
+        try:
+            all_totals_snap = get_mlb_totals()
+            ou_snap = all_totals_snap.get(odds_key, {})
+            log_odds(
+                game_pk          = game_pk,
+                game_date        = date.today().isoformat(),
+                away_team        = result["away_team"],
+                home_team        = result["home_team"],
+                away_ml          = game_odds.get("away_avg_odds"),
+                home_ml          = game_odds.get("home_avg_odds"),
+                away_implied_pct = game_odds.get("away_implied_pct"),
+                home_implied_pct = game_odds.get("home_implied_pct"),
+                over_under       = ou_snap.get("line"),
+            )
+        except Exception:
+            pass
+
     # ── Over/Under + Run line odds ────────────────────────────────────
     try:
         all_totals = get_mlb_totals()
@@ -1440,6 +1459,13 @@ def update_my_picks():
     updated = update_pick_results(user_id=_uid())
     stats   = get_pick_stats(user_id=_uid())
     return jsonify({"updated": updated, "my_pct": stats["my_pct"], "sim_pct": stats["sim_pct"]})
+
+
+@app.route("/odds-history")
+@login_required
+def odds_history_page():
+    rows = get_odds_history(limit=200)
+    return render_template("odds_history.html", rows=rows)
 
 
 @app.route("/accuracy")

@@ -91,6 +91,44 @@ def update_results():
     return updated
 
 
+def log_odds(game_pk, game_date, away_team, home_team,
+             away_ml, home_ml, away_implied_pct, home_implied_pct, over_under=None):
+    """Save a snapshot of Vegas odds for this game to odds_history."""
+    try:
+        # Only insert if we don't already have a row for this game today
+        existing = supa().table("odds_history").select("id") \
+            .eq("game_pk", str(game_pk)) \
+            .eq("game_date", str(game_date)).execute()
+        row = {
+            "game_pk":          str(game_pk),
+            "game_date":        str(game_date),
+            "away_team":        away_team,
+            "home_team":        home_team,
+            "away_ml":          int(away_ml) if away_ml else None,
+            "home_ml":          int(home_ml) if home_ml else None,
+            "away_implied_pct": round(float(away_implied_pct), 2) if away_implied_pct else None,
+            "home_implied_pct": round(float(home_implied_pct), 2) if home_implied_pct else None,
+            "over_under":       float(over_under) if over_under else None,
+        }
+        if existing.data:
+            supa().table("odds_history").update(row) \
+                .eq("game_pk", str(game_pk)) \
+                .eq("game_date", str(game_date)).execute()
+        else:
+            supa().table("odds_history").insert(row).execute()
+    except Exception:
+        pass
+
+
+def get_odds_history(limit=100):
+    """Returns recent odds history rows, newest first."""
+    res = supa().table("odds_history").select("*") \
+        .order("game_date", desc=True) \
+        .order("logged_at", desc=True) \
+        .limit(limit).execute()
+    return res.data or []
+
+
 def get_all_predictions():
     """Returns all predictions, newest first."""
     res = supa().table("predictions").select("*") \
