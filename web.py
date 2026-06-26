@@ -664,7 +664,7 @@ def build_game_result(game, n_sims, use_splits=True):
 @app.route("/login", methods=["GET", "POST"])
 def login_page():
     if current_user.is_authenticated:
-        return redirect(url_for("simulate_all"))
+        return redirect(url_for("index"))
     error = None
     if request.method == "POST":
         username = request.form.get("username", "").strip()
@@ -672,7 +672,7 @@ def login_page():
         user_data = check_password(username, password)
         if user_data:
             login_user(User(user_data), remember=True)
-            return redirect(request.args.get("next") or url_for("simulate_all"))
+            return redirect(request.args.get("next") or url_for("index"))
         error = "Invalid username or password."
     return render_template("login.html", error=error)
 
@@ -680,7 +680,7 @@ def login_page():
 @app.route("/register", methods=["GET", "POST"])
 def register_page():
     if current_user.is_authenticated:
-        return redirect(url_for("simulate_all"))
+        return redirect(url_for("index"))
     error = None
     if request.method == "POST":
         username = request.form.get("username", "").strip()
@@ -693,7 +693,7 @@ def register_page():
             if ok:
                 user_data = get_user_by_id(result)
                 login_user(User(user_data), remember=True)
-                return redirect(url_for("simulate_all"))
+                return redirect(url_for("index"))
             else:
                 error = result
     return render_template("register.html", error=error)
