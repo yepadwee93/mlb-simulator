@@ -1461,6 +1461,116 @@ def settle_bets_route():
     return jsonify({"settled": n})
 
 
+# ── Account Settings ─────────────────────────────────────────────────────────
+
+@app.route("/settings", methods=["GET", "POST"])
+@login_required
+def settings_page():
+    from data.email_alerts import update_user_email, get_user_email_settings
+    uid = _uid()
+    message = None
+    error   = None
+
+    if request.method == "POST":
+        email     = request.form.get("email", "").strip().lower()
+        alerts_on = request.form.get("email_alerts") == "on"
+        if email and "@" not in email:
+            error = "Please enter a valid email address."
+        else:
+            ok = update_user_email(uid, email, alerts_on)
+            message = "Settings saved." if ok else "Could not save — try again."
+
+    prefs = get_user_email_settings(uid)
+    return render_template("settings.html",
+                           username=current_user.username,
+                           email=prefs.get("email") or "",
+                           email_alerts=prefs.get("email_alerts", False),
+                           message=message, error=error)
+
+
+# ── Daily email alerts cron endpoint ────────────────────────────────────────
+# Triggered by Vercel Cron at 10:00 AM ET every day.
+# Protected by a shared secret so only the cron job can call it.
+
+@app.route("/send-daily-alerts", methods=["POST", "GET"])
+def send_daily_alerts_route():
+    from data.email_alerts import send_daily_alerts
+
+    # Simple secret check — set CRON_SECRET in Vercel env vars
+    secret = os.getenv("CRON_SECRET", "")
+    auth   = request.headers.get("Authorization", "") or request.args.get("secret", "")
+    if secret and auth != f"Bearer {secret}" and auth != secret:
+        return jsonify({"error": "unauthorized"}), 401
+
+    # Run fast simulations on today's games to find top plays
+    try:
+        games = get_today_schedule()
+    except Exception:
+        return jsonify({"error": "could not fetch schedule"}), 500
+
+    all_odds_data = {}
+    try:
+        all_odds_data = get_mlb_odds()
+    except Exception:
+        pass
+
+    top_plays = []
+    for game in games[:15]:   # cap at 15 games to keep cron fast
+        try:
+            lineup = get_game_lineup(game["gamePk"])
+            if not lineup:
+                continue
+
+            away_hand = get_pitcher_hand(lineup.get("away_pitcher_id"))
+            home_hand = get_pitcher_hand(lineup.get("home_pitcher_id"))
+
+            away_stats = [get_player_season_stats(b["id"]) for b in lineup.get("away_batters", []) if b.get("id")]
+            home_stats = [get_player_season_stats(b["id"]) for b in lineup.get("home_batters", []) if b.get("id")]
+
+            if not away_stats or not home_stats:
+                continue
+
+            away_pid = lineup.get("away_pitcher_id")
+            home_pid = lineup.get("home_pitcher_id")
+            away_p = get_player_season_stats(away_pid, group="pitching") if away_pid else {}
+            home_p = get_player_season_stats(home_pid, group="pitching") if home_pid else {}
+
+            result = run_simulation(
+                away_team=game["away_team"], home_team=game["home_team"],
+                away_lineup=away_stats, home_lineup=home_stats,
+                away_pitcher=away_p, home_pitcher=home_p,
+                n=100_000,
+            )
+
+            odds_key  = frozenset([game["away_team"], game["home_team"]])
+            game_odds = all_odds_data.get(odds_key, {})
+
+            for side in ("away", "home"):
+                team    = game[f"{side}_team"]
+                opp     = game["home_team" if side == "away" else "away_team"]
+                win_pct = result[f"{side}_win_pct"]
+                if win_pct >= 65.0:
+                    ml_raw  = game_odds.get(f"{side}_avg_odds")
+                    ml_odds = format_odds(ml_raw) if ml_raw else "—"
+                    ev      = calc_ev(win_pct, ml_raw) if ml_raw else None
+                    top_plays.append({
+                        "team":     team,
+                        "opponent": opp,
+                        "win_pct":  win_pct,
+                        "ml_odds":  ml_odds,
+                        "ev":       ev,
+                        "venue":    game.get("venue", ""),
+                    })
+        except Exception:
+            continue
+
+    top_plays.sort(key=lambda x: x["win_pct"], reverse=True)
+
+    site_url = os.getenv("SITE_URL", "https://mlb-simulator-vert.vercel.app")
+    result   = send_daily_alerts(top_plays, site_url=site_url)
+    return jsonify({"plays_found": len(top_plays), "email_result": result})
+
+
 if __name__ == "__main__":
     port  = int(os.environ.get("PORT", 5000))
     debug = os.environ.get("FLASK_ENV") != "production"

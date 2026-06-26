@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings — MLB Simulator</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0d1120; color: #e8eaf0; font-family: 'Segoe UI', Arial, sans-serif; padding-bottom: 60px; }
+    a { color: #64b5f6; text-decoration: none; }
+    .page { max-width: 540px; margin: 0 auto; padding: 0 16px; }
+    h1 { font-size: 1.4rem; font-weight: 800; margin-bottom: 6px; }
+    .subtitle { color: #b0b8cc; font-size: 0.88rem; margin-bottom: 28px; }
+    .card { background: #1a1e2e; border: 1px solid #252836; border-radius: 14px; padding: 24px 28px; margin-bottom: 20px; }
+    .card h2 { font-size: 0.9rem; font-weight: 700; color: #d8dce8; margin-bottom: 18px; }
+    label { display: block; font-size: 0.72rem; color: #b0b8cc; text-transform: uppercase; letter-spacing: .4px; margin-bottom: 6px; }
+    input[type="email"] {
+      width: 100%; background: #0d1120; border: 1px solid #333650;
+      border-radius: 8px; color: #e8eaf0; padding: 10px 14px; font-size: 0.9rem;
+      margin-bottom: 16px;
+    }
+    input[type="email"]:focus { outline: none; border-color: #64b5f6; }
+    .toggle-row { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
+    .toggle-label { font-size: 0.88rem; color: #e8eaf0; }
+    .toggle-sub { font-size: 0.72rem; color: #9aa0b8; margin-top: 2px; }
+    /* Toggle switch */
+    .switch { position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+              background: #333650; border-radius: 24px; transition: .2s; }
+    .slider:before { position: absolute; content: ""; height: 18px; width: 18px;
+                     left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: .2s; }
+    input:checked + .slider { background: #4caf50; }
+    input:checked + .slider:before { transform: translateX(20px); }
+    .save-btn {
+      width: 100%; padding: 11px; background: #1565c0; border: none;
+      color: #fff; border-radius: 8px; font-size: 0.9rem; font-weight: 700;
+      cursor: pointer; transition: background 0.15s;
+    }
+    .save-btn:hover { background: #1976d2; }
+    .msg-ok  { background: #1b4332; color: #4caf50; border: 1px solid #2e7d32;
+               padding: 10px 16px; border-radius: 8px; font-size: 0.85rem; margin-bottom: 16px; }
+    .msg-err { background: #3a1a1a; color: #ef5350; border: 1px solid #c62828;
+               padding: 10px 16px; border-radius: 8px; font-size: 0.85rem; margin-bottom: 16px; }
+    .hint { font-size: 0.72rem; color: #555870; margin-top: 12px; line-height: 1.5; }
+  </style>
+</head>
+<body>
+
+<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 24px;background:#1e2235;border-bottom:1px solid #353a52;margin-bottom:28px;">
+  <a href="/" style="color:#fff;text-decoration:none;font-size:1.1rem;font-weight:800;">⚾ MLB Simulator</a>
+  <div style="display:flex;gap:16px;font-size:0.85rem;align-items:center;flex-wrap:wrap;">
+    <a href="/" style="color:#64b5f6;text-decoration:none;font-weight:600;">🎯 Games</a>
+    <a href="/bets" style="color:#ffb74d;text-decoration:none;font-weight:600;">💰 My Bets</a>
+    <a href="/accuracy" style="color:#64b5f6;text-decoration:none;font-weight:600;">📊 Accuracy</a>
+    <a href="/bankroll" style="color:#81c784;text-decoration:none;font-weight:600;">📈 Bankroll</a>
+    <a href="/calculator" style="color:#b0b8cc;text-decoration:none;font-weight:600;">🧮 Calculator</a>
+    <a href="/parlay" style="color:#ffd54f;text-decoration:none;font-weight:600;">🎰 Parlay</a>
+    <a href="/my-picks" style="color:#ce93d8;text-decoration:none;font-weight:600;">🎯 My Picks</a>
+    {% if current_user.is_authenticated %}
+      <span style="color:#aaa;">👤 {{ username }}</span>
+      <a href="/logout" style="color:#ef9a9a;text-decoration:none;font-weight:600;">Sign Out</a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="page">
+  <h1>⚙️ Account Settings</h1>
+  <p class="subtitle">Manage your email alerts and account preferences.</p>
+
+  {% if message %}
+    <div class="msg-ok">✅ {{ message }}</div>
+  {% endif %}
+  {% if error %}
+    <div class="msg-err">❌ {{ error }}</div>
+  {% endif %}
+
+  <div class="card">
+    <h2>📧 Daily Email Alerts</h2>
+    <form method="POST">
+
+      <label for="email">Your email address</label>
+      <input type="email" id="email" name="email" placeholder="you@example.com"
+             value="{{ email }}" autocomplete="email">
+
+      <div class="toggle-row">
+        <label class="switch">
+          <input type="checkbox" name="email_alerts" id="email_alerts"
+                 {% if email_alerts %}checked{% endif %}>
+          <span class="slider"></span>
+        </label>
+        <div>
+          <div class="toggle-label">Send me daily top plays</div>
+          <div class="toggle-sub">Delivered each morning with today's best model edges</div>
+        </div>
+      </div>
+
+      <button type="submit" class="save-btn">Save Settings</button>
+    </form>
+
+    <div class="hint">
+      We use Gmail to send alerts. Your email is only used for MLB Simulator alerts
+      and is never shared. You can unsubscribe at any time by toggling this off.
+      <br><br>
+      Alerts are sent at <b>~10:00 AM ET</b> on days with MLB games, once lineups start
+      posting. Only games where our model gives a team ≥65% win probability are included.
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

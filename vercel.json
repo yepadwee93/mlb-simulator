@@ -10,5 +10,11 @@
       "src": "/(.*)",
       "dest": "web.py"
     }
+  ],
+  "crons": [
+    {
+      "path": "/send-daily-alerts",
+      "schedule": "0 14 * * *"
+    }
   ]
 }

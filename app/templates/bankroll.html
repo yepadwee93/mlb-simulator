@@ -48,6 +48,7 @@
       <a href="/my-picks" style="color:#ce93d8;text-decoration:none;font-weight:600;">🎯 My Picks</a>
     {% if current_user.is_authenticated %}
       <span style="color:#aaa;">👤 {{ current_user.username }}</span>
+      <a href="/settings" style="color:#9aa0b8;text-decoration:none;font-weight:600;">⚙️ Settings</a>
       <a href="/logout" style="color:#ef9a9a;text-decoration:none;font-weight:600;">Sign Out</a>
     {% else %}
       <a href="/login" style="color:#a5d6a7;text-decoration:none;font-weight:600;">Login</a>
