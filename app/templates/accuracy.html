@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Model Accuracy — MLB Simulator</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0f1117;
+      color: #e8eaf0;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      min-height: 100vh;
+      padding: 40px 20px;
+    }
+
+    .back-link {
+      display: inline-block;
+      margin-bottom: 28px;
+      color: #64b5f6;
+      text-decoration: none;
+      font-size: 0.9rem;
+    }
+    .back-link:hover { text-decoration: underline; }
+
+    h1 {
+      font-size: 1.6rem;
+      font-weight: 800;
+      margin-bottom: 6px;
+    }
+
+    .subtitle {
+      color: #8890a4;
+      font-size: 0.88rem;
+      margin-bottom: 32px;
+    }
+
+    .card {
+      background: #1a1d27;
+      border: 1px solid #2a2d3a;
+      border-radius: 14px;
+      padding: 24px 28px;
+      max-width: 860px;
+      margin: 0 auto 24px auto;
+    }
+
+    .section-title {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: #8890a4;
+      margin-bottom: 16px;
+      font-weight: 600;
+    }
+
+    /* ── Big stat tiles ── */
+    .stat-tiles {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 16px;
+      margin-bottom: 0;
+    }
+
+    .tile {
+      background: #0f1117;
+      border-radius: 10px;
+      padding: 16px;
+      text-align: center;
+    }
+
+    .tile-val {
+      font-size: 2.2rem;
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    .tile-lbl {
+      font-size: 0.73rem;
+      color: #8890a4;
+      margin-top: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    .tile-val.green { color: #4caf50; }
+    .tile-val.yellow { color: #ffd54f; }
+    .tile-val.red { color: #ef5350; }
+    .tile-val.blue { color: #64b5f6; }
+
+    /* ── Confidence table ── */
+    .conf-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+    }
+
+    .conf-table th {
+      text-align: left;
+      color: #555870;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 6px 0;
+      border-bottom: 1px solid #2a2d3a;
+    }
+
+    .conf-table td {
+      padding: 10px 0;
+      border-bottom: 1px solid #1a1d27;
+    }
+
+    .calibration-bar-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .calibration-bar {
+      height: 8px;
+      border-radius: 4px;
+      background: #2a2d3a;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .calibration-fill {
+      height: 100%;
+      border-radius: 4px;
+    }
+
+    /* ── Recent predictions table ── */
+    .pred-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.83rem;
+    }
+
+    .pred-table th {
+      text-align: left;
+      color: #555870;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 6px 0;
+      border-bottom: 1px solid #2a2d3a;
+    }
+
+    .pred-table td {
+      padding: 9px 0;
+      border-bottom: 1px solid #1a1d27;
+      vertical-align: middle;
+    }
+
+    .result-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 5px;
+      font-size: 0.72rem;
+      font-weight: 700;
+    }
+
+    .result-badge.correct  { background: #1b4332; color: #4caf50; }
+    .result-badge.wrong    { background: #3b1f1f; color: #ef5350; }
+    .result-badge.pending  { background: #2a2d3a; color: #8890a4; }
+
+    /* ── Update button ── */
+    .update-btn {
+      display: inline-block;
+      padding: 10px 22px;
+      background: #2563eb;
+      color: #fff;
+      font-weight: 700;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-size: 0.88rem;
+    }
+    .update-btn:hover { background: #1d4ed8; }
+    .update-btn:disabled { background: #2a2d3a; color: #555870; cursor: default; }
+
+    .no-data {
+      text-align: center;
+      padding: 40px 0;
+      color: #555870;
+      font-size: 0.92rem;
+    }
+  </style>
+</head>
+<body>
+
+<a class="back-link" href="/">← Back to games</a>
+<h1>Model Accuracy</h1>
+<p class="subtitle">How often does the simulator pick the right winner — and how close are the predicted scores?</p>
+
+{% if results_available == 0 %}
+<!-- No results yet -->
+<div class="card">
+  <div class="no-data">
+    <div style="font-size:2rem; margin-bottom:12px;">📊</div>
+    <div style="font-weight:700; margin-bottom:6px;">No results yet</div>
+    <div>Simulate some games, then come back after they finish and click <strong>Check Results</strong> to see how accurate the model was.</div>
+    <br>
+    <div style="color:#8890a4; font-size:0.82rem;">{{ total_predictions }} prediction{{ 's' if total_predictions != 1 }} logged so far (waiting for games to finish)</div>
+    <br>
+    <button class="update-btn" id="update-btn" onclick="checkResults()">🔄 Check Results Now</button>
+    <div id="update-msg" style="margin-top:10px; font-size:0.82rem; color:#8890a4;"></div>
+  </div>
+</div>
+
+{% else %}
+
+<!-- ── Big stats ── -->
+<div class="card">
+  <div class="section-title">Overall Performance — {{ results_available }} games with results</div>
+  <div class="stat-tiles">
+    <div class="tile">
+      <div class="tile-val {% if accuracy_pct >= 60 %}green{% elif accuracy_pct >= 50 %}yellow{% else %}red{% endif %}">
+        {{ accuracy_pct }}%
+      </div>
+      <div class="tile-lbl">Pick Accuracy</div>
+    </div>
+    <div class="tile">
+      <div class="tile-val blue">{{ correct_picks }}/{{ results_available }}</div>
+      <div class="tile-lbl">Correct Picks</div>
+    </div>
+    <div class="tile">
+      <div class="tile-val {% if avg_run_diff_error <= 2 %}green{% elif avg_run_diff_error <= 4 %}yellow{% else %}red{% endif %}">
+        {% if avg_run_diff_error %}±{{ avg_run_diff_error }}{% else %}—{% endif %}
+      </div>
+      <div class="tile-lbl">Avg Run Error</div>
+    </div>
+    <div class="tile">
+      <div class="tile-val" style="color:#e8eaf0;">{{ total_predictions }}</div>
+      <div class="tile-lbl">Total Predicted</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Confidence calibration ── -->
+{% if by_confidence %}
+<div class="card">
+  <div class="section-title">Accuracy by Confidence Level</div>
+  <p style="font-size:0.8rem; color:#8890a4; margin-bottom:16px;">
+    A well-calibrated model should hit ~70% when it says 70%, ~80% when it says 80%, etc.
+    If a bar is short, that confidence range is overconfident.
+  </p>
+  <table class="conf-table">
+    <thead>
+      <tr>
+        <th>Confidence</th>
+        <th>Games</th>
+        <th>Correct</th>
+        <th style="width:45%;">Accuracy</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for bucket in by_confidence %}
+      <tr>
+        <td style="font-weight:600;">{{ bucket.label }}</td>
+        <td style="color:#8890a4;">{{ bucket.total }}</td>
+        <td style="color:#e8eaf0;">{{ bucket.correct }}</td>
+        <td>
+          <div class="calibration-bar-wrap">
+            <div class="calibration-bar">
+              <div class="calibration-fill" style="
+                width: {{ bucket.pct }}%;
+                background: {% if bucket.pct >= 65 %}#4caf50{% elif bucket.pct >= 50 %}#ffd54f{% else %}#ef5350{% endif %};
+              "></div>
+            </div>
+            <span style="font-weight:700; font-size:0.85rem; min-width:38px; text-align:right;
+              color: {% if bucket.pct >= 65 %}#4caf50{% elif bucket.pct >= 50 %}#ffd54f{% else %}#ef5350{% endif %};">
+              {{ bucket.pct }}%
+            </span>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<!-- ── Recent predictions ── -->
+{% if recent %}
+<div class="card">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+    <div class="section-title" style="margin-bottom:0;">Recent Predictions</div>
+    <div>
+      <button class="update-btn" id="update-btn" onclick="checkResults()">🔄 Check Results</button>
+      <span id="update-msg" style="font-size:0.78rem; color:#8890a4; margin-left:10px;"></span>
+    </div>
+  </div>
+
+  <table class="pred-table">
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Matchup</th>
+        <th>Our Pick</th>
+        <th>Confidence</th>
+        <th>Pred Score</th>
+        <th>Actual Score</th>
+        <th>Result</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in recent %}
+      <tr>
+        <td style="color:#8890a4; white-space:nowrap;">{{ r.game_date }}</td>
+        <td style="font-size:0.8rem;">{{ r.away_team }} @ {{ r.home_team }}</td>
+        <td style="font-weight:600;">{{ r.predicted_winner }}</td>
+        <td style="color:#8890a4;">
+          {% set conf = [r.away_win_pct | float, r.home_win_pct | float] | max %}
+          {{ conf }}%
+        </td>
+        <td style="color:#8890a4; font-size:0.8rem;">
+          {{ r.away_avg_runs }}–{{ r.home_avg_runs }}
+        </td>
+        <td style="font-size:0.8rem;">
+          {% if r.actual_away_runs != '' %}
+            <strong>{{ r.actual_away_runs }}–{{ r.actual_home_runs }}</strong>
+          {% else %}
+            <span style="color:#555870;">Pending</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if r.correct_pick == '1' %}
+            <span class="result-badge correct">✓ Correct</span>
+          {% elif r.correct_pick == '0' %}
+            <span class="result-badge wrong">✗ Wrong</span>
+          {% else %}
+            <span class="result-badge pending">Pending</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% endif %}
+
+<script>
+function checkResults() {
+  var btn = document.getElementById('update-btn');
+  var msg = document.getElementById('update-msg');
+  btn.disabled = true;
+  btn.textContent = 'Checking...';
+  msg.textContent = '';
+
+  fetch('/update-results', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.updated > 0) {
+        msg.textContent = data.updated + ' result' + (data.updated !== 1 ? 's' : '') + ' updated!';
+        msg.style.color = '#4caf50';
+        // Reload to show updated stats
+        setTimeout(function() { window.location.reload(); }, 1200);
+      } else {
+        msg.textContent = 'No new results yet — check back after games finish.';
+        msg.style.color = '#8890a4';
+        btn.disabled = false;
+        btn.textContent = '🔄 Check Results';
+      }
+    })
+    .catch(function() {
+      msg.textContent = 'Error checking results.';
+      btn.disabled = false;
+      btn.textContent = '🔄 Check Results';
+    });
+}
+</script>
+
+</body>
+</html>

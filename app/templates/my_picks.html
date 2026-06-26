@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Picks — MLB Simulator</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0f1117;
+      color: #e8eaf0;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      min-height: 100vh;
+      padding: 40px 20px;
+    }
+    .back-link { display:inline-block; margin-bottom:28px; color:#64b5f6; text-decoration:none; font-size:0.9rem; }
+    .back-link:hover { text-decoration:underline; }
+    h1 { font-size:1.6rem; font-weight:800; margin-bottom:6px; }
+    .subtitle { color:#8890a4; font-size:0.88rem; margin-bottom:32px; }
+
+    .card {
+      background: #1a1d27;
+      border: 1px solid #2a2d3a;
+      border-radius: 14px;
+      padding: 24px 28px;
+      max-width: 900px;
+      margin: 0 auto 24px auto;
+    }
+
+    .section-title {
+      font-size:0.72rem; text-transform:uppercase; letter-spacing:0.8px;
+      color:#8890a4; margin-bottom:16px; font-weight:600;
+    }
+
+    /* ── Stats tiles ── */
+    .stat-tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:14px; }
+    .tile { background:#0f1117; border-radius:10px; padding:16px; text-align:center; }
+    .tile-val { font-size:2rem; font-weight:800; line-height:1; }
+    .tile-lbl { font-size:0.72rem; color:#8890a4; margin-top:6px; text-transform:uppercase; letter-spacing:0.4px; }
+    .green { color:#4caf50; } .yellow { color:#ffd54f; } .red { color:#ef5350; }
+    .blue { color:#64b5f6; } .purple { color:#ce93d8; }
+
+    /* ── Add pick form ── */
+    .pick-form { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+    .pick-form select, .pick-form input[type=text] {
+      width:100%; padding:10px 12px; background:#0f1117; border:1px solid #2a2d3a;
+      border-radius:8px; color:#e8eaf0; font-size:0.88rem;
+    }
+    .pick-form select:focus, .pick-form input:focus { outline:none; border-color:#64b5f6; }
+    .pick-form label { font-size:0.78rem; color:#8890a4; margin-bottom:5px; display:block; }
+    .full-width { grid-column: 1 / -1; }
+
+    .submit-btn {
+      padding:11px 24px; background:#7c3aed; color:#fff; font-weight:700;
+      border-radius:8px; border:none; cursor:pointer; font-size:0.9rem; width:100%;
+    }
+    .submit-btn:hover { background:#6d28d9; }
+
+    /* ── Picks table ── */
+    .picks-table { width:100%; border-collapse:collapse; font-size:0.83rem; }
+    .picks-table th {
+      text-align:left; color:#555870; font-size:0.7rem; text-transform:uppercase;
+      letter-spacing:0.5px; padding:6px 0; border-bottom:1px solid #2a2d3a;
+    }
+    .picks-table td { padding:10px 0; border-bottom:1px solid #1a1d27; vertical-align:middle; }
+
+    .badge {
+      display:inline-block; padding:2px 8px; border-radius:5px;
+      font-size:0.72rem; font-weight:700;
+    }
+    .badge.correct  { background:#1b4332; color:#4caf50; }
+    .badge.wrong    { background:#3b1f1f; color:#ef5350; }
+    .badge.pending  { background:#2a2d3a; color:#8890a4; }
+    .badge.sim-win  { background:#1a237e; color:#90caf9; }
+    .badge.sim-diff { background:#3b1f1f; color:#ef9a9a; }
+
+    .update-btn {
+      padding:9px 18px; background:#2563eb; color:#fff; font-weight:700;
+      border-radius:8px; border:none; cursor:pointer; font-size:0.85rem;
+    }
+    .update-btn:disabled { background:#2a2d3a; color:#555870; cursor:default; }
+    .update-btn:hover:not(:disabled) { background:#1d4ed8; }
+
+    .no-picks { text-align:center; padding:40px 0; color:#555870; }
+  </style>
+</head>
+<body>
+
+<a class="back-link" href="/">← Back to games</a>
+<h1>🎯 My Picks</h1>
+<p class="subtitle">Log your game picks, see what the simulator thinks, and track your hit rate over time.</p>
+
+<!-- ── Stats ── -->
+{% if completed > 0 %}
+<div class="card">
+  <div class="section-title">Your Record — {{ completed }} graded pick{{ 's' if completed != 1 }}</div>
+  <div class="stat-tiles">
+    <div class="tile">
+      <div class="tile-val {% if my_pct >= 60 %}green{% elif my_pct >= 50 %}yellow{% else %}red{% endif %}">{{ my_pct }}%</div>
+      <div class="tile-lbl">My Accuracy</div>
+    </div>
+    <div class="tile">
+      <div class="tile-val blue">{{ my_correct }}/{{ completed }}</div>
+      <div class="tile-lbl">Correct Picks</div>
+    </div>
+    {% if sim_pct %}
+    <div class="tile">
+      <div class="tile-val purple">{{ sim_pct }}%</div>
+      <div class="tile-lbl">Sim Accuracy</div>
+    </div>
+    {% endif %}
+    {% if avg_run_error %}
+    <div class="tile">
+      <div class="tile-val {% if avg_run_error <= 2 %}green{% elif avg_run_error <= 4 %}yellow{% else %}red{% endif %}">
+        ±{{ avg_run_error }}
+      </div>
+      <div class="tile-lbl">Avg Run Error</div>
+    </div>
+    {% endif %}
+    <div class="tile">
+      <div class="tile-val" style="color:#e8eaf0;">{{ total }}</div>
+      <div class="tile-lbl">Total Logged</div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- ── Add a pick ── -->
+<div class="card">
+  <div class="section-title">Log a New Pick</div>
+  <form id="pick-form">
+    <div class="pick-form">
+      <div>
+        <label>Game</label>
+        <select id="game-select" onchange="onGameSelect()">
+          <option value="">— Pick a game —</option>
+          {% for g in games %}
+          <option value="{{ g.gamePk }}"
+            data-away="{{ g.away_team }}"
+            data-home="{{ g.home_team }}"
+            data-date="{{ g.game_date[:10] if g.game_date else '' }}">
+            {{ g.away_team }} @ {{ g.home_team }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label>My Pick</label>
+        <select id="my-pick-select" disabled>
+          <option value="">— Select game first —</option>
+        </select>
+      </div>
+      <div class="full-width">
+        <label>Notes (optional — e.g. "bullpen edge", "starter is struggling")</label>
+        <input type="text" id="my-notes" placeholder="Why are you picking this team?">
+      </div>
+      <div class="full-width" id="sim-preview" style="display:none; padding:12px; background:#0f1117; border-radius:8px;">
+        <div style="font-size:0.75rem; color:#8890a4; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">Simulator says</div>
+        <div id="sim-preview-text" style="font-size:0.9rem;"></div>
+        <div style="font-size:0.72rem; color:#555870; margin-top:4px;">Run a simulation first on the game page to load sim data here.</div>
+      </div>
+      <div class="full-width">
+        <button type="button" class="submit-btn" onclick="submitPick()">🎯 Log My Pick</button>
+      </div>
+    </div>
+  </form>
+  <div id="form-msg" style="margin-top:10px; font-size:0.83rem; text-align:center;"></div>
+</div>
+
+<!-- ── All picks ── -->
+<div class="card">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+    <div class="section-title" style="margin-bottom:0;">All Picks</div>
+    <div>
+      <button class="update-btn" id="update-btn" onclick="checkResults()">🔄 Check Results</button>
+      <span id="update-msg" style="font-size:0.78rem; color:#8890a4; margin-left:8px;"></span>
+    </div>
+  </div>
+
+  {% if all_picks %}
+  <table class="picks-table">
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Matchup</th>
+        <th>My Pick</th>
+        <th>Sim Pick</th>
+        <th>Sim Odds</th>
+        <th>Pred Score</th>
+        <th>Actual Score</th>
+        <th>My Result</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in all_picks %}
+      <tr>
+        <td style="color:#8890a4; white-space:nowrap; font-size:0.78rem;">{{ r.game_date }}</td>
+        <td style="font-size:0.8rem;">{{ r.away_team }} @ {{ r.home_team }}</td>
+        <td style="font-weight:600; color:#ce93d8;">{{ r.my_pick }}</td>
+        <td>
+          {% if r.sim_pick %}
+            <span class="badge {% if r.sim_pick == r.my_pick %}sim-win{% else %}sim-diff{% endif %}">
+              {{ r.sim_pick }}
+            </span>
+          {% else %}
+            <span style="color:#555870;">—</span>
+          {% endif %}
+        </td>
+        <td style="font-size:0.78rem; color:#8890a4;">
+          {% if r.sim_away_pct and r.sim_home_pct %}
+            {{ r.away_team[:3] | upper }} {{ r.sim_away_pct }}% / {{ r.home_team[:3] | upper }} {{ r.sim_home_pct }}%
+          {% else %}—{% endif %}
+        </td>
+        <td style="font-size:0.78rem; color:#8890a4;">
+          {% if r.sim_away_runs and r.sim_home_runs %}
+            {{ r.sim_away_runs }}–{{ r.sim_home_runs }}
+          {% else %}—{% endif %}
+        </td>
+        <td style="font-size:0.85rem;">
+          {% if r.actual_away_runs != '' %}
+            <strong>{{ r.actual_away_runs }}–{{ r.actual_home_runs }}</strong>
+            {% if r.run_diff_error != '' %}
+              <span style="color:#555870; font-size:0.72rem; margin-left:4px;">(±{{ r.run_diff_error }} runs off)</span>
+            {% endif %}
+          {% else %}
+            <span style="color:#555870;">Pending</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if r.my_pick_correct == '1' %}
+            <span class="badge correct">✓ Won</span>
+          {% elif r.my_pick_correct == '0' %}
+            <span class="badge wrong">✗ Lost</span>
+          {% else %}
+            <span class="badge pending">Pending</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% if r.my_notes %}
+      <tr>
+        <td colspan="8" style="color:#555870; font-size:0.75rem; padding-top:0; padding-bottom:8px; border-bottom:1px solid #1a1d27;">
+          📝 {{ r.my_notes }}
+        </td>
+      </tr>
+      {% endif %}
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="no-picks">
+    <div style="font-size:2rem; margin-bottom:10px;">🎯</div>
+    No picks logged yet. Add your first one above!
+  </div>
+  {% endif %}
+</div>
+
+<script>
+// ── Game select → populate team options ──────────────────────────
+var simData = JSON.parse(localStorage.getItem('simData') || '{}');
+
+function onGameSelect() {
+  var sel  = document.getElementById('game-select');
+  var opt  = sel.options[sel.selectedIndex];
+  var pk   = opt.value;
+  var away = opt.getAttribute('data-away') || '';
+  var home = opt.getAttribute('data-home') || '';
+  var pick = document.getElementById('my-pick-select');
+
+  if (!pk) {
+    pick.innerHTML = '<option value="">— Select game first —</option>';
+    pick.disabled = true;
+    document.getElementById('sim-preview').style.display = 'none';
+    return;
+  }
+
+  pick.innerHTML =
+    '<option value="">— Pick a team —</option>' +
+    '<option value="' + away + '">' + away + ' (Away)</option>' +
+    '<option value="' + home + '">' + home + ' (Home)</option>';
+  pick.disabled = false;
+
+  // Show sim preview if we have cached sim data for this game
+  var cached = simData[pk];
+  var preview = document.getElementById('sim-preview');
+  var previewText = document.getElementById('sim-preview-text');
+  if (cached) {
+    var simWinner = parseFloat(cached.away_pct) >= parseFloat(cached.home_pct) ? away : home;
+    previewText.innerHTML =
+      '<strong style="color:#64b5f6;">' + simWinner + '</strong> to win — ' +
+      away + ' ' + cached.away_pct + '% / ' + home + ' ' + cached.home_pct + '%' +
+      '<br><span style="color:#8890a4;">Predicted: ' + cached.away_runs + '–' + cached.home_runs + '</span>';
+    preview.style.display = 'block';
+  } else {
+    preview.style.display = 'none';
+  }
+}
+
+// ── Submit pick ──────────────────────────────────────────────────
+function submitPick() {
+  var sel     = document.getElementById('game-select');
+  var opt     = sel.options[sel.selectedIndex];
+  var pk      = opt.value;
+  var away    = opt.getAttribute('data-away') || '';
+  var home    = opt.getAttribute('data-home') || '';
+  var gameDate = opt.getAttribute('data-date') || new Date().toISOString().slice(0,10);
+  var myPick  = document.getElementById('my-pick-select').value;
+  var notes   = document.getElementById('my-notes').value;
+  var msg     = document.getElementById('form-msg');
+
+  if (!pk || !myPick) {
+    msg.textContent = 'Please select a game and a team.';
+    msg.style.color = '#ef5350';
+    return;
+  }
+
+  var cached = simData[pk] || {};
+
+  fetch('/my-picks', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      game_pk:       pk,
+      game_date:     gameDate,
+      away_team:     away,
+      home_team:     home,
+      my_pick:       myPick,
+      my_notes:      notes,
+      sim_away_pct:  cached.away_pct  || null,
+      sim_home_pct:  cached.home_pct  || null,
+      sim_away_runs: cached.away_runs || null,
+      sim_home_runs: cached.home_runs || null,
+    })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function() {
+    msg.textContent = '✓ Pick logged!';
+    msg.style.color = '#4caf50';
+    setTimeout(function() { window.location.reload(); }, 800);
+  })
+  .catch(function() {
+    msg.textContent = 'Error saving pick.';
+    msg.style.color = '#ef5350';
+  });
+}
+
+// ── Check results ────────────────────────────────────────────────
+function checkResults() {
+  var btn = document.getElementById('update-btn');
+  var msg = document.getElementById('update-msg');
+  btn.disabled = true;
+  btn.textContent = 'Checking...';
+
+  fetch('/my-picks/update', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.updated > 0) {
+        msg.textContent = data.updated + ' result' + (data.updated !== 1 ? 's' : '') + ' updated!';
+        msg.style.color = '#4caf50';
+        setTimeout(function() { window.location.reload(); }, 1200);
+      } else {
+        msg.textContent = 'No new results yet.';
+        msg.style.color = '#8890a4';
+        btn.disabled = false;
+        btn.textContent = '🔄 Check Results';
+      }
+    });
+}
+</script>
+
+</body>
+</html>

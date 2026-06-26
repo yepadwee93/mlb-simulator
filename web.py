@@ -17,6 +17,8 @@ load_dotenv()   # loads ODDS_API_KEY from .env file
 from flask import Flask, render_template, abort, request
 
 from data.odds_api import get_mlb_odds, get_mlb_events, get_player_props, format_odds, calc_edge, get_requests_remaining
+from data.tracker import log_prediction, update_results, get_accuracy_stats, get_all_predictions
+from data.my_picks import add_pick, update_pick_results, get_all_picks, get_pick_stats
 from data.mlb_api import (
     get_today_schedule,
     get_game_lineup,
@@ -338,7 +340,24 @@ def simulate(game_pk):
     if result is None:
         return render_template("index.html", games=games,
                                date=date.today().strftime("%A, %B %d %Y"),
-                               error="Lineup not available yet. Try a game already in progress.")
+                               error="Lineup not available yet. Try a game already in progress.",
+                               api_remaining=get_requests_remaining())
+
+    # Log this prediction for accuracy tracking
+    try:
+        log_prediction(
+            game_pk       = game_pk,
+            game_date     = date.today().isoformat(),
+            away_team     = result["away_team"],
+            home_team     = result["home_team"],
+            away_win_pct  = result["away_win_pct"],
+            home_win_pct  = result["home_win_pct"],
+            away_avg_runs = result["away_avg_runs"],
+            home_avg_runs = result["home_avg_runs"],
+            n_sims        = n_sims,
+        )
+    except Exception:
+        pass  # never let logging break the simulation
 
     # Fetch moneyline odds (cached for 30 min — only 1 API call per 30 min window)
     all_odds  = get_mlb_odds()
@@ -568,6 +587,66 @@ def simulate_all():
         date          = today,
         n_sims        = N_SIMS_ALL,
     )
+
+
+@app.route("/my-picks", methods=["GET", "POST"])
+def my_picks():
+    """Personal picks log — enter your pick, see simulator's take, track results."""
+    from flask import request as freq, jsonify
+
+    if freq.method == "POST":
+        # Submitted a new pick via the form
+        data = freq.get_json() or {}
+        add_pick(
+            game_pk       = data.get("game_pk"),
+            game_date     = data.get("game_date"),
+            away_team     = data.get("away_team"),
+            home_team     = data.get("home_team"),
+            my_pick       = data.get("my_pick"),
+            my_notes      = data.get("my_notes", ""),
+            sim_away_pct  = data.get("sim_away_pct"),
+            sim_home_pct  = data.get("sim_home_pct"),
+            sim_away_runs = data.get("sim_away_runs"),
+            sim_home_runs = data.get("sim_home_runs"),
+        )
+        return jsonify({"ok": True})
+
+    # GET — show the page
+    stats  = get_pick_stats()
+    games  = get_today_schedule()
+    return render_template("my_picks.html", games=games, **stats)
+
+
+@app.route("/my-picks/update", methods=["POST"])
+def update_my_picks():
+    from flask import jsonify
+    updated = update_pick_results()
+    stats   = get_pick_stats()
+    return jsonify({"updated": updated, "my_pct": stats["my_pct"], "sim_pct": stats["sim_pct"]})
+
+
+@app.route("/accuracy")
+def accuracy():
+    """Model accuracy dashboard — how often are we right?"""
+    stats = get_accuracy_stats()
+    return render_template("accuracy.html", **stats)
+
+
+@app.route("/update-results", methods=["POST"])
+def trigger_update():
+    """
+    Check the MLB API for final scores on any logged predictions
+    that don't have results yet. Called from the accuracy page.
+    """
+    from flask import jsonify
+    updated = update_results()
+    stats   = get_accuracy_stats()
+    return jsonify({
+        "updated": updated,
+        "accuracy_pct": stats["accuracy_pct"],
+        "correct_picks": stats["correct_picks"],
+        "results_available": stats["results_available"],
+    })
 
 
 if __name__ == "__main__":

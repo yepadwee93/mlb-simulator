@@ -678,6 +678,23 @@ document.querySelectorAll('[data-prop-player]').forEach(function(wrapper) {
     window._propNameMap.push({ name: name, el: content, wrapper: wrapper });
   }
 });
+
+// ── Save sim result to localStorage so My Picks page can read it ──
+(function() {
+  try {
+    var simData = JSON.parse(localStorage.getItem('simData') || '{}');
+    simData['{{ game_pk }}'] = {
+      away_pct:  '{{ away_win_pct }}',
+      home_pct:  '{{ home_win_pct }}',
+      away_runs: '{{ away_avg_runs }}',
+      home_runs: '{{ home_avg_runs }}',
+    };
+    // Keep only the last 30 games to avoid filling up storage
+    var keys = Object.keys(simData);
+    if (keys.length > 30) delete simData[keys[0]];
+    localStorage.setItem('simData', JSON.stringify(simData));
+  } catch(e) {}
+})();
 </script>
 
 <div style="text-align:center; margin-top: 8px; margin-bottom: 40px;">
