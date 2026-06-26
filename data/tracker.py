@@ -163,6 +163,7 @@ def get_accuracy_stats():
             "avg_run_diff_error": None,
             "by_confidence":      [],
             "recent":             [],
+            "all_single":         all_rows,
         }
 
     correct      = sum(int(r["correct_pick"]) for r in completed)
