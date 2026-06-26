@@ -15,24 +15,98 @@
       padding: 40px 20px;
     }
 
-    header {
-      text-align: center;
-      margin-bottom: 40px;
-    }
+    /* ── Header ── */
+    header { text-align: center; margin-bottom: 32px; }
 
     header h1 {
       font-size: 2.4rem;
       font-weight: 800;
       color: #ffffff;
-      letter-spacing: -0.5px;
     }
 
-    header p {
+    /* ── Date navigator ── */
+    .date-nav {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      margin: 18px auto 20px auto;
+      max-width: 480px;
+    }
+
+    .date-arrow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px; height: 36px;
+      background: #1a1d27;
+      border: 1px solid #2a2d3a;
+      border-radius: 8px;
       color: #8890a4;
-      margin-top: 8px;
-      font-size: 1rem;
+      text-decoration: none;
+      font-size: 1.1rem;
+      transition: border-color 0.2s, color 0.2s;
+    }
+    .date-arrow:hover { border-color: #4a6fa5; color: #fff; }
+
+    .date-picker-wrap {
+      flex: 1;
+      position: relative;
     }
 
+    .date-picker-wrap input[type="date"] {
+      width: 100%;
+      padding: 8px 12px;
+      background: #1a1d27;
+      border: 1px solid #2a2d3a;
+      border-radius: 8px;
+      color: #e8eaf0;
+      font-size: 0.95rem;
+      font-family: inherit;
+      cursor: pointer;
+      text-align: center;
+    }
+
+    .date-picker-wrap input[type="date"]::-webkit-calendar-picker-indicator {
+      filter: invert(0.6);
+      cursor: pointer;
+    }
+
+    .today-badge {
+      font-size: 0.7rem;
+      background: #2563eb;
+      color: #fff;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+    }
+
+    /* ── Simulate all button ── */
+    .simulate-all-btn {
+      display: inline-block;
+      margin: 4px auto 24px auto;
+      padding: 13px 30px;
+      background: linear-gradient(135deg, #7c3aed, #2563eb);
+      color: #fff;
+      font-weight: 700;
+      font-size: 1rem;
+      border-radius: 10px;
+      text-decoration: none;
+      letter-spacing: 0.3px;
+      transition: opacity 0.2s;
+    }
+    .simulate-all-btn:hover { opacity: 0.88; }
+    .simulate-all-btn.disabled {
+      background: #2a2d3a;
+      color: #555870;
+      pointer-events: none;
+    }
+
+    /* ── Error message ── */
+    .error-msg { color: #f87171; font-size: 0.88rem; margin-bottom: 16px; text-align: center; }
+
+    /* ── Games grid ── */
     .games-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
@@ -45,17 +119,15 @@
       background: #1a1d27;
       border: 1px solid #2a2d3a;
       border-radius: 12px;
-      padding: 20px 24px;
+      padding: 20px 22px;
       display: flex;
       flex-direction: column;
-      gap: 14px;
+      gap: 12px;
       transition: border-color 0.2s;
     }
+    .game-card:hover { border-color: #4a6fa5; }
 
-    .game-card:hover {
-      border-color: #4a6fa5;
-    }
-
+    /* Teams row */
     .teams {
       display: flex;
       align-items: center;
@@ -63,23 +135,30 @@
       gap: 10px;
     }
 
+    .team-block { flex: 1; }
+    .team-block.away { text-align: left; }
+    .team-block.home { text-align: right; }
+
     .team-name {
       font-size: 1rem;
-      font-weight: 600;
+      font-weight: 700;
       color: #ffffff;
-      flex: 1;
     }
 
-    .team-name.away { text-align: left; }
-    .team-name.home { text-align: right; }
-
-    .vs {
+    .probable-pitcher {
+      font-size: 0.75rem;
       color: #8890a4;
-      font-size: 0.85rem;
-      font-weight: 600;
-      padding: 0 8px;
+      margin-top: 3px;
     }
 
+    .probable-pitcher span {
+      color: #a5b4fc;
+      font-weight: 600;
+    }
+
+    .vs { color: #8890a4; font-size: 0.85rem; font-weight: 600; padding: 0 6px; }
+
+    /* Meta row */
     .meta {
       display: flex;
       justify-content: space-between;
@@ -87,71 +166,81 @@
     }
 
     .status {
-      font-size: 0.78rem;
-      font-weight: 600;
+      font-size: 0.73rem;
+      font-weight: 700;
       padding: 3px 10px;
       border-radius: 20px;
       text-transform: uppercase;
       letter-spacing: 0.5px;
     }
+    .status.final   { background: #1e3a2f; color: #4caf50; }
+    .status.live    { background: #3a1e1e; color: #f44336; }
+    .status.pregame { background: #1e2a3a; color: #64b5f6; }
+    .status.delayed { background: #3a2e1e; color: #ffa726; }
+    .status.other   { background: #2a2d3a; color: #8890a4; }
 
-    .status.final       { background: #1e3a2f; color: #4caf50; }
-    .status.live        { background: #3a1e1e; color: #f44336; }
-    .status.pregame     { background: #1e2a3a; color: #64b5f6; }
-    .status.delayed     { background: #3a2e1e; color: #ffa726; }
-    .status.other       { background: #2a2d3a; color: #8890a4; }
-
-    .venue {
-      font-size: 0.78rem;
+    .game-time {
+      font-size: 0.75rem;
       color: #8890a4;
     }
 
-    .simulate-btn {
-      display: block;
-      width: 100%;
-      padding: 11px;
-      background: #2563eb;
-      color: #ffffff;
-      font-size: 0.92rem;
-      font-weight: 700;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
+    .venue {
+      font-size: 0.73rem;
+      color: #555870;
+    }
+
+    /* Sim picker */
+    .sim-picker {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .sim-label {
+      font-size: 0.75rem;
+      color: #8890a4;
+      flex-shrink: 0;
+    }
+
+    .sim-opt {
+      flex: 1;
       text-align: center;
+      padding: 9px 4px;
+      background: #2563eb;
+      color: #fff;
+      font-size: 0.82rem;
+      font-weight: 700;
+      border-radius: 7px;
       text-decoration: none;
-      letter-spacing: 0.3px;
       transition: background 0.2s;
     }
+    .sim-opt:hover { background: #1d4ed8; }
 
-    .simulate-btn:hover { background: #1d4ed8; }
-
-    .simulate-btn.disabled {
-      background: #2a2d3a;
+    .btn-disabled {
+      display: block;
+      width: 100%;
+      padding: 10px;
+      background: #1e2535;
       color: #555870;
+      font-size: 0.82rem;
+      border-radius: 7px;
+      text-align: center;
       cursor: not-allowed;
-      pointer-events: none;
     }
 
-    .simulate-all-btn {
-      display: inline-block;
-      margin-top: 16px;
-      padding: 13px 30px;
-      background: linear-gradient(135deg, #7c3aed, #2563eb);
-      color: #fff;
-      font-weight: 700;
+    /* No games */
+    .no-games {
+      text-align: center;
+      color: #8890a4;
+      padding: 60px 0;
       font-size: 1rem;
-      border-radius: 10px;
-      text-decoration: none;
-      letter-spacing: 0.3px;
-      transition: opacity 0.2s;
     }
-    .simulate-all-btn:hover { opacity: 0.88; }
 
     footer {
       text-align: center;
       margin-top: 50px;
       color: #555870;
-      font-size: 0.8rem;
+      font-size: 0.78rem;
     }
   </style>
 </head>
@@ -159,19 +248,43 @@
 
 <header>
   <h1>⚾ MLB Simulator</h1>
-  <p>{{ date }} — Pick a game to simulate</p>
-  <a class="simulate-all-btn" href="/simulate-all">
-    ⚡ Simulate All Games + Best Parlay
-  </a>
+
+  <!-- Date navigator -->
+  <div class="date-nav">
+    <a class="date-arrow" href="/?date={{ prev_date }}" title="Previous day">‹</a>
+
+    <div class="date-picker-wrap">
+      <input type="date" value="{{ selected_date }}"
+             onchange="window.location='/?date='+this.value">
+    </div>
+
+    <a class="date-arrow" href="/?date={{ next_date }}" title="Next day">›</a>
+
+    {% if is_today %}
+      <span class="today-badge">TODAY</span>
+    {% endif %}
+  </div>
+
+  <!-- Simulate all (only makes sense on today or past dates with real lineups) -->
+  {% if is_today %}
+    <a class="simulate-all-btn" href="/simulate-all">
+      ⚡ Simulate All Games + Best Parlay
+    </a>
+  {% else %}
+    <span class="simulate-all-btn disabled">⚡ Simulate All (today only)</span>
+  {% endif %}
+
   {% if error %}
-  <p style="color:#f87171; margin-top:12px;">⚠ {{ error }}</p>
+    <p class="error-msg">⚠ {{ error }}</p>
   {% endif %}
 </header>
 
+<!-- Games grid -->
+{% if games %}
 <div class="games-grid">
   {% for game in games %}
     {% set s = game.status | lower %}
-    {% if 'final' in s %}
+    {% if 'final' in s or 'game over' in s %}
       {% set badge = 'final' %}
     {% elif 'progress' in s or 'live' in s %}
       {% set badge = 'live' %}
@@ -183,32 +296,65 @@
       {% set badge = 'other' %}
     {% endif %}
 
+    <!-- Parse game time from UTC to readable local hint -->
+    {% set raw_time = game.game_time %}
+
     <div class="game-card">
+
+      <!-- Teams + probable pitchers -->
       <div class="teams">
-        <span class="team-name away">{{ game.away_team }}</span>
+        <div class="team-block away">
+          <div class="team-name">{{ game.away_team }}</div>
+          <div class="probable-pitcher">
+            SP: <span>{{ game.away_probable }}</span>
+          </div>
+        </div>
+
         <span class="vs">@</span>
-        <span class="team-name home">{{ game.home_team }}</span>
+
+        <div class="team-block home">
+          <div class="team-name">{{ game.home_team }}</div>
+          <div class="probable-pitcher" style="text-align:right;">
+            SP: <span>{{ game.home_probable }}</span>
+          </div>
+        </div>
       </div>
 
+      <!-- Status + venue -->
       <div class="meta">
         <span class="status {{ badge }}">{{ game.status }}</span>
         <span class="venue">{{ game.venue }}</span>
       </div>
 
-      <!-- Only allow simulation if lineup is likely available -->
-      {% if badge in ['final', 'live'] %}
-        <a class="simulate-btn" href="/simulate/{{ game.gamePk }}">
-          Run 100,000 Simulations →
-        </a>
+      <!-- Simulate buttons -->
+      {% if badge in ['live', 'final', 'delayed'] %}
+        <!-- Lineup is available — show sim count picker -->
+        <div class="sim-picker">
+          <span class="sim-label">Sims:</span>
+          <a class="sim-opt" href="/simulate/{{ game.gamePk }}?sims=100000">100k</a>
+          <a class="sim-opt" href="/simulate/{{ game.gamePk }}?sims=500000">500k</a>
+          <a class="sim-opt" href="/simulate/{{ game.gamePk }}?sims=1000000">1M</a>
+        </div>
+      {% elif badge == 'pregame' and is_today %}
+        <!-- Game today but lineup not set yet -->
+        <span class="btn-disabled">🕐 Lineup locks ~1hr before first pitch</span>
+      {% elif badge == 'pregame' and not is_today %}
+        <!-- Future game — show probable pitchers but can't simulate -->
+        <span class="btn-disabled">📅 Simulation available on game day</span>
       {% else %}
-        <span class="simulate-btn disabled">Lineup not set yet</span>
+        <span class="btn-disabled">Not available</span>
       {% endif %}
+
     </div>
   {% endfor %}
 </div>
 
+{% else %}
+  <div class="no-games">No games scheduled for this date.</div>
+{% endif %}
+
 <footer>
-  Data: MLB Stats API &nbsp;·&nbsp; Predictions are for entertainment only
+  Data: MLB Stats API · Predictions for entertainment only
 </footer>
 
 </body>

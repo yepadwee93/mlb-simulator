@@ -80,22 +80,34 @@ def get_today_schedule(game_date=None):
     data = _get("/schedule", params={
         "sportId": 1,          # sportId=1 means MLB (as opposed to minor leagues etc.)
         "date": game_date,
-        "hydrate": "team"      # include full team names in the response
+        "hydrate": "team,probablePitcher",   # also grab probable starters
     })
 
     games = []
     # The API wraps results in dates[] -> games[]
     for day in data.get("dates", []):
         for game in day.get("games", []):
+            away = game["teams"]["away"]
+            home = game["teams"]["home"]
+
+            # probablePitcher is available days before the game
+            away_prob = away.get("probablePitcher", {})
+            home_prob = home.get("probablePitcher", {})
+
             games.append({
-                "gamePk":       game["gamePk"],          # unique game ID used in other calls
-                "status":       game["status"]["detailedState"],
-                "home_team":    game["teams"]["home"]["team"]["name"],
-                "away_team":    game["teams"]["away"]["team"]["name"],
-                "home_id":      game["teams"]["home"]["team"]["id"],
-                "away_id":      game["teams"]["away"]["team"]["id"],
-                "game_time":    game.get("gameDate", ""),   # UTC time string
-                "venue":        game["venue"]["name"],
+                "gamePk":             game["gamePk"],
+                "status":             game["status"]["detailedState"],
+                "home_team":          home["team"]["name"],
+                "away_team":          away["team"]["name"],
+                "home_id":            home["team"]["id"],
+                "away_id":            away["team"]["id"],
+                "game_time":          game.get("gameDate", ""),
+                "venue":              game["venue"]["name"],
+                # Probable pitchers (empty string if not yet announced)
+                "away_probable":      away_prob.get("fullName", "TBD"),
+                "home_probable":      home_prob.get("fullName", "TBD"),
+                "away_probable_id":   away_prob.get("id"),
+                "home_probable_id":   home_prob.get("id"),
             })
     return games
 

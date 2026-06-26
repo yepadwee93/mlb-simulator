@@ -266,6 +266,57 @@
   <div class="sim-note">Based on {{ simulations | int | string | replace('000000','M') }} simulated games</div>
 </div>
 
+<!-- ── Odds comparison card ── -->
+{% if away_implied_pct %}
+<div class="card">
+  <div class="section-title">
+    Our Model vs Vegas
+    <span style="float:right; font-weight:400;">{{ books_used }} book{{ 's' if books_used != 1 }} averaged</span>
+  </div>
+
+  <table style="width:100%; border-collapse:collapse; font-size:0.88rem;">
+    <thead>
+      <tr style="color:#8890a4; font-size:0.72rem; text-transform:uppercase; letter-spacing:0.5px;">
+        <td style="padding:6px 0;">Team</td>
+        <td style="padding:6px 0; text-align:center;">Our Model</td>
+        <td style="padding:6px 0; text-align:center;">Vegas Implied</td>
+        <td style="padding:6px 0; text-align:center;">Moneyline</td>
+        <td style="padding:6px 0; text-align:center;">Edge</td>
+      </tr>
+    </thead>
+    <tbody>
+      {% for side, team, our_pct, implied, ml, edge in [
+          ('away', away_team, away_win_pct, away_implied_pct, away_avg_odds, away_edge),
+          ('home', home_team, home_win_pct, home_implied_pct, home_avg_odds, home_edge)
+      ] %}
+      <tr style="border-top:1px solid #2a2d3a;">
+        <td style="padding:10px 0; font-weight:600;">{{ team }}</td>
+        <td style="padding:10px 0; text-align:center; color:{% if side=='away' %}#64b5f6{% else %}#81c784{% endif %}; font-weight:700;">
+          {{ our_pct }}%
+        </td>
+        <td style="padding:10px 0; text-align:center; color:#8890a4;">{{ implied }}%</td>
+        <td style="padding:10px 0; text-align:center; color:#e8eaf0;">{{ ml }}</td>
+        <td style="padding:10px 0; text-align:center;">
+          {% if edge > 5 %}
+            <span style="color:#4caf50; font-weight:700;">+{{ edge }}% ✓</span>
+          {% elif edge < -5 %}
+            <span style="color:#f44336; font-weight:700;">{{ edge }}%</span>
+          {% else %}
+            <span style="color:#8890a4;">{{ edge }}%</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <p style="font-size:0.72rem; color:#555870; margin-top:12px;">
+    Edge = Our model % minus Vegas implied %. Positive (green) = our model likes this team more than Vegas does.
+    For entertainment only — not financial advice.
+  </p>
+</div>
+{% endif %}
+
 <!-- ── Pitching matchup card ── -->
 <div class="card">
   <div class="section-title">Starting Pitchers</div>
