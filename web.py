@@ -1309,8 +1309,19 @@ def calculator_page():
 @app.route("/bets")
 @login_required
 def bets_dashboard():
-    settle_bets(user_id=_uid())
-    stats = get_bet_stats(user_id=_uid())
+    try:
+        settle_bets(user_id=_uid())
+    except Exception:
+        pass
+    try:
+        stats = get_bet_stats(user_id=_uid())
+    except Exception as e:
+        stats = {
+            "bets": [], "total_bets": 0, "settled": 0, "pending": 0,
+            "wins": 0, "losses": 0, "pushes": 0, "win_pct": None,
+            "total_wagered": 0, "total_profit": 0, "roi": 0,
+            "avg_clv": None, "by_type": {},
+        }
     stats["today"] = date.today().isoformat()
     return render_template("bets.html", **stats, username=current_user.username)
 
