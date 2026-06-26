@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ away_team }} @ {{ home_team }} — MLB Simulator</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0f1117;
+      color: #e8eaf0;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      min-height: 100vh;
+      padding: 40px 20px;
+    }
+
+    .back-link {
+      display: inline-block;
+      margin-bottom: 28px;
+      color: #64b5f6;
+      text-decoration: none;
+      font-size: 0.9rem;
+    }
+    .back-link:hover { text-decoration: underline; }
+
+    .card {
+      background: #1a1d27;
+      border: 1px solid #2a2d3a;
+      border-radius: 14px;
+      padding: 28px 32px;
+      max-width: 700px;
+      margin: 0 auto 24px auto;
+    }
+
+    /* ── Matchup header ── */
+    .matchup {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 28px;
+    }
+
+    .team-block { text-align: center; flex: 1; }
+
+    .team-name {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .team-pct {
+      font-size: 2.6rem;
+      font-weight: 800;
+      margin-top: 6px;
+      line-height: 1;
+    }
+
+    .team-pct.away { color: #64b5f6; }
+    .team-pct.home { color: #81c784; }
+
+    .win-label {
+      font-size: 0.75rem;
+      color: #8890a4;
+      margin-top: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .vs-divider {
+      color: #8890a4;
+      font-size: 1rem;
+      font-weight: 600;
+      padding: 0 16px;
+    }
+
+    /* ── Probability bar ── */
+    .prob-bar-wrap { margin-bottom: 24px; }
+
+    .prob-bar {
+      height: 14px;
+      border-radius: 7px;
+      overflow: hidden;
+      background: #2a2d3a;
+      display: flex;
+    }
+
+    .bar-away {
+      background: #2563eb;
+      height: 100%;
+      transition: width 0.8s ease;
+    }
+
+    .bar-home {
+      background: #16a34a;
+      height: 100%;
+      flex: 1;
+    }
+
+    .bar-labels {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 6px;
+      font-size: 0.78rem;
+      color: #8890a4;
+    }
+
+    /* ── Predicted score ── */
+    .score-box {
+      text-align: center;
+      padding: 16px;
+      background: #0f1117;
+      border-radius: 10px;
+      margin-bottom: 8px;
+    }
+
+    .score-label {
+      font-size: 0.75rem;
+      color: #8890a4;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+
+    .score-value {
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .sim-note {
+      text-align: center;
+      font-size: 0.78rem;
+      color: #555870;
+      margin-top: 10px;
+    }
+
+    /* ── Pitchers ── */
+    .section-title {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: #8890a4;
+      margin-bottom: 14px;
+      font-weight: 600;
+    }
+
+    .pitcher-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid #2a2d3a;
+    }
+    .pitcher-row:last-child { border-bottom: none; }
+
+    .pitcher-name { font-weight: 600; font-size: 0.95rem; }
+    .pitcher-team { font-size: 0.78rem; color: #8890a4; margin-top: 2px; }
+
+    .pitcher-stats {
+      display: flex;
+      gap: 16px;
+      font-size: 0.85rem;
+    }
+
+    .stat-pill {
+      text-align: center;
+    }
+    .stat-pill .val { font-weight: 700; color: #ffffff; }
+    .stat-pill .lbl { font-size: 0.7rem; color: #8890a4; }
+
+    /* ── Lineups ── */
+    .lineups-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    .lineup-col h3 {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 10px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #2a2d3a;
+    }
+
+    .batter-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 0;
+      font-size: 0.85rem;
+    }
+
+    .slot {
+      color: #555870;
+      font-size: 0.75rem;
+      width: 14px;
+      flex-shrink: 0;
+    }
+
+    .batter-name { flex: 1; }
+
+    .pos-badge {
+      font-size: 0.7rem;
+      color: #8890a4;
+      background: #2a2d3a;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    .back-btn {
+      display: block;
+      width: fit-content;
+      margin: 0 auto;
+      padding: 12px 28px;
+      background: #2563eb;
+      color: #ffffff;
+      font-weight: 700;
+      border-radius: 8px;
+      text-decoration: none;
+      font-size: 0.92rem;
+    }
+    .back-btn:hover { background: #1d4ed8; }
+  </style>
+</head>
+<body>
+
+<a class="back-link" href="/">← Back to today's games</a>
+
+<!-- ── Main prediction card ── -->
+<div class="card">
+  <div class="matchup">
+    <div class="team-block">
+      <div class="team-name">{{ away_team }}</div>
+      <div class="team-pct away">{{ away_win_pct }}%</div>
+      <div class="win-label">win probability</div>
+    </div>
+
+    <div class="vs-divider">@</div>
+
+    <div class="team-block">
+      <div class="team-name">{{ home_team }}</div>
+      <div class="team-pct home">{{ home_win_pct }}%</div>
+      <div class="win-label">win probability</div>
+    </div>
+  </div>
+
+  <div class="prob-bar-wrap">
+    <div class="prob-bar">
+      <div class="bar-away" style="width: {{ away_win_pct }}%"></div>
+      <div class="bar-home"></div>
+    </div>
+    <div class="bar-labels">
+      <span>{{ away_team }}</span>
+      <span>{{ home_team }}</span>
+    </div>
+  </div>
+
+  <div class="score-box">
+    <div class="score-label">Predicted Score</div>
+    <div class="score-value">{{ away_team }} {{ away_avg_runs }} — {{ home_avg_runs }} {{ home_team }}</div>
+  </div>
+
+  <div class="sim-note">Based on {{ simulations | int | string | replace('000000','M') }} simulated games</div>
+</div>
+
+<!-- ── Pitching matchup card ── -->
+<div class="card">
+  <div class="section-title">Starting Pitchers</div>
+
+  <div class="pitcher-row">
+    <div>
+      <div class="pitcher-name">{{ away_pitcher_name }}</div>
+      <div class="pitcher-team">{{ away_team }}</div>
+    </div>
+    <div class="pitcher-stats">
+      <div class="stat-pill">
+        <div class="val">{{ away_era }}</div>
+        <div class="lbl">ERA</div>
+      </div>
+      <div class="stat-pill">
+        <div class="val">{{ away_whip }}</div>
+        <div class="lbl">WHIP</div>
+      </div>
+      <div class="stat-pill">
+        <div class="val">{{ away_wl }}</div>
+        <div class="lbl">W-L</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pitcher-row">
+    <div>
+      <div class="pitcher-name">{{ home_pitcher_name }}</div>
+      <div class="pitcher-team">{{ home_team }}</div>
+    </div>
+    <div class="pitcher-stats">
+      <div class="stat-pill">
+        <div class="val">{{ home_era }}</div>
+        <div class="lbl">ERA</div>
+      </div>
+      <div class="stat-pill">
+        <div class="val">{{ home_whip }}</div>
+        <div class="lbl">WHIP</div>
+      </div>
+      <div class="stat-pill">
+        <div class="val">{{ home_wl }}</div>
+        <div class="lbl">W-L</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Lineups card ── -->
+<div class="card">
+  <div class="section-title">Lineups</div>
+  <div class="lineups-grid">
+    <div class="lineup-col">
+      <h3>{{ away_team }}</h3>
+      {% for b in away_batters %}
+      <div class="batter-row">
+        <span class="slot">{{ loop.index }}</span>
+        <span class="batter-name">{{ b.name }}</span>
+        <span class="pos-badge">{{ b.position }}</span>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="lineup-col">
+      <h3>{{ home_team }}</h3>
+      {% for b in home_batters %}
+      <div class="batter-row">
+        <span class="slot">{{ loop.index }}</span>
+        <span class="batter-name">{{ b.name }}</span>
+        <span class="pos-badge">{{ b.position }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div style="text-align:center; margin-top: 8px; margin-bottom: 40px;">
+  <a class="back-btn" href="/">← Simulate Another Game</a>
+</div>
+
+</body>
+</html>

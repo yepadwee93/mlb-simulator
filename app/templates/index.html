@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MLB Simulator</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0f1117;
+      color: #e8eaf0;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      min-height: 100vh;
+      padding: 40px 20px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    header h1 {
+      font-size: 2.4rem;
+      font-weight: 800;
+      color: #ffffff;
+      letter-spacing: -0.5px;
+    }
+
+    header p {
+      color: #8890a4;
+      margin-top: 8px;
+      font-size: 1rem;
+    }
+
+    .games-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 16px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .game-card {
+      background: #1a1d27;
+      border: 1px solid #2a2d3a;
+      border-radius: 12px;
+      padding: 20px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      transition: border-color 0.2s;
+    }
+
+    .game-card:hover {
+      border-color: #4a6fa5;
+    }
+
+    .teams {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .team-name {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #ffffff;
+      flex: 1;
+    }
+
+    .team-name.away { text-align: left; }
+    .team-name.home { text-align: right; }
+
+    .vs {
+      color: #8890a4;
+      font-size: 0.85rem;
+      font-weight: 600;
+      padding: 0 8px;
+    }
+
+    .meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .status {
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 20px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .status.final       { background: #1e3a2f; color: #4caf50; }
+    .status.live        { background: #3a1e1e; color: #f44336; }
+    .status.pregame     { background: #1e2a3a; color: #64b5f6; }
+    .status.delayed     { background: #3a2e1e; color: #ffa726; }
+    .status.other       { background: #2a2d3a; color: #8890a4; }
+
+    .venue {
+      font-size: 0.78rem;
+      color: #8890a4;
+    }
+
+    .simulate-btn {
+      display: block;
+      width: 100%;
+      padding: 11px;
+      background: #2563eb;
+      color: #ffffff;
+      font-size: 0.92rem;
+      font-weight: 700;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      text-align: center;
+      text-decoration: none;
+      letter-spacing: 0.3px;
+      transition: background 0.2s;
+    }
+
+    .simulate-btn:hover { background: #1d4ed8; }
+
+    .simulate-btn.disabled {
+      background: #2a2d3a;
+      color: #555870;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+
+    footer {
+      text-align: center;
+      margin-top: 50px;
+      color: #555870;
+      font-size: 0.8rem;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>⚾ MLB Simulator</h1>
+  <p>{{ date }} — Pick a game to simulate</p>
+</header>
+
+<div class="games-grid">
+  {% for game in games %}
+    {% set s = game.status | lower %}
+    {% if 'final' in s %}
+      {% set badge = 'final' %}
+    {% elif 'progress' in s or 'live' in s %}
+      {% set badge = 'live' %}
+    {% elif 'pre' in s or 'scheduled' in s or 'warmup' in s %}
+      {% set badge = 'pregame' %}
+    {% elif 'delay' in s %}
+      {% set badge = 'delayed' %}
+    {% else %}
+      {% set badge = 'other' %}
+    {% endif %}
+
+    <div class="game-card">
+      <div class="teams">
+        <span class="team-name away">{{ game.away_team }}</span>
+        <span class="vs">@</span>
+        <span class="team-name home">{{ game.home_team }}</span>
+      </div>
+
+      <div class="meta">
+        <span class="status {{ badge }}">{{ game.status }}</span>
+        <span class="venue">{{ game.venue }}</span>
+      </div>
+
+      <!-- Only allow simulation if lineup is likely available -->
+      {% if badge in ['final', 'live'] %}
+        <a class="simulate-btn" href="/simulate/{{ game.gamePk }}">
+          Run 100,000 Simulations →
+        </a>
+      {% else %}
+        <span class="simulate-btn disabled">Lineup not set yet</span>
+      {% endif %}
+    </div>
+  {% endfor %}
+</div>
+
+<footer>
+  Data: MLB Stats API &nbsp;·&nbsp; Predictions are for entertainment only
+</footer>
+
+</body>
+</html>
