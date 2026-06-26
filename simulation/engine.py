@@ -400,6 +400,34 @@ def build_fatigued_pitcher_stats(base_stats: dict, fatigue_factor: float) -> dic
     }
 
 
+def apply_batter_rest_modifier(probs: list, rest_days: int) -> list:
+    """
+    Adjust batter hit probabilities based on days of rest since last game.
+
+    Back-to-back (1 day rest): small hit penalty, batters tire over 162 games.
+    Extra rest (3+ days): small hit boost, batters are fresh.
+    Normal (2 days): no change.
+
+    OUTCOME_ORDER = [WALK, K, 1B, 2B, 3B, HR, OUT]
+    """
+    if rest_days is None or rest_days == 2:
+        return probs
+
+    adjusted = list(probs)
+    if rest_days == 1:
+        hit_factor = 0.96   # back-to-back: 4% hit reduction
+    elif rest_days == 3:
+        hit_factor = 1.01   # one extra day off
+    else:
+        hit_factor = 1.02   # 4+ days rest: fresh
+
+    for i in (2, 3, 4, 5):   # 1B, 2B, 3B, HR
+        adjusted[i] *= hit_factor
+
+    total = sum(adjusted)
+    return [p / total for p in adjusted]
+
+
 def blend_probs(season_probs: list, recent_probs: list, recent_weight: float = 0.4) -> list:
     """
     Blend season-long probabilities with recent form probabilities.
@@ -422,7 +450,8 @@ def blend_probs(season_probs: list, recent_probs: list, recent_weight: float = 0
 def precompute_lineup(lineup_stats: list, pitcher_stats: dict,
                       weather: dict = None, recent_stats_list: list = None,
                       venue: str = None, matchup_stats_list: list = None,
-                      daynight_stats_list: list = None) -> list:
+                      daynight_stats_list: list = None,
+                      batter_rest_days: int = None) -> list:
     """
     Pre-calculate cumulative probability arrays for every batter in a lineup.
     Doing this ONCE before the simulation loop (instead of inside it) is the
@@ -475,6 +504,10 @@ def precompute_lineup(lineup_stats: list, pitcher_stats: dict,
         # Today's weather on top of ballpark baseline
         if weather:
             probs = apply_weather_modifier(probs, weather)
+
+        # Batter rest modifier
+        if batter_rest_days is not None:
+            probs = apply_batter_rest_modifier(probs, batter_rest_days)
 
         cum_weights = list(accumulate(probs))
         result.append(cum_weights)
@@ -810,6 +843,8 @@ def run_simulation(
     home_matchup_stats:  list = None, # home batters' career stats vs away starter
     away_daynight_stats: list = None, # away batters' day or night game splits
     home_daynight_stats: list = None, # home batters' day or night game splits
+    away_batter_rest:    int  = None,
+    home_batter_rest:    int  = None,
     n:                   int = 100_000,
 ) -> dict:
     """
@@ -842,20 +877,20 @@ def run_simulation(
     # ── Phase 1: innings 1-2 (starter is fresh) ───────────────────────
     away_precomp_early = precompute_lineup(
         away_lineup, home_pitcher, weather, away_recent, venue,
-        away_matchup_stats, away_daynight_stats)
+        away_matchup_stats, away_daynight_stats, away_batter_rest)
     home_precomp_early = precompute_lineup(
         home_lineup, away_pitcher, weather, home_recent, venue,
-        home_matchup_stats, home_daynight_stats)
+        home_matchup_stats, home_daynight_stats, home_batter_rest)
 
     # ── Phase 2: innings 3-5 (starter showing fatigue) ───────────────
     home_pitcher_mid = build_fatigued_pitcher_stats(home_pitcher, home_fatigue["phase2"])
     away_pitcher_mid = build_fatigued_pitcher_stats(away_pitcher, away_fatigue["phase2"])
     away_precomp_mid = precompute_lineup(
         away_lineup, home_pitcher_mid, weather, away_recent, venue,
-        away_matchup_stats, away_daynight_stats)
+        away_matchup_stats, away_daynight_stats, away_batter_rest)
     home_precomp_mid = precompute_lineup(
         home_lineup, away_pitcher_mid, weather, home_recent, venue,
-        home_matchup_stats, home_daynight_stats)
+        home_matchup_stats, home_daynight_stats, home_batter_rest)
 
     # ── RISP: clutch stats when runner on 2nd or 3rd ─────────────────
     away_precomp_risp = None
@@ -864,12 +899,12 @@ def run_simulation(
     if away_risp_stats and any(s for s in away_risp_stats if s and s.get("plateAppearances", 0) >= 20):
         away_precomp_risp = precompute_lineup(
             away_risp_stats, home_pitcher, weather, away_recent, venue,
-            away_matchup_stats, away_daynight_stats
+            away_matchup_stats, away_daynight_stats, away_batter_rest
         )
     if home_risp_stats and any(s for s in home_risp_stats if s and s.get("plateAppearances", 0) >= 20):
         home_precomp_risp = precompute_lineup(
             home_risp_stats, away_pitcher, weather, home_recent, venue,
-            home_matchup_stats, home_daynight_stats
+            home_matchup_stats, home_daynight_stats, home_batter_rest
         )
 
     # ── Late game: batters vs the bullpen (innings 6+) ───────────────

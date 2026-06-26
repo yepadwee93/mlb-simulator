@@ -612,3 +612,27 @@ def get_ballpark_weather(venue_name):
 
     except Exception:
         return {}   # weather unavailable — simulation still runs without it
+
+
+def get_team_rest_days(team_name, today=None):
+    """
+    Return days since this team last played a completed game (looks back 5 days).
+    1 = normal rest, 2+ = extra rest, 3+ = well rested.
+    Returns 1 as fallback if lookup fails.
+    """
+    from datetime import date as _date, timedelta
+    today_dt = _date.fromisoformat(today[:10]) if today else _date.today()
+
+    for days_back in range(1, 6):
+        check_date = (today_dt - timedelta(days=days_back)).isoformat()
+        try:
+            games = get_today_schedule(game_date=check_date)
+            for g in games:
+                if team_name in (g["away_team"], g["home_team"]):
+                    status = g.get("status", "").lower()
+                    if any(w in status for w in ("final", "game over", "completed")):
+                        return days_back
+        except Exception:
+            pass
+
+    return 1
