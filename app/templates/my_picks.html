@@ -86,16 +86,23 @@
 </head>
 <body>
 
-<nav style="display:flex;gap:12px;flex-wrap:wrap;padding:16px 20px 8px;font-size:0.82rem;">
-  <a href="/" style="color:#b0b8cc;padding:5px 12px;border-radius:6px;border:1px solid #353a52;text-decoration:none;">🏠 Home</a>
-  <a href="/simulate-all" style="color:#b0b8cc;padding:5px 12px;border-radius:6px;border:1px solid #353a52;text-decoration:none;">🎯 Games</a>
-  <a href="/bets" style="color:#b0b8cc;padding:5px 12px;border-radius:6px;border:1px solid #353a52;text-decoration:none;">💰 My Bets</a>
-  <a href="/accuracy" style="color:#b0b8cc;padding:5px 12px;border-radius:6px;border:1px solid #353a52;text-decoration:none;">📊 Accuracy</a>
-  <a href="/bankroll" style="color:#b0b8cc;padding:5px 12px;border-radius:6px;border:1px solid #353a52;text-decoration:none;">📈 Bankroll</a>
-  <a href="/calculator" style="color:#b0b8cc;padding:5px 12px;border-radius:6px;border:1px solid #353a52;text-decoration:none;">🧮 Calculator</a>
-  <a href="/my-picks" style="color:#b0b8cc;padding:5px 12px;border-radius:6px;border:1px solid #353a52;text-decoration:none;">🎯 My Picks</a>
-</nav>
-<a class="back-link" href="/">← Back to games</a>
+<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 24px;background:#1e2235;border-bottom:1px solid #353a52;margin-bottom:28px;">
+  <a href="/" style="color:#fff;text-decoration:none;font-size:1.1rem;font-weight:800;">⚾ MLB Simulator</a>
+  <div style="display:flex;gap:16px;font-size:0.85rem;align-items:center;flex-wrap:wrap;">
+    <a href="/simulate-all" style="color:#64b5f6;text-decoration:none;font-weight:600;">🎯 Games</a>
+    <a href="/bets" style="color:#ffb74d;text-decoration:none;font-weight:600;">💰 My Bets</a>
+    <a href="/accuracy" style="color:#64b5f6;text-decoration:none;font-weight:600;">📊 Accuracy</a>
+    <a href="/bankroll" style="color:#81c784;text-decoration:none;font-weight:600;">📈 Bankroll</a>
+    <a href="/calculator" style="color:#b0b8cc;text-decoration:none;font-weight:600;">🧮 Calculator</a>
+    <a href="/my-picks" style="color:#ce93d8;text-decoration:none;font-weight:600;">🎯 My Picks</a>
+    {% if current_user.is_authenticated %}
+      <span style="color:#aaa;">👤 {{ current_user.username }}</span>
+      <a href="/logout" style="color:#ef9a9a;text-decoration:none;font-weight:600;">Sign Out</a>
+    {% else %}
+      <a href="/login" style="color:#a5d6a7;text-decoration:none;font-weight:600;">Login</a>
+    {% endif %}
+  </div>
+</div>
 <h1>🎯 My Picks</h1>
 <p class="subtitle">Log your game picks, see what the simulator thinks, and track your hit rate over time.</p>
 
