@@ -1450,6 +1450,27 @@ def api_live_scores():
     return jsonify(scores)
 
 
+@app.route("/api/scores")
+def api_scores():
+    """JSON: today's games with live scores for the scoreboard bar."""
+    from data.mlb_api import get_live_scores
+    games = get_live_scores()
+    out = []
+    for g in games:
+        out.append({
+            "away": g.get("away_team", ""),
+            "home": g.get("home_team", ""),
+            "away_score": g.get("away_score", ""),
+            "home_score": g.get("home_score", ""),
+            "status": g.get("status", ""),
+            "inning": g.get("inning", ""),
+            "inning_half": g.get("inning_half", ""),
+            "game_time": g.get("game_time_utc", ""),
+            "gamePk": g.get("game_pk", ""),
+        })
+    return jsonify(out)
+
+
 @app.route("/api/bets")
 @login_required
 def api_bets():

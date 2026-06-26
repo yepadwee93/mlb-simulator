@@ -242,8 +242,25 @@
       color: #9aa0b8;
       font-size: 0.78rem;
     }
-  </style>
-</head>
+  
+.nav-dropdown { position:relative; display:inline-block; }
+.nav-dropdown > a { color:#ffb74d;text-decoration:none;font-weight:600; }
+.nav-dropdown-menu {
+  display:none; position:absolute; top:calc(100% + 6px); left:50%;
+  transform:translateX(-50%);
+  background:#1e2235; border:1px solid #353a52; border-radius:10px;
+  min-width:160px; z-index:999; padding:6px 0; white-space:nowrap;
+  box-shadow:0 8px 24px rgba(0,0,0,0.4);
+}
+.nav-dropdown:hover .nav-dropdown-menu,
+.nav-dropdown:focus-within .nav-dropdown-menu { display:block; }
+.nav-dropdown-menu a {
+  display:block; padding:9px 16px; font-size:0.83rem; font-weight:600;
+  text-decoration:none; color:#e8eaf0;
+}
+.nav-dropdown-menu a:hover { background:#252a3a; }
+</style>
+
 <body>
 
 <header>
@@ -251,8 +268,7 @@
     <h1>⚾ MLB Simulator</h1>
     <div style="display:flex; gap:16px; font-size:0.85rem; align-items:center;">
       <a href="/accuracy" style="color:#64b5f6; text-decoration:none; font-weight:600;">📊 Accuracy</a>
-      <a href="/my-picks" style="color:#ce93d8; text-decoration:none; font-weight:600;">🎯 My Picks</a>
-      <a href="/bets" style="color:#ffb74d; text-decoration:none; font-weight:600;">💰 My Bets</a>
+      <span class="nav-dropdown"><a href="/bets">&#128176; My Bets &#9660;</a><div class="nav-dropdown-menu"><a href="/bets">&#128176; My Bets</a><a href="/bankroll">&#128200; Bankroll</a><a href="/calculator">&#129518; Calculator</a><a href="/parlay">&#127920; Parlay</a><a href="/my-picks">&#127919; My Picks</a></div></span>
       {% if current_user.is_authenticated %}
         <a href="/settings" style="color:#aaa;text-decoration:none;font-weight:600;">👤 {{ current_user.username }}</a>
         <a href="/logout" style="color:#ef9a9a; text-decoration:none; font-weight:600;">Logout</a>
@@ -345,7 +361,14 @@
           </div>
         </div>
 
-        <span class="vs">@</span>
+        <div style="text-align:center;flex-shrink:0;">
+          <span class="vs">@</span>
+          {% if game.game_time %}
+          <div style="font-size:0.68rem;color:#9aa0b8;margin-top:4px;" class="game-time-utc" data-utc="{{ game.game_time }}">
+            {{ game.game_time[11:16] }} UTC
+          </div>
+          {% endif %}
+        </div>
 
         <div class="team-block home">
           <div class="team-name">{{ game.home_team }}</div>
@@ -413,6 +436,18 @@
 <footer>
   Data: MLB Stats API · Predictions for entertainment only
 </footer>
+
+<script>
+// Convert UTC game times to user's local time
+document.querySelectorAll('.game-time-utc').forEach(function(el) {
+  var utc = el.dataset.utc;
+  if (!utc) return;
+  try {
+    var d = new Date(utc);
+    el.textContent = d.toLocaleTimeString([], {hour:'numeric', minute:'2-digit', timeZoneName:'short'});
+  } catch(e) {}
+});
+</script>
 
 </body>
 </html>
