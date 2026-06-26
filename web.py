@@ -50,7 +50,7 @@ from data.mlb_api import (
     get_team_streak,
     get_live_scores,
 )
-from simulation.engine import run_simulation, predict_pitcher_ks, detect_pitcher_form
+from simulation.engine import run_simulation, predict_pitcher_ks, detect_pitcher_form, predict_batter_props
 
 app = Flask(__name__, template_folder="app/templates")
 app.secret_key = os.environ.get("SECRET_KEY", "mlb-sim-secret-change-in-prod-2026")
@@ -852,6 +852,30 @@ def simulate(game_pk):
     # Props are NOT auto-fetched here — user clicks "Load Props" button
     # which calls /props/<game_pk> separately (saves 2 API calls per simulation)
     result["props_by_player"] = {}
+
+    # ── Batter prop model predictions ────────────────────────────────────
+    try:
+        away_batter_props = predict_batter_props(
+            away_batter_stats, home_pitcher_stats,
+            weather=weather, venue=game.get("venue"),
+        )
+        home_batter_props = predict_batter_props(
+            home_batter_stats, away_pitcher_stats,
+            weather=weather, venue=game.get("venue"),
+        )
+        # Attach batter names to each slot
+        for i, prop in enumerate(away_batter_props):
+            b = lineup["away_batters"][i] if i < len(lineup["away_batters"]) else {}
+            prop["name"] = b.get("name", f"Batter {i+1}")
+        for i, prop in enumerate(home_batter_props):
+            b = lineup["home_batters"][i] if i < len(lineup["home_batters"]) else {}
+            prop["name"] = b.get("name", f"Batter {i+1}")
+    except Exception:
+        away_batter_props = []
+        home_batter_props = []
+
+    result["away_batter_props"] = away_batter_props
+    result["home_batter_props"] = home_batter_props
 
     return render_template("result.html", game_pk=game_pk, **result)
 

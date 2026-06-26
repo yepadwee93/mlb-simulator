@@ -1405,6 +1405,113 @@ def detect_pitcher_form(pitcher_log: list, pitcher_stats: dict) -> dict:
     return {"form": "stable", "note": "", "modifier": 1.0}
 
 
+def predict_batter_props(
+    lineup_stats: list,
+    pitcher_stats: dict,
+    weather: dict = None,
+    venue: str = None,
+    batting_slots: int = 9,
+) -> list:
+    """
+    Project per-batter prop lines (hits, HR, RBI, total bases) for one team.
+
+    Uses the same outcome probabilities as the simulation engine so predictions
+    are consistent with the win/run totals.
+
+    Returns a list of dicts (one per batter slot, in batting order):
+      {
+        "slot":        int,    # 1-9
+        "avg_hits":    float,  # expected hits per game
+        "avg_hr":      float,  # expected HR per game
+        "avg_rbi":     float,  # expected RBI per game (approximated)
+        "avg_tb":      float,  # expected total bases per game
+        "hit_pct":     float,  # P(at least 1 hit)
+        "hr_pct":      float,  # P(at least 1 HR)
+        "multi_hit_pct": float,  # P(2+ hits)
+      }
+    """
+    # Expected plate appearances per slot (leadoff sees more PAs)
+    # Rough MLB average: team gets ~38 PAs/game, distributed across 9 slots
+    PA_BY_SLOT = [4.8, 4.4, 4.3, 4.2, 4.1, 4.0, 3.9, 3.8, 3.6]
+
+    park = BALLPARK_FACTORS.get(venue, {}) if venue else {}
+    hr_park  = park.get("hr",  1.0)
+    hit_park = park.get("hit", 1.0)
+
+    results = []
+    for i, stats in enumerate(lineup_stats[:9]):
+        slot = i + 1
+        pa_expected = PA_BY_SLOT[i] if i < len(PA_BY_SLOT) else 3.8
+
+        # Build base outcome probs from batter stats
+        probs = build_batter_probs(stats)
+
+        # Apply pitcher modifier
+        probs = apply_pitcher_modifier(probs, pitcher_stats)
+
+        # Apply weather
+        if weather:
+            probs = apply_weather_modifier(probs, weather)
+
+        # Apply park factor to HR and hits
+        adj = list(probs)
+        adj[5] *= hr_park    # HR
+        adj[2] *= hit_park   # single
+        adj[3] *= hit_park   # double
+        total = sum(adj)
+        probs = [p / total for p in adj]
+
+        # OUTCOME_ORDER = [WALK, K, 1B, 2B, 3B, HR, OUT]
+        p_walk = probs[0]
+        p_1b   = probs[2]
+        p_2b   = probs[3]
+        p_3b   = probs[4]
+        p_hr   = probs[5]
+        p_hit  = p_1b + p_2b + p_3b + p_hr
+
+        # Expected per PA
+        exp_hits_pa = p_hit
+        exp_hr_pa   = p_hr
+        exp_tb_pa   = p_1b * 1 + p_2b * 2 + p_3b * 3 + p_hr * 4
+
+        # Scale to expected PAs
+        avg_hits = exp_hits_pa * pa_expected
+        avg_hr   = exp_hr_pa   * pa_expected
+        avg_tb   = exp_tb_pa   * pa_expected
+
+        # RBI approximation: ~30% of hits drive in a run (runners on base ~30% of time)
+        # HRs always score at least 1 run
+        avg_rbi = avg_hr * 1.3 + (avg_hits - avg_hr) * 0.28
+
+        # P(at least 1 hit) = 1 - P(no hits in all PAs)
+        p_no_hit_pa = 1 - p_hit
+        hit_pct     = round((1 - p_no_hit_pa ** pa_expected) * 100, 1)
+
+        # P(at least 1 HR)
+        p_no_hr_pa = 1 - p_hr
+        hr_pct     = round((1 - p_no_hr_pa ** pa_expected) * 100, 1)
+
+        # P(2+ hits) using Poisson approximation
+        import math
+        lam = avg_hits
+        p_0 = math.exp(-lam)
+        p_1 = lam * math.exp(-lam)
+        multi_hit_pct = round((1 - p_0 - p_1) * 100, 1)
+
+        results.append({
+            "slot":          slot,
+            "avg_hits":      round(avg_hits, 2),
+            "avg_hr":        round(avg_hr, 3),
+            "avg_rbi":       round(avg_rbi, 2),
+            "avg_tb":        round(avg_tb, 2),
+            "hit_pct":       hit_pct,
+            "hr_pct":        hr_pct,
+            "multi_hit_pct": multi_hit_pct,
+        })
+
+    return results
+
+
 def predict_pitcher_ks(pitcher_stats: dict, lineup_stats: list,
                         umpire_name: str = None,
                         pitcher_log: list = None,

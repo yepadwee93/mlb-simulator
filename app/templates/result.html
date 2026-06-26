@@ -706,6 +706,74 @@
   {{ lineup_table(home_team, home_batters, away_pitcher_name, away_pitcher_hand) }}
 </div>
 
+<!-- ── Batter Prop Model Predictions ── -->
+{% if away_batter_props or home_batter_props %}
+<div class="card" style="max-width:900px;" id="batter-props-card">
+  <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;">
+    <span>🎯 Batter Prop Model</span>
+    <span style="font-size:0.72rem;font-weight:400;text-transform:none;letter-spacing:0;color:#9aa0b8;">
+      Model projections — click "Load Props" above to compare vs Vegas lines
+    </span>
+  </div>
+
+  {% macro prop_table(team_name, batter_props) %}
+  {% if batter_props %}
+  <div style="margin-bottom:28px;">
+    <div style="font-weight:700;font-size:0.88rem;color:#64b5f6;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid #1e2235;">
+      {{ team_name }}
+    </div>
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:0.8rem;">
+        <thead>
+          <tr style="color:#9aa0b8;text-transform:uppercase;font-size:0.65rem;letter-spacing:.5px;">
+            <th style="text-align:left;padding:6px 8px;font-weight:600;">#</th>
+            <th style="text-align:left;padding:6px 8px;font-weight:600;">Batter</th>
+            <th style="text-align:right;padding:6px 8px;font-weight:600;">Proj Hits</th>
+            <th style="text-align:right;padding:6px 8px;font-weight:600;">Hit %</th>
+            <th style="text-align:right;padding:6px 8px;font-weight:600;">Multi-H %</th>
+            <th style="text-align:right;padding:6px 8px;font-weight:600;">Proj HR</th>
+            <th style="text-align:right;padding:6px 8px;font-weight:600;">HR %</th>
+            <th style="text-align:right;padding:6px 8px;font-weight:600;">Proj RBI</th>
+            <th style="text-align:right;padding:6px 8px;font-weight:600;">Proj TB</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for p in batter_props %}
+          {% set hit_color = '#81c784' if p.hit_pct >= 65 else ('#ffd54f' if p.hit_pct >= 50 else '#ef9a9a') %}
+          {% set hr_color = '#81c784' if p.hr_pct >= 12 else ('#ffd54f' if p.hr_pct >= 7 else '#b0b8cc') %}
+          <tr style="border-top:1px solid #1a1e2e;" class="prop-row" data-batter="{{ p.name }}" data-proj-hits="{{ p.avg_hits }}" data-proj-hr="{{ p.avg_hr }}" data-proj-rbi="{{ p.avg_rbi }}" data-proj-tb="{{ p.avg_tb }}">
+            <td style="padding:7px 8px;color:#555870;">{{ p.slot }}</td>
+            <td style="padding:7px 8px;color:#e8eaf0;font-weight:600;">{{ p.name }}</td>
+            <td style="padding:7px 8px;text-align:right;color:#e8eaf0;">{{ p.avg_hits }}</td>
+            <td style="padding:7px 8px;text-align:right;font-weight:700;color:{{ hit_color }};">{{ p.hit_pct }}%</td>
+            <td style="padding:7px 8px;text-align:right;color:#b0b8cc;">{{ p.multi_hit_pct }}%</td>
+            <td style="padding:7px 8px;text-align:right;color:#e8eaf0;">{{ p.avg_hr }}</td>
+            <td style="padding:7px 8px;text-align:right;font-weight:700;color:{{ hr_color }};">{{ p.hr_pct }}%</td>
+            <td style="padding:7px 8px;text-align:right;color:#b0b8cc;">{{ p.avg_rbi }}</td>
+            <td style="padding:7px 8px;text-align:right;color:#b0b8cc;">{{ p.avg_tb }}</td>
+          </tr>
+          <!-- Vegas line comparison row — filled in by JS after loadProps() -->
+          <tr class="prop-compare-row" data-compare-batter="{{ p.name }}" style="display:none;">
+            <td colspan="9" style="padding:4px 8px 8px 24px;background:#0d1120;">
+              <div class="prop-compare-content" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div style="font-size:0.67rem;color:#555870;margin-top:8px;">
+      Hit % = P(≥1 hit) · Multi-H % = P(≥2 hits) · TB = Total Bases · Proj HR per game avg
+    </div>
+  </div>
+  {% endif %}
+  {% endmacro %}
+
+  {{ prop_table(away_team, away_batter_props) }}
+  {{ prop_table(home_team, home_batter_props) }}
+</div>
+{% endif %}
+
 <script>
 // ── Toggle batter stat rows ───────────────────────────────────────
 function toggleStats(uid) {
@@ -774,6 +842,60 @@ function loadProps() {
             + '<span class="prop-book">' + p.book + '</span>'
             + '</span>';
         }).join('');
+      });
+
+      // ── Populate prop-compare rows in the Batter Prop Model table ──
+      document.querySelectorAll('[data-compare-batter]').forEach(function(compareRow) {
+        var batterName = compareRow.getAttribute('data-compare-batter');
+        var playerProps = props[batterName] || [];
+        if (playerProps.length === 0) return;
+
+        // Find the model row above to get projections
+        var modelRow = document.querySelector('.prop-row[data-batter="' + batterName + '"]');
+
+        var hitProps  = playerProps.filter(function(p) { return p.market === 'Hits'; });
+        var hrProps   = playerProps.filter(function(p) { return p.market === 'HR'; });
+        var rbiProps  = playerProps.filter(function(p) { return p.market === 'RBI'; });
+        var tbProps   = playerProps.filter(function(p) { return p.market === 'TB'; });
+
+        if (hitProps.length === 0 && hrProps.length === 0 && rbiProps.length === 0 && tbProps.length === 0) return;
+
+        function pillsForMarket(propList, label, modelVal) {
+          if (propList.length === 0) return '';
+          return propList.map(function(p) {
+            var overUnder = p.desc || '';
+            var lineNum   = parseFloat(overUnder.replace(/[^\d.]/g, ''));
+            var edgeTxt   = '';
+            if (modelVal !== undefined && !isNaN(lineNum)) {
+              var diff = modelVal - lineNum;
+              var edgeColor = diff > 0 ? '#81c784' : (diff < -0.05 ? '#ef9a9a' : '#b0b8cc');
+              edgeTxt = '<span style="color:' + edgeColor + ';font-size:0.68rem;margin-left:3px;">'
+                + (diff > 0 ? '▲' : '▼') + Math.abs(diff).toFixed(2) + ' edge</span>';
+            }
+            return '<span class="prop-pill" style="font-size:0.75rem;">'
+              + '<span class="prop-label">' + label + '</span> '
+              + '<span class="prop-line">' + overUnder + '</span> '
+              + '<span class="prop-odds">' + p.odds + '</span>'
+              + edgeTxt
+              + '</span>';
+          }).join('');
+        }
+
+        // Pull model projections from data attrs set on the row
+        var projHits = modelRow ? parseFloat(modelRow.getAttribute('data-proj-hits')) : undefined;
+        var projHr   = modelRow ? parseFloat(modelRow.getAttribute('data-proj-hr'))   : undefined;
+        var projRbi  = modelRow ? parseFloat(modelRow.getAttribute('data-proj-rbi'))  : undefined;
+        var projTb   = modelRow ? parseFloat(modelRow.getAttribute('data-proj-tb'))   : undefined;
+
+        var contentEl = compareRow.querySelector('.prop-compare-content');
+        if (contentEl) {
+          contentEl.innerHTML =
+            pillsForMarket(hitProps, 'Hits', projHits) +
+            pillsForMarket(hrProps,  'HR',   projHr)   +
+            pillsForMarket(rbiProps, 'RBI',  projRbi)  +
+            pillsForMarket(tbProps,  'TB',   projTb);
+        }
+        compareRow.style.display = 'table-row';
       });
 
       btn.textContent = '✓ Props Loaded';
