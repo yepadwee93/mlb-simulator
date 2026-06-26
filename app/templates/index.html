@@ -362,8 +362,8 @@
       </div>
 
       <!-- Public betting % -->
-      {% set pk = (game.away_team, game.home_team) | sort | list | join(',') %}
-      {% set pub = pub_pcts.get((game.away_team, game.home_team) | sort | tuple) %}
+      {% set _teams = [game.away_team, game.home_team] | sort %}
+      {% set pub = pub_pcts.get((_teams[0], _teams[1])) %}
       {% if pub %}
       <div style="margin:6px 0 4px 0; font-size:0.72rem; color:#9aa0b8;">
         <div style="display:flex; justify-content:space-between; margin-bottom:3px;">
