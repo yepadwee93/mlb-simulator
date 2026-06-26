@@ -1626,3 +1626,126 @@ def predict_pitcher_ks(pitcher_stats: dict, lineup_stats: list,
         "model_k_high": round(model_k + std, 1),
         "expected_ip":  round(expected_ip, 1),
     }
+
+
+def optimize_batting_order(
+    lineup_stats: list,
+    pitcher_stats: dict,
+    weather: dict = None,
+    venue: str = None,
+) -> dict:
+    """
+    Suggest an optimized batting order using wOBA-based scoring.
+
+    Classic lineup construction rules:
+      - Slot 1: best OBP (gets the most PAs, needs to be on base)
+      - Slot 2: second-best OBP or best all-around hitter
+      - Slot 3: best overall hitter (highest wOBA)
+      - Slot 4: best power (highest SLG/HR rate)
+      - Slot 5: second-best power
+      - Slots 6-9: descending wOBA
+
+    Returns:
+      {
+        "current":   [{"slot": int, "name": str, "obp": float, "slg": float, "woba": float}, ...],
+        "optimized": [...same structure but reordered...],
+        "changes":   int,   # how many slots differ
+        "run_gain":  float, # estimated extra runs per game
+      }
+    """
+    import itertools
+
+    if not lineup_stats or len(lineup_stats) < 2:
+        return {}
+
+    park = BALLPARK_FACTORS.get(venue, {}) if venue else {}
+    hr_park  = park.get("hr",  1.0)
+    hit_park = park.get("hit", 1.0)
+
+    # Score each batter
+    scored = []
+    for i, stats in enumerate(lineup_stats[:9]):
+        probs = build_batter_probs(stats)
+        probs = apply_pitcher_modifier(probs, pitcher_stats)
+        if weather:
+            probs = apply_weather_modifier(probs, weather)
+
+        adj = list(probs)
+        adj[5] *= hr_park
+        adj[2] *= hit_park
+        adj[3] *= hit_park
+        total = sum(adj)
+        probs = [p / total for p in adj]
+
+        p_walk = probs[0]
+        p_1b   = probs[2]
+        p_2b   = probs[3]
+        p_3b   = probs[4]
+        p_hr   = probs[5]
+        p_hit  = p_1b + p_2b + p_3b + p_hr
+        p_obp  = p_hit + p_walk
+
+        # wOBA weights (approximate)
+        woba = p_walk * 0.69 + p_1b * 0.888 + p_2b * 1.271 + p_3b * 1.616 + p_hr * 2.101
+        slg  = p_1b * 1 + p_2b * 2 + p_3b * 3 + p_hr * 4
+
+        scored.append({
+            "orig_slot": i + 1,
+            "name":  stats.get("name", f"Batter {i+1}"),
+            "obp":   round(p_obp, 3),
+            "slg":   round(slg,   3),
+            "woba":  round(woba,  3),
+            "p_hr":  round(p_hr,  4),
+        })
+
+    # Build current order info
+    current = [{"slot": b["orig_slot"], "name": b["name"],
+                "obp": b["obp"], "slg": b["slg"], "woba": b["woba"]} for b in scored]
+
+    # Sort by wOBA descending to rank players
+    ranked = sorted(scored, key=lambda x: x["woba"], reverse=True)
+
+    # Apply lineup construction rules:
+    # Slot 1 → highest OBP, Slot 2 → 2nd highest OBP, 3 → top wOBA,
+    # 4 → top HR, 5 → 2nd HR, 6-9 → remaining by wOBA desc
+    by_obp  = sorted(scored, key=lambda x: x["obp"],  reverse=True)
+    by_woba = sorted(scored, key=lambda x: x["woba"], reverse=True)
+    by_hr   = sorted(scored, key=lambda x: x["p_hr"], reverse=True)
+
+    assigned = []
+    used = set()
+
+    def pick(pool, used):
+        for p in pool:
+            if p["name"] not in used:
+                used.add(p["name"])
+                return p
+
+    slot1 = pick(by_obp,  used)
+    slot2 = pick(by_obp,  used)
+    slot3 = pick(by_woba, used)
+    slot4 = pick(by_hr,   used)
+    slot5 = pick(by_hr,   used)
+    rest  = [b for b in by_woba if b["name"] not in used]
+
+    optimized_order = [slot1, slot2, slot3, slot4, slot5] + rest
+
+    optimized = [{"slot": i + 1, "name": b["name"],
+                  "obp": b["obp"], "slg": b["slg"], "woba": b["woba"],
+                  "orig_slot": b["orig_slot"]}
+                 for i, b in enumerate(optimized_order) if b]
+
+    # Count changes
+    changes = sum(1 for a, b in zip(current, optimized) if a["name"] != b["name"])
+
+    # Estimate run gain: top-of-order wOBA improvement × ~0.3 runs per wOBA point per slot
+    current_top3_woba  = sum(c["woba"] for c in current[:3])  / 3
+    optimized_top3_woba = sum(o["woba"] for o in optimized[:3]) / 3
+    run_gain = round((optimized_top3_woba - current_top3_woba) * 3.0, 2)
+
+    return {
+        "current":   current,
+        "optimized": optimized,
+        "changes":   changes,
+        "run_gain":  run_gain,
+    }

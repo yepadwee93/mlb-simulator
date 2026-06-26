@@ -1030,6 +1030,71 @@
 </div>
 {% endif %}
 
+{# ── Batting Order Optimizer ── #}
+{% macro order_table(team, opt) %}
+{% if opt and opt.optimized %}
+<div style="margin-bottom:24px;">
+  <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#b0b8cc;margin-bottom:10px;">
+    {{ team }}
+    {% if opt.changes == 0 %}
+      <span style="color:#4caf50;margin-left:8px;">✓ Current order is optimal</span>
+    {% else %}
+      <span style="color:#ffd54f;margin-left:8px;">{{ opt.changes }} slot{{ 's' if opt.changes != 1 }} differ</span>
+      {% if opt.run_gain > 0 %}
+      <span style="color:#81c784;margin-left:6px;">+{{ opt.run_gain }} projected runs/game</span>
+      {% endif %}
+    {% endif %}
+  </div>
+  <table style="width:100%;border-collapse:collapse;font-size:0.8rem;">
+    <thead>
+      <tr>
+        <th style="padding:6px 10px;text-align:left;color:#9aa0b8;font-size:0.67rem;text-transform:uppercase;border-bottom:1px solid #252836;">Slot</th>
+        <th style="padding:6px 10px;text-align:left;color:#9aa0b8;font-size:0.67rem;text-transform:uppercase;border-bottom:1px solid #252836;">Player</th>
+        <th style="padding:6px 10px;text-align:right;color:#9aa0b8;font-size:0.67rem;text-transform:uppercase;border-bottom:1px solid #252836;">OBP</th>
+        <th style="padding:6px 10px;text-align:right;color:#9aa0b8;font-size:0.67rem;text-transform:uppercase;border-bottom:1px solid #252836;">SLG</th>
+        <th style="padding:6px 10px;text-align:right;color:#9aa0b8;font-size:0.67rem;text-transform:uppercase;border-bottom:1px solid #252836;">wOBA</th>
+        <th style="padding:6px 10px;text-align:center;color:#9aa0b8;font-size:0.67rem;text-transform:uppercase;border-bottom:1px solid #252836;">Was</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for b in opt.optimized %}
+      {% set moved = b.orig_slot != b.slot %}
+      <tr style="border-bottom:1px solid #1a1d28;{% if moved %}background:#0f1a10;{% endif %}">
+        <td style="padding:7px 10px;color:#555870;font-weight:700;">{{ b.slot }}</td>
+        <td style="padding:7px 10px;color:#e8eaf0;font-weight:600;">
+          {{ b.name }}
+          {% if moved %}<span style="font-size:0.65rem;color:#81c784;margin-left:4px;">↑ moved</span>{% endif %}
+        </td>
+        <td style="padding:7px 10px;text-align:right;color:#64b5f6;">{{ "%.3f"|format(b.obp) }}</td>
+        <td style="padding:7px 10px;text-align:right;color:#b0b8cc;">{{ "%.3f"|format(b.slg) }}</td>
+        <td style="padding:7px 10px;text-align:right;font-weight:700;color:{% if b.woba >= 0.37 %}#4caf50{% elif b.woba >= 0.32 %}#ffd54f{% else %}#ef9a9a{% endif %};">{{ "%.3f"|format(b.woba) }}</td>
+        <td style="padding:7px 10px;text-align:center;color:#555870;font-size:0.75rem;">
+          {% if moved %}#{{ b.orig_slot }}{% else %}—{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endmacro %}
+
+{% if away_order_opt or home_order_opt %}
+<div class="card" style="max-width:900px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+    <h2 style="font-size:1rem;font-weight:800;">🔢 Batting Order Optimizer</h2>
+    <span style="font-size:0.72rem;color:#9aa0b8;">Based on model OBP · SLG · wOBA vs today's pitcher</span>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+    <div>{{ order_table(away_team, away_order_opt) }}</div>
+    <div>{{ order_table(home_team, home_order_opt) }}</div>
+  </div>
+  <div style="font-size:0.68rem;color:#555870;margin-top:8px;">
+    Optimal order: Slots 1-2 highest OBP · Slot 3 best overall · Slots 4-5 top power · 6-9 descending wOBA
+  </div>
+</div>
+{% endif %}
+
 <script>
 // ── Toggle batter stat rows ───────────────────────────────────────
 function toggleStats(uid) {

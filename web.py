@@ -51,7 +51,7 @@ from data.mlb_api import (
     get_live_scores,
     compute_injury_impact,
 )
-from simulation.engine import run_simulation, predict_pitcher_ks, detect_pitcher_form, predict_batter_props
+from simulation.engine import run_simulation, predict_pitcher_ks, detect_pitcher_form, predict_batter_props, optimize_batting_order
 
 app = Flask(__name__, template_folder="app/templates")
 app.secret_key = os.environ.get("SECRET_KEY", "mlb-sim-secret-change-in-prod-2026")
@@ -966,6 +966,20 @@ def simulate(game_pk):
 
     result["away_batter_props"] = away_batter_props
     result["home_batter_props"] = home_batter_props
+
+    # ── Batting order optimizer ───────────────────────────────────────
+    try:
+        result["away_order_opt"] = optimize_batting_order(
+            away_batter_stats, home_pitcher_stats,
+            weather=weather, venue=game.get("venue"),
+        )
+        result["home_order_opt"] = optimize_batting_order(
+            home_batter_stats, away_pitcher_stats,
+            weather=weather, venue=game.get("venue"),
+        )
+    except Exception:
+        result["away_order_opt"] = {}
+        result["home_order_opt"] = {}
 
     return render_template("result.html", game_pk=game_pk, n_sims=n_sims, **result)
 
