@@ -412,17 +412,14 @@
       {% endif %}
 
       <!-- Simulate buttons -->
-      {% if badge in ['live', 'final', 'delayed'] %}
-        <!-- Lineup is available — show sim count picker -->
+      {% if badge != 'pregame' or is_today %}
+        <!-- Show sim buttons for all today's games + live/final regardless of date -->
         <div class="sim-picker">
           <span class="sim-label">Sims:</span>
           <a class="sim-opt" href="/simulate/{{ game.gamePk }}?sims=100000">100k</a>
           <a class="sim-opt" href="/simulate/{{ game.gamePk }}?sims=500000">500k</a>
           <a class="sim-opt" href="/simulate/{{ game.gamePk }}?sims=1000000">1M</a>
         </div>
-      {% elif badge == 'pregame' and is_today %}
-        <!-- Game today but lineup not set yet -->
-        <span class="btn-disabled">🕐 Lineup locks ~1hr before first pitch</span>
       {% elif badge == 'pregame' and not is_today %}
         <!-- Future game — show probable pitchers but can't simulate -->
         <span class="btn-disabled">📅 Simulation available on game day</span>
