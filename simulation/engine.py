@@ -481,6 +481,75 @@ def precompute_lineup(lineup_stats: list, pitcher_stats: dict,
     return result
 
 
+# ── Batter situational tendency rates ────────────────────────────
+
+# League-average rates used as fallback when a batter lacks enough sample
+LEAGUE_GDP_RATE    = 0.09   # % of non-K outs with runner on 1st that become DPs
+LEAGUE_SF_RATE     = 0.04   # % of outs with runner on 3rd, <2 out that score as sac flies
+LEAGUE_SB_RATE     = 0.04   # % of at-bats with runner on 1st only where steal is attempted
+LEAGUE_SB_SUCCESS  = 0.72   # % of steal attempts that succeed (league average)
+
+
+def compute_batter_rates(lineup_stats: list) -> list:
+    """
+    Extract per-batter situational tendency rates from season stats.
+
+    These rates are used inside simulate_half_inning to apply:
+      - GIDP  (ground into double play): when runner on 1st, <2 outs, non-K out
+      - SF    (sacrifice fly): when runner on 3rd, <2 outs, non-K out
+      - SB    (stolen base attempt): when runner on 1st only, before each at-bat
+
+    Returns a list of dicts (one per batter):
+      {
+        "gdp_rate":   float,   # probability a non-K out becomes a GIDP (runner on 1st)
+        "sf_rate":    float,   # probability a non-K out becomes a sac fly (runner on 3rd)
+        "sb_rate":    float,   # probability of a steal attempt (runner on 1st, 2nd open)
+        "sb_success": float,   # probability the steal succeeds if attempted
+      }
+    """
+    rates = []
+    for stats in lineup_stats:
+        ab  = int(stats.get("atBats",              0) or 0)
+        gdp = int(stats.get("groundIntoDoublePlay", 0) or 0)
+        sf  = int(stats.get("sacFlies",            0) or 0)
+        sb  = int(stats.get("stolenBases",         0) or 0)
+        cs  = int(stats.get("caughtStealing",      0) or 0)
+        hits = int(stats.get("hits",               0) or 0)
+        k    = int(stats.get("strikeOuts",         0) or 0)
+        pa   = int(stats.get("plateAppearances",   0) or 0)
+
+        if ab >= 100:
+            # GIDP rate: GDP / (non-K outs) — these are the outs where a DP is even possible
+            non_k_outs = max(ab - hits - k, 1)
+            gdp_rate   = gdp / non_k_outs
+
+            # Sac fly rate: SF / (estimated PA with runner on 3rd, <2 out)
+            # ~20% of PA come with runner on 3rd and <2 out (rough MLB estimate)
+            sf_eligible = max(pa * 0.20, 1)
+            sf_rate     = sf / sf_eligible
+
+            # SB: attempt rate per PA where runner on 1st only (~30% of PA)
+            sb_attempts = sb + cs
+            sb_eligible = max(pa * 0.30, 1)
+            sb_rate     = sb_attempts / sb_eligible
+            sb_success  = (sb / sb_attempts) if sb_attempts >= 5 else LEAGUE_SB_SUCCESS
+        else:
+            # Insufficient sample — use league averages
+            gdp_rate   = LEAGUE_GDP_RATE
+            sf_rate    = LEAGUE_SF_RATE
+            sb_rate    = LEAGUE_SB_RATE
+            sb_success = LEAGUE_SB_SUCCESS
+
+        rates.append({
+            "gdp_rate":   round(min(max(gdp_rate,   0.01), 0.25), 3),
+            "sf_rate":    round(min(max(sf_rate,    0.005), 0.15), 3),
+            "sb_rate":    round(min(max(sb_rate,    0.005), 0.20), 3),
+            "sb_success": round(min(max(sb_success, 0.45), 0.92), 3),
+        })
+
+    return rates
+
+
 # ── STEP 2: Simulate one at-bat ─────────────────────────────────
 
 def simulate_at_bat(cum_weights: list) -> str:
@@ -543,7 +612,8 @@ def advance_runners(b1: bool, b2: bool, b3: bool, outcome: str) -> tuple:
 # ── STEP 4: Simulate one half-inning ────────────────────────────
 
 def simulate_half_inning(precomp_lineup: list, lineup_pos: int,
-                         risp_precomp: list = None) -> tuple:
+                         risp_precomp: list = None,
+                         batter_rates: list = None) -> tuple:
     """
     Simulate one half-inning (3 outs) for one team.
 
@@ -552,8 +622,12 @@ def simulate_half_inning(precomp_lineup: list, lineup_pos: int,
     risp_precomp:   optional — RISP (runners in scoring position) probs.
                     When a runner is on 2nd or 3rd, we swap to these probs
                     instead of the regular ones. Clutch batters get a boost;
-                    chokers take a hit. This is the biggest single accuracy gain
-                    because it directly captures who scores when it matters.
+                    chokers take a hit.
+    batter_rates:   optional — per-batter situational tendency rates from
+                    compute_batter_rates(). Enables:
+                      • GIDP  — runner on 1st, <2 outs, non-K out → double play
+                      • SF    — runner on 3rd, <2 outs, non-K out → run scores
+                      • SB    — runner on 1st only → steal attempt before each AB
 
     Returns: (runs_scored, new_lineup_pos)
     The lineup_pos return value lets the next inning pick up where this one left off.
@@ -564,7 +638,23 @@ def simulate_half_inning(precomp_lineup: list, lineup_pos: int,
     pos = lineup_pos
 
     while outs < 3:
-        # Use RISP probs when runner is on 2nd or 3rd (scoring position)
+        # ── Stolen base attempt (between at-bats, runner on 1st only) ────────
+        # We check BEFORE the current batter faces a pitch.
+        # Uses the previous batter's (the runner's) steal tendency.
+        if batter_rates and b1 and not b2 and outs < 2:
+            runner_idx = (pos - 1) % 9   # runner on 1st was the prior batter
+            r = batter_rates[runner_idx]
+            if random.random() < r["sb_rate"]:
+                if random.random() < r["sb_success"]:
+                    b2, b1 = True, False    # successful steal of 2nd
+                else:
+                    b1 = False              # caught stealing — runner is out
+                    outs += 1
+                    if outs >= 3:
+                        break
+
+        # ── Select probability array ──────────────────────────────────────────
+        # Switch to RISP stats when runner is on 2nd or 3rd (scoring position).
         if risp_precomp and (b2 or b3):
             cum_weights = risp_precomp[pos % 9]
         else:
@@ -573,6 +663,29 @@ def simulate_half_inning(precomp_lineup: list, lineup_pos: int,
         outcome = simulate_at_bat(cum_weights)
 
         if outcome in (STRIKEOUT, OUT):
+            if outcome == OUT and batter_rates and outs < 2:
+                batter_idx = pos % 9
+
+                # ── GIDP: runner on 1st, <2 outs, non-K out ──────────────────
+                # Ground ball turns into a double play — two outs, runner erased.
+                if b1:
+                    if random.random() < batter_rates[batter_idx]["gdp_rate"]:
+                        outs += 2       # batter AND runner are both out
+                        b1 = False      # runner on 1st is erased
+                        pos += 1
+                        continue
+
+                # ── Sac fly: runner on 3rd, <2 outs, non-K out ───────────────
+                # Ball is caught in the outfield — runner tags and scores.
+                # (Only checked if GIDP didn't fire above)
+                if b3:
+                    if random.random() < batter_rates[batter_idx]["sf_rate"]:
+                        runs += 1       # run scores on the sac fly
+                        b3 = False      # runner on 3rd scores
+                        outs += 1
+                        pos += 1
+                        continue
+
             outs += 1
         else:
             b1, b2, b3, new_runs = advance_runners(b1, b2, b3, outcome)
@@ -594,6 +707,8 @@ def simulate_game(
     home_precomp_late:  list = None,
     away_precomp_risp:  list = None,    # RISP probs for away batters (b2 or b3 occupied)
     home_precomp_risp:  list = None,    # RISP probs for home batters
+    away_batter_rates:  list = None,    # per-batter GIDP/SF/SB rates for away batters
+    home_batter_rates:  list = None,    # per-batter GIDP/SF/SB rates for home batters
     innings: int = 9,
     bullpen_start: int = 5,             # 0-indexed: inning 6 in human terms
     mid_start:     int = 2,             # 0-indexed: inning 3 in human terms
@@ -631,8 +746,9 @@ def simulate_game(
             away_cur = away_precomp_early
             home_cur = home_precomp_early
 
-        # Away team bats (pass RISP probs — used whenever b2 or b3 is occupied)
-        runs, away_pos = simulate_half_inning(away_cur, away_pos, away_precomp_risp)
+        # Away team bats (RISP probs swap in when b2/b3; GIDP/SF/SB from batter_rates)
+        runs, away_pos = simulate_half_inning(away_cur, away_pos,
+                                              away_precomp_risp, away_batter_rates)
         away_runs += runs
 
         # Walk-off rule: home team wins in 9th without finishing if already ahead
@@ -640,7 +756,8 @@ def simulate_game(
             break
 
         # Home team bats
-        runs, home_pos = simulate_half_inning(home_cur, home_pos, home_precomp_risp)
+        runs, home_pos = simulate_half_inning(home_cur, home_pos,
+                                              home_precomp_risp, home_batter_rates)
         home_runs += runs
 
     # Extra innings if tied (up to 3 extra) — use bullpen probs
@@ -648,9 +765,11 @@ def simulate_game(
     extra_home = home_precomp_late or home_precomp_mid or home_precomp_early
     extra = 0
     while away_runs == home_runs and extra < 3:
-        runs, away_pos = simulate_half_inning(extra_away, away_pos, away_precomp_risp)
+        runs, away_pos = simulate_half_inning(extra_away, away_pos,
+                                              away_precomp_risp, away_batter_rates)
         away_runs += runs
-        runs, home_pos = simulate_half_inning(extra_home, home_pos, home_precomp_risp)
+        runs, home_pos = simulate_half_inning(extra_home, home_pos,
+                                              home_precomp_risp, home_batter_rates)
         home_runs += runs
         extra += 1
 
@@ -771,6 +890,13 @@ def run_simulation(
             home_rp_stats, away_bp_pitcher, weather, home_recent, venue
         )
 
+    # ── Compute per-batter situational rates (GIDP, sac fly, stolen base) ──────
+    # Derived from season stats already in memory — no extra API calls needed.
+    # away_batter_rates describes away BATTERS (how they run, hit with runners on)
+    # home_batter_rates describes home BATTERS
+    away_batter_rates = compute_batter_rates(away_lineup)
+    home_batter_rates = compute_batter_rates(home_lineup)
+
     # ── Run the simulation loop ───────────────────────────────────────
     away_wins  = 0
     home_wins  = 0
@@ -783,6 +909,7 @@ def run_simulation(
             away_precomp_mid,   home_precomp_mid,
             away_precomp_late,  home_precomp_late,
             away_precomp_risp,  home_precomp_risp,
+            away_batter_rates,  home_batter_rates,
         )
         away_total += a
         home_total += h
