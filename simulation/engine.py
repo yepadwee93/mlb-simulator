@@ -644,6 +644,13 @@ def advance_runners(b1: bool, b2: bool, b3: bool, outcome: str) -> tuple:
 
 # ── STEP 4: Simulate one half-inning ────────────────────────────
 
+# League-average error and wild pitch rates (2024 MLB season)
+# Error: ~0.50 errors per team per game / 27 outs = ~1.85% per non-K out
+# Wild pitch/PB: ~0.40 WP+PB per team per game = ~1.5% per AB with runners on
+ERROR_RATE      = 0.018
+WILD_PITCH_RATE = 0.015
+
+
 def simulate_half_inning(precomp_lineup: list, lineup_pos: int,
                          risp_precomp: list = None,
                          batter_rates: list = None) -> tuple:
@@ -719,8 +726,32 @@ def simulate_half_inning(precomp_lineup: list, lineup_pos: int,
                         pos += 1
                         continue
 
+            # -- Error: on a non-K out, small chance batter reaches base
+            if outcome == OUT and random.random() < ERROR_RATE:
+                # Fielding error -- batter reaches 1st, runners advance
+                b1, b2, b3, new_runs = advance_runners(b1, b2, b3, SINGLE)
+                runs += new_runs
+                pos += 1
+                continue   # no out recorded
+
             outs += 1
+
+            # -- Wild pitch / passed ball: advance all runners one base
+            # Only matters when there are runners on base.
+            if (b1 or b2 or b3) and random.random() < WILD_PITCH_RATE:
+                if b3: runs += 1
+                b3 = b2
+                b2 = b1
+                b1 = False
+
         else:
+            # -- Wild pitch before the hit: runners advance on passed ball
+            if (b1 or b2 or b3) and random.random() < WILD_PITCH_RATE:
+                if b3: runs += 1
+                b3 = b2
+                b2 = b1
+                b1 = False
+
             b1, b2, b3, new_runs = advance_runners(b1, b2, b3, outcome)
             runs += new_runs
 
