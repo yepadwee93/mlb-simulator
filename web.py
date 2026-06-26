@@ -1240,10 +1240,10 @@ def my_picks():
         )
         return jsonify({"status": "ok"})
     update_pick_results(user_id=_uid())
-    picks = get_all_picks(user_id=_uid())
+    games = get_today_schedule()
     stats = get_pick_stats(user_id=_uid())
-    return render_template("my_picks.html", picks=picks, stats=stats,
-                           username=current_user.username)
+    return render_template("my_picks.html", games=games,
+                           username=current_user.username, **stats)
 
 
 @app.route("/my-picks/update", methods=["POST"])
