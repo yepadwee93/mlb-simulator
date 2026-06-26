@@ -732,3 +732,89 @@ def get_game_umpire(game_pk):
     except Exception:
         pass
     return None
+
+
+def get_team_bullpen_usage(team_id: int, days_back: int = 3) -> dict:
+    """
+    Return the total bullpen innings pitched over the last `days_back` days
+    for a given team, plus a fatigue label.
+
+    Strategy: fetch the team schedule for recent dates, pull boxscores for
+    completed games, sum IP from all non-starting pitchers.
+
+    Returns:
+      {
+        "total_bp_ip":  float,   # total bullpen IP in the window
+        "games_played": int,     # games found in the window
+        "fatigue":      str,     # "fresh" | "normal" | "tired" | "gassed"
+        "era_modifier": float,   # multiply against bullpen ERA (1.0 = no change)
+        "whip_modifier": float,
+      }
+    """
+    from datetime import date as _date, timedelta
+    today = _date.today()
+    total_bp_ip = 0.0
+    games_played = 0
+
+    for d in range(1, days_back + 1):
+        check_date = (today - timedelta(days=d)).isoformat()
+        try:
+            sched = _get("/schedule", params={
+                "sportId": 1,
+                "date": check_date,
+                "teamId": team_id,
+                "hydrate": "team",
+            })
+            for day in sched.get("dates", []):
+                for game in day.get("games", []):
+                    status = game.get("status", {}).get("detailedState", "").lower()
+                    if not any(w in status for w in ("final", "game over", "completed")):
+                        continue
+                    gp = game["gamePk"]
+                    # Determine which side this team is
+                    home_id = game["teams"]["home"]["team"]["id"]
+                    side = "home" if home_id == team_id else "away"
+                    try:
+                        box = _get(f"/game/{gp}/boxscore")
+                        team_data = box["teams"][side]
+                        pitchers   = team_data.get("pitchers", [])   # list of player IDs
+                        players    = team_data.get("players", {})
+                        if not pitchers:
+                            continue
+                        starter_id = pitchers[0]   # first pitcher listed = starter
+                        for pid in pitchers[1:]:   # all others = bullpen
+                            p_stats = players.get(f"ID{pid}", {}).get("stats", {}).get("pitching", {})
+                            ip_str  = str(p_stats.get("inningsPitched", "0"))
+                            # IP is stored as "1.2" meaning 1 full inning + 2 outs
+                            try:
+                                parts = ip_str.split(".")
+                                full  = int(parts[0])
+                                outs  = int(parts[1]) if len(parts) > 1 else 0
+                                total_bp_ip += full + outs / 3
+                            except (ValueError, IndexError):
+                                pass
+                        games_played += 1
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+    # Classify fatigue level
+    # League average: ~3.5 BP IP per game
+    # Gassed: 5+ IP in window (deep into pen multiple days)
+    if total_bp_ip >= 5.0 or (games_played >= 2 and total_bp_ip >= 8.0):
+        fatigue, era_mod, whip_mod = "gassed",  1.18, 1.12
+    elif total_bp_ip >= 3.5 or (games_played >= 2 and total_bp_ip >= 6.0):
+        fatigue, era_mod, whip_mod = "tired",   1.10, 1.06
+    elif total_bp_ip >= 1.5:
+        fatigue, era_mod, whip_mod = "normal",  1.00, 1.00
+    else:
+        fatigue, era_mod, whip_mod = "fresh",   0.93, 0.97
+
+    return {
+        "total_bp_ip":   round(total_bp_ip, 1),
+        "games_played":  games_played,
+        "fatigue":       fatigue,
+        "era_modifier":  era_mod,
+        "whip_modifier": whip_mod,
+    }

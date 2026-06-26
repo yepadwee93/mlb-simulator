@@ -250,6 +250,13 @@
       flex-shrink: 0;
     }
     .pitcher-name { font-weight: 600; color: #c8cdd8; font-size: 0.8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .bp-badge {
+      display: inline-block; font-size: 0.62rem; padding: 1px 7px;
+      border-radius: 4px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px;
+    }
+    .bp-fresh  { background: #1a3a1a; color: #66bb6a; border: 1px solid #2a4a2a; }
+    .bp-tired  { background: #3a2a10; color: #ffa726; border: 1px solid #5a3a10; }
+    .bp-gassed { background: #3a1a1a; color: #ef5350; border: 1px solid #5a2a2a; }
     .umpire-badge {
       font-size: 0.7rem;
       color: #8890a4;
@@ -580,12 +587,18 @@
             <div style="font-size:0.7rem;color:#666">SP</div>
           </div>
         </div>
-        {%- if r.umpire %}
         <div class="umpire-badge">
+          {%- if r.away_bp_fatigue and r.away_bp_fatigue != "normal" %}
+          <span class="bp-badge bp-{{ r.away_bp_fatigue }}">Away pen {{ r.away_bp_fatigue }}</span><br>
+          {%- endif %}
+          {%- if r.umpire %}
           <div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:.4px;">HP Ump</div>
           <div style="color:#c8cdd8;font-size:0.75rem;font-weight:600;">{{ r.umpire }}</div>
+          {%- endif %}
+          {%- if r.home_bp_fatigue and r.home_bp_fatigue != "normal" %}
+          <br><span class="bp-badge bp-{{ r.home_bp_fatigue }}">Home pen {{ r.home_bp_fatigue }}</span>
+          {%- endif %}
         </div>
-        {%- endif %}
         <div class="pitcher-block home">
           <div>
             <div class="pitcher-name">{{ r.home_pitcher_name }}</div>

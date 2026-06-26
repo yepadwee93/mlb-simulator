@@ -1029,6 +1029,8 @@ def run_simulation(
     away_savant:         list = None,  # Statcast data per away batter
     home_savant:         list = None,  # Statcast data per home batter
     umpire_name:         str  = None,  # home plate umpire for K/BB modifier
+    away_bp_fatigue:     dict = None,  # bullpen fatigue {era_modifier, whip_modifier, fatigue}
+    home_bp_fatigue:     dict = None,  # bullpen fatigue for home team
     n:                   int = 100_000,
 ) -> dict:
     """
@@ -1094,8 +1096,24 @@ def run_simulation(
     # ── Late game: batters vs the bullpen (innings 6+) ───────────────
     # Use real team bullpen ERA/WHIP if available, otherwise league average.
     # A team with a 3.00 bullpen ERA gets a real edge in innings 6-9.
-    away_bp_pitcher = away_bullpen if away_bullpen else LEAGUE_AVG_PITCHER
-    home_bp_pitcher = home_bullpen if home_bullpen else LEAGUE_AVG_PITCHER
+    def _apply_bp_fatigue(bp_stats, fatigue):
+        """Scale bullpen ERA/WHIP up when the pen is tired."""
+        if not fatigue or not bp_stats:
+            return bp_stats
+        era_mod  = fatigue.get('era_modifier',  1.0)
+        whip_mod = fatigue.get('whip_modifier', 1.0)
+        result = dict(bp_stats)
+        try:
+            result['era']  = str(round(float(result.get('era',  4.20)) * era_mod,  2))
+            result['whip'] = str(round(float(result.get('whip', 1.30)) * whip_mod, 3))
+        except (ValueError, TypeError):
+            pass
+        return result
+
+    away_bp_pitcher_raw = away_bullpen if away_bullpen else LEAGUE_AVG_PITCHER
+    home_bp_pitcher_raw = home_bullpen if home_bullpen else LEAGUE_AVG_PITCHER
+    away_bp_pitcher = _apply_bp_fatigue(away_bp_pitcher_raw, away_bp_fatigue)
+    home_bp_pitcher = _apply_bp_fatigue(home_bp_pitcher_raw, home_bp_fatigue)
 
     away_precomp_late = None
     home_precomp_late = None

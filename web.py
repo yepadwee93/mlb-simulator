@@ -35,6 +35,7 @@ from data.mlb_api import (
     get_team_rest_days,
     get_savant_stats_all,
     get_game_umpire,
+    get_team_bullpen_usage,
 )
 from simulation.engine import run_simulation
 
@@ -243,6 +244,13 @@ def build_game_result(game, n_sims, use_splits=True):
         away_batter_rest = None
         home_batter_rest = None
 
+    try:
+        away_bp_fatigue = get_team_bullpen_usage(game["away_id"])
+        home_bp_fatigue = get_team_bullpen_usage(game["home_id"])
+    except Exception:
+        away_bp_fatigue = None
+        home_bp_fatigue = None
+
     # Fetch umpire for K/BB tendency modifier
     try:
         umpire_name = get_game_umpire(game["gamePk"])
@@ -306,12 +314,18 @@ def build_game_result(game, n_sims, use_splits=True):
         away_savant         = away_savant,
         home_savant         = home_savant,
         umpire_name         = umpire_name,
+        away_bp_fatigue     = away_bp_fatigue,
+        home_bp_fatigue     = home_bp_fatigue,
         n                   = n_sims,
     )
 
     # Attach IDs for logo/headshot URLs in templates
     result["away_team_id"]     = game.get("away_id")
     result["home_team_id"]     = game.get("home_id")
+    result["away_bp_fatigue"]  = (away_bp_fatigue or {}).get("fatigue", "normal")
+    result["home_bp_fatigue"]  = (home_bp_fatigue or {}).get("fatigue", "normal")
+    result["away_bp_ip"]       = (away_bp_fatigue or {}).get("total_bp_ip", None)
+    result["home_bp_ip"]       = (home_bp_fatigue or {}).get("total_bp_ip", None)
     result["away_pitcher_id"]  = away_pitcher.get("id")
     result["home_pitcher_id"]  = home_pitcher.get("id")
     result["away_pitcher_name"] = away_pitcher.get("name", "TBD")
