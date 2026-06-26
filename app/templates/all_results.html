@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>All Games — MLB Simulator</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0f1117;
+      color: #e8eaf0;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      min-height: 100vh;
+      padding: 40px 20px;
+    }
+
+    a.back { color: #64b5f6; text-decoration: none; font-size: 0.9rem; display: inline-block; margin-bottom: 28px; }
+    a.back:hover { text-decoration: underline; }
+
+    header { text-align: center; margin-bottom: 36px; }
+    header h1 { font-size: 2rem; font-weight: 800; }
+    header p  { color: #8890a4; margin-top: 6px; font-size: 0.95rem; }
+
+    /* ── Parlay box ── */
+    .parlay-box {
+      max-width: 820px;
+      margin: 0 auto 40px auto;
+      background: linear-gradient(135deg, #1a1230, #0f1f35);
+      border: 1px solid #4a3a7a;
+      border-radius: 16px;
+      padding: 28px 32px;
+    }
+
+    .parlay-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 20px;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .parlay-title {
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: #c084fc;
+    }
+
+    .parlay-title span { color: #ffffff; }
+
+    .parlay-combined {
+      text-align: right;
+    }
+
+    .parlay-combined .pct {
+      font-size: 2rem;
+      font-weight: 800;
+      color: #a78bfa;
+      line-height: 1;
+    }
+
+    .parlay-combined .lbl {
+      font-size: 0.72rem;
+      color: #8890a4;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-top: 2px;
+    }
+
+    .parlay-picks {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .parlay-pick {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(255,255,255,0.04);
+      border-radius: 8px;
+      padding: 10px 14px;
+    }
+
+    .pick-team  { font-weight: 700; font-size: 1rem; }
+    .pick-opp   { font-size: 0.8rem; color: #8890a4; margin-top: 2px; }
+    .pick-pct   { font-size: 1.2rem; font-weight: 800; color: #a78bfa; }
+
+    .no-parlay {
+      color: #8890a4;
+      font-style: italic;
+      text-align: center;
+      padding: 12px 0;
+    }
+
+    .disclaimer {
+      margin-top: 16px;
+      font-size: 0.73rem;
+      color: #555870;
+      text-align: center;
+    }
+
+    /* ── Games grid ── */
+    .section-title {
+      max-width: 820px;
+      margin: 0 auto 16px auto;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: #8890a4;
+      font-weight: 600;
+    }
+
+    .games-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+      gap: 16px;
+      max-width: 820px;
+      margin: 0 auto;
+    }
+
+    .game-card {
+      background: #1a1d27;
+      border: 1px solid #2a2d3a;
+      border-radius: 12px;
+      padding: 20px 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .game-card.parlay-pick-card {
+      border-color: #7c3aed;
+      background: #1a1730;
+    }
+
+    /* Team matchup row */
+    .matchup-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .team-block { flex: 1; }
+    .team-block.away { text-align: left; }
+    .team-block.home { text-align: right; }
+
+    .team-name { font-weight: 700; font-size: 0.95rem; }
+    .team-pct  { font-size: 1.5rem; font-weight: 800; line-height: 1; margin-top: 4px; }
+    .team-pct.away { color: #64b5f6; }
+    .team-pct.home { color: #81c784; }
+    .team-label { font-size: 0.7rem; color: #8890a4; text-transform: uppercase; letter-spacing: 0.4px; }
+
+    .at-divider { color: #555870; font-size: 0.85rem; }
+
+    /* Prob bar */
+    .prob-bar {
+      height: 8px;
+      border-radius: 4px;
+      overflow: hidden;
+      background: #2a2d3a;
+      display: flex;
+    }
+    .bar-away { background: #2563eb; height: 100%; }
+    .bar-home { background: #16a34a; height: 100%; flex: 1; }
+
+    /* Score + weather row */
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.82rem;
+    }
+
+    .predicted-score { color: #ffffff; font-weight: 600; }
+    .weather-badge {
+      background: #1e2a3a;
+      color: #64b5f6;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+    }
+
+    /* Pitcher row */
+    .pitcher-row {
+      font-size: 0.78rem;
+      color: #8890a4;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .hand-badge {
+      display: inline-block;
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 1px 5px;
+      border-radius: 4px;
+      margin-left: 4px;
+      vertical-align: middle;
+    }
+    .hand-L { background: #1e3a2f; color: #4caf50; }
+    .hand-R { background: #1e2a3a; color: #64b5f6; }
+
+    .parlay-tag {
+      font-size: 0.68rem;
+      font-weight: 700;
+      background: #7c3aed;
+      color: #fff;
+      padding: 2px 8px;
+      border-radius: 10px;
+      letter-spacing: 0.3px;
+    }
+
+    footer {
+      text-align: center;
+      margin-top: 50px;
+      color: #555870;
+      font-size: 0.78rem;
+    }
+  </style>
+</head>
+<body>
+
+<a class="back" href="/">← Back to game picker</a>
+
+<header>
+  <h1>⚾ Today's Predictions</h1>
+  <p>{{ date }} · {{ results|length }} games · {{ n_sims|int // 1000 }}k simulations each</p>
+</header>
+
+<!-- ── Best Parlay Box ── -->
+<div class="parlay-box">
+  <div class="parlay-header">
+    <div>
+      <div class="parlay-title">🎯 Best Parlay — <span>Teams ≥ 60% to Win</span></div>
+      {% if parlay_picks %}
+        <div style="color:#8890a4; font-size:0.82rem; margin-top:6px;">
+          {{ parlay_picks|length }}-team parlay · all picks must win
+        </div>
+      {% endif %}
+    </div>
+    {% if parlay_picks %}
+    <div class="parlay-combined">
+      <div class="pct">{{ combined_prob }}%</div>
+      <div class="lbl">combined probability</div>
+    </div>
+    {% endif %}
+  </div>
+
+  {% if parlay_picks %}
+    <div class="parlay-picks">
+      {% for pick in parlay_picks %}
+      <div class="parlay-pick">
+        <div>
+          <div class="pick-team">{{ pick.team }}</div>
+          <div class="pick-opp">vs {{ pick.opponent }} · {{ pick.venue }}</div>
+        </div>
+        <div class="pick-pct">{{ pick.win_pct }}%</div>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="disclaimer">
+      ⚠ For entertainment only. Probabilities are model estimates, not guaranteed outcomes.
+    </div>
+  {% else %}
+    <div class="no-parlay">No games cleared the 60% threshold today — too close to call across the board.</div>
+  {% endif %}
+</div>
+
+<!-- ── All Game Cards ── -->
+<div class="section-title">ALL GAMES TODAY</div>
+
+<div class="games-grid">
+  {% for r in results %}
+    {% set is_parlay = false %}
+    {% for pick in parlay_picks %}
+      {% if pick.team == r.away_team or pick.team == r.home_team %}
+        {% set is_parlay = true %}
+      {% endif %}
+    {% endfor %}
+
+    <div class="game-card {% if is_parlay %}parlay-pick-card{% endif %}">
+
+      <!-- Team names + win % -->
+      <div class="matchup-row">
+        <div class="team-block away">
+          <div class="team-name">{{ r.away_team }}</div>
+          <div class="team-pct away">{{ r.away_win_pct }}%</div>
+          <div class="team-label">win prob</div>
+        </div>
+        <div class="at-divider">@</div>
+        <div class="team-block home">
+          <div class="team-name">{{ r.home_team }}</div>
+          <div class="team-pct home">{{ r.home_win_pct }}%</div>
+          <div class="team-label">win prob</div>
+        </div>
+      </div>
+
+      <!-- Probability bar -->
+      <div class="prob-bar">
+        <div class="bar-away" style="width:{{ r.away_win_pct }}%"></div>
+        <div class="bar-home"></div>
+      </div>
+
+      <!-- Predicted score + weather -->
+      <div class="info-row">
+        <span class="predicted-score">
+          {{ r.away_avg_runs }} — {{ r.home_avg_runs }}
+        </span>
+        {% if r.weather %}
+          <span class="weather-badge">
+            🌡 {{ r.weather.temp_f }}°F · 💨 {{ r.weather.wind_label }}
+          </span>
+        {% endif %}
+      </div>
+
+      <!-- Pitchers with L/R hand badges -->
+      <div class="pitcher-row">
+        <span>
+          {{ r.away_pitcher_name }}
+          <span class="hand-badge hand-{{ r.away_pitcher_hand }}">{{ r.away_pitcher_hand }}HP</span>
+          · ERA {{ r.away_era }}
+        </span>
+        <span>
+          {{ r.home_pitcher_name }}
+          <span class="hand-badge hand-{{ r.home_pitcher_hand }}">{{ r.home_pitcher_hand }}HP</span>
+          · ERA {{ r.home_era }}
+        </span>
+      </div>
+
+      {% if is_parlay %}
+        <div><span class="parlay-tag">🎯 PARLAY PICK</span></div>
+      {% endif %}
+
+    </div>
+  {% endfor %}
+</div>
+
+<footer>
+  Data: MLB Stats API + Open-Meteo · Predictions for entertainment only
+</footer>
+
+</body>
+</html>

@@ -75,6 +75,58 @@ def build_batter_probs(stats: dict) -> list:
     return [p_walk, p_k, p_1b, p_2b, p_3b, p_hr, p_out]
 
 
+def apply_weather_modifier(probs: list, weather: dict) -> list:
+    """
+    Adjust HR probability based on ballpark weather conditions.
+
+    Effects:
+    - Cold air (< 50°F): ball doesn't carry as well → fewer HRs
+    - Hot air (> 85°F): ball carries better → more HRs
+    - Wind blowing OUT (speed > 10 mph, roughly toward CF): more HRs
+    - Wind blowing IN  (speed > 10 mph, roughly toward home): fewer HRs
+
+    We simplify wind direction to: if wind_deg is between 45–135° (roughly
+    blowing from left/right field toward the infield) it's blowing IN.
+    Otherwise it's blowing OUT or across.
+    """
+    if not weather:
+        return probs   # no weather data, no change
+
+    adjusted = list(probs)
+
+    # Temperature effect on HR (index 5 = HR in OUTCOME_ORDER)
+    temp = weather.get("temp_f", 72)
+    if temp < 50:
+        hr_temp_factor = 0.85    # cold air: 15% fewer HRs
+    elif temp > 85:
+        hr_temp_factor = 1.10    # hot air: 10% more HRs
+    else:
+        hr_temp_factor = 1.0
+
+    # Wind effect on HR
+    wind_mph = weather.get("wind_mph", 0)
+    wind_deg = weather.get("wind_deg", 0)
+
+    # Blowing IN = wind coming from the outfield toward home plate (roughly 45–135°)
+    # Blowing OUT = coming from behind home plate toward outfield (roughly 225–315°)
+    if wind_mph > 10:
+        if 45 <= wind_deg <= 135:
+            hr_wind_factor = max(0.75, 1.0 - (wind_mph - 10) * 0.015)  # blowing in
+        elif 225 <= wind_deg <= 315:
+            hr_wind_factor = min(1.35, 1.0 + (wind_mph - 10) * 0.015)  # blowing out
+        else:
+            hr_wind_factor = 1.0   # crosswind
+    else:
+        hr_wind_factor = 1.0
+
+    total_hr_factor = hr_temp_factor * hr_wind_factor
+    adjusted[5] *= total_hr_factor   # index 5 = HR
+
+    # Normalize
+    total = sum(adjusted)
+    return [p / total for p in adjusted]
+
+
 def apply_pitcher_modifier(probs: list, pitcher_stats: dict) -> list:
     """
     Adjust batter probabilities for the quality of the pitcher they're facing.
@@ -114,19 +166,23 @@ def apply_pitcher_modifier(probs: list, pitcher_stats: dict) -> list:
     return [p / total for p in adjusted]
 
 
-def precompute_lineup(lineup_stats: list, pitcher_stats: dict) -> list:
+def precompute_lineup(lineup_stats: list, pitcher_stats: dict, weather: dict = None) -> list:
     """
     Pre-calculate cumulative probability arrays for every batter in a lineup.
     Doing this ONCE before the simulation loop (instead of inside it) is the
     key performance optimization — we avoid repeating the same math 100,000 times.
 
-    Returns a list of (outcomes, cumulative_weights) tuples, one per batter.
+    Now also applies weather modifiers (wind, temperature) to HR probability.
+
+    Returns a list of cumulative weight arrays, one per batter.
     """
     result = []
     for stats in lineup_stats:
-        probs     = build_batter_probs(stats)
-        adj       = apply_pitcher_modifier(probs, pitcher_stats)
-        cum_weights = list(accumulate(adj))   # e.g. [0.08, 0.30, 0.45, ...]
+        probs = build_batter_probs(stats)
+        probs = apply_pitcher_modifier(probs, pitcher_stats)
+        if weather:
+            probs = apply_weather_modifier(probs, weather)
+        cum_weights = list(accumulate(probs))
         result.append(cum_weights)
     return result
 
@@ -279,19 +335,21 @@ def run_simulation(
     home_lineup:  list,   # list of stat dicts for the 9 home batters
     away_pitcher: dict,   # away starting pitcher's season stats
     home_pitcher: dict,   # home starting pitcher's season stats
+    weather:      dict = None,   # ballpark weather (from get_ballpark_weather)
     n:            int = 100_000,
 ) -> dict:
     """
     Run N Monte Carlo simulations and return aggregated results.
 
+    Now accepts weather data — wind and temperature affect HR probability.
     The key optimization: pre-compute probability arrays ONCE, then
     reuse them across all N games. This is what makes 100,000 games fast.
     """
 
-    # Pre-compute batter probabilities adjusted for each opposing pitcher
+    # Pre-compute batter probabilities adjusted for pitcher + weather
     # away batters face the home pitcher, and vice versa
-    away_precomp = precompute_lineup(away_lineup, home_pitcher)
-    home_precomp = precompute_lineup(home_lineup, away_pitcher)
+    away_precomp = precompute_lineup(away_lineup, home_pitcher, weather)
+    home_precomp = precompute_lineup(home_lineup, away_pitcher, weather)
 
     # Run the simulation loop
     away_wins  = 0

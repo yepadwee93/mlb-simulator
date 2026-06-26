@@ -132,6 +132,21 @@
       pointer-events: none;
     }
 
+    .simulate-all-btn {
+      display: inline-block;
+      margin-top: 16px;
+      padding: 13px 30px;
+      background: linear-gradient(135deg, #7c3aed, #2563eb);
+      color: #fff;
+      font-weight: 700;
+      font-size: 1rem;
+      border-radius: 10px;
+      text-decoration: none;
+      letter-spacing: 0.3px;
+      transition: opacity 0.2s;
+    }
+    .simulate-all-btn:hover { opacity: 0.88; }
+
     footer {
       text-align: center;
       margin-top: 50px;
@@ -145,6 +160,12 @@
 <header>
   <h1>⚾ MLB Simulator</h1>
   <p>{{ date }} — Pick a game to simulate</p>
+  <a class="simulate-all-btn" href="/simulate-all">
+    ⚡ Simulate All Games + Best Parlay
+  </a>
+  {% if error %}
+  <p style="color:#f87171; margin-top:12px;">⚠ {{ error }}</p>
+  {% endif %}
 </header>
 
 <div class="games-grid">

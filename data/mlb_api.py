@@ -13,6 +13,44 @@ from datetime import date
 # The root URL for every API call we make
 BASE_URL = "https://statsapi.mlb.com/api/v1"
 
+# ── Ballpark coordinates for weather lookups ─────────────────────
+# (latitude, longitude) for each MLB venue name
+BALLPARK_COORDS = {
+    "Tropicana Field":      (27.768,  -82.653),
+    "PNC Park":             (40.447,  -80.006),
+    "Oracle Park":          (37.779,  -122.389),
+    "Comerica Park":        (42.339,  -83.049),
+    "Nationals Park":       (38.873,  -77.007),
+    "Rogers Centre":        (43.641,  -79.389),
+    "Citi Field":           (40.757,  -73.846),
+    "Fenway Park":          (42.347,  -71.097),
+    "Busch Stadium":        (38.623,  -90.193),
+    "Yankee Stadium":       (40.829,  -73.926),
+    "Dodger Stadium":       (34.074,  -118.240),
+    "Wrigley Field":        (41.948,  -87.656),
+    "Great American Ball Park": (39.097, -84.507),
+    "Truist Park":          (33.891,  -84.468),
+    "American Family Field":(43.028,  -87.971),
+    "Guaranteed Rate Field":(41.830,  -87.634),
+    "Progressive Field":    (41.496,  -81.685),
+    "Kauffman Stadium":     (39.051,  -94.480),
+    "Target Field":         (44.982,  -93.278),
+    "Globe Life Field":     (32.747,  -97.083),
+    "Minute Maid Park":     (29.757,  -95.355),
+    "Angel Stadium":        (33.800,  -117.883),
+    "T-Mobile Park":        (47.591,  -122.333),
+    "Oakland Coliseum":     (37.752,  -122.201),
+    "Sutter Health Park":   (38.580,  -121.500),
+    "Chase Field":          (33.445,  -112.067),
+    "Coors Field":          (39.756,  -104.994),
+    "Petco Park":           (32.708,  -117.157),
+    "loanDepot park":       (25.778,  -80.220),
+    "Citizens Bank Park":   (39.906,  -75.166),
+    "Daikin Park":          (29.757,  -95.355),
+    "Oriole Park at Camden Yards": (39.284, -76.622),
+    "Sahlen Field":         (42.886,  -78.872),
+}
+
 
 def _get(path, params=None):
     """
@@ -248,3 +286,112 @@ def get_player_recent_stats(player_id, group="hitting", num_games=10, season=Non
 
     totals["games_found"] = len(recent)
     return totals
+
+
+# ──────────────────────────────────────────────
+# 5. BATTER VS LEFT / RIGHT PITCHER SPLITS
+# ──────────────────────────────────────────────
+
+def get_pitcher_hand(pitcher_id):
+    """
+    Returns 'L' or 'R' — which hand the pitcher throws with.
+    We use this to decide which batter split stats to pull.
+    """
+    info = get_player_info(pitcher_id)
+    return info.get("throws", "R")   # default to R if unknown
+
+
+def get_batter_split_stats(player_id, pitcher_hand, season=None):
+    """
+    Returns a batter's stats specifically against left-handed or right-handed pitchers.
+
+    pitcher_hand: 'L' or 'R'
+
+    This is much more accurate than season totals because:
+    - Some batters hit .300 vs righties but only .200 vs lefties
+    - Knowing who's on the mound means we can use the right split
+
+    sitCodes: 'vl' = vs left-handed pitchers, 'vr' = vs right-handed pitchers
+    """
+    if season is None:
+        season = date.today().year
+
+    sit_code = "vl" if pitcher_hand == "L" else "vr"
+
+    data = _get(f"/people/{player_id}/stats", params={
+        "stats":    "statSplits",
+        "group":    "hitting",
+        "season":   season,
+        "gameType": "R",
+        "sitCodes": sit_code,
+    })
+
+    stats_list = data.get("stats", [])
+    if not stats_list:
+        return {}
+
+    splits = stats_list[0].get("splits", [])
+    if not splits:
+        return {}
+
+    return splits[0].get("stat", {})
+
+
+# ──────────────────────────────────────────────
+# 6. WEATHER FOR A BALLPARK
+# ──────────────────────────────────────────────
+
+def get_ballpark_weather(venue_name):
+    """
+    Fetches the current weather forecast for a ballpark using Open-Meteo.
+    Free API, no key needed.
+
+    Returns a dict with:
+      temp_f        — temperature in Fahrenheit
+      wind_mph      — wind speed in mph
+      wind_deg      — wind direction in degrees (0=N, 90=E, 180=S, 270=W)
+      wind_label    — human-readable wind direction (e.g. "15 mph NE")
+      condition     — short description
+
+    If the venue isn't in our coords list, returns empty dict.
+    """
+    coords = BALLPARK_COORDS.get(venue_name)
+    if not coords:
+        return {}
+
+    lat, lon = coords
+
+    try:
+        resp = requests.get(
+            "https://api.open-meteo.com/v1/forecast",
+            params={
+                "latitude":        lat,
+                "longitude":       lon,
+                "current":         "temperature_2m,wind_speed_10m,wind_direction_10m,weather_code",
+                "temperature_unit": "fahrenheit",
+                "wind_speed_unit": "mph",
+                "timezone":        "auto",
+            },
+            timeout=5,
+        )
+        resp.raise_for_status()
+        data    = resp.json()
+        current = data.get("current", {})
+
+        temp_f   = current.get("temperature_2m",    70)
+        wind_mph = current.get("wind_speed_10m",     0)
+        wind_deg = current.get("wind_direction_10m", 0)
+
+        # Convert wind degrees to compass label
+        dirs   = ["N","NE","E","SE","S","SW","W","NW"]
+        label  = dirs[round(wind_deg / 45) % 8]
+
+        return {
+            "temp_f":     round(temp_f),
+            "wind_mph":   round(wind_mph),
+            "wind_deg":   wind_deg,
+            "wind_label": f"{round(wind_mph)} mph {label}",
+        }
+
+    except Exception:
+        return {}   # weather unavailable — simulation still runs without it
