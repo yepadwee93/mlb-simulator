@@ -180,6 +180,84 @@
 
     .at-divider { color: #555870; font-size: 0.85rem; }
 
+
+
+    /* ── Inning segments (F3/F5/F7) ── */
+    .seg-row {
+      display: flex; gap: 6px; margin-top: 8px;
+      padding-top: 8px; border-top: 1px solid #252836;
+    }
+    .seg-cell {
+      flex: 1; background: #0f1117; border-radius: 8px;
+      padding: 6px 8px; text-align: center; font-size: 0.7rem;
+    }
+    .seg-label { color: #8890a4; text-transform: uppercase; letter-spacing: .4px; font-size: 0.62rem; }
+    .seg-away  { color: #64b5f6; font-weight: 700; font-size: 0.85rem; }
+    .seg-home  { color: #81c784; font-weight: 700; font-size: 0.85rem; }
+    .seg-tie   { color: #555870; font-size: 0.65rem; margin-top: 1px; }
+
+    /* ── O/U + run line rows ── */
+    .market-row {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      margin-top: 6px; padding-top: 6px; border-top: 1px solid #252836;
+      font-size: 0.72rem; gap: 8px;
+    }
+    .market-label { color: #8890a4; font-size: 0.65rem; text-transform: uppercase;
+                    letter-spacing: .4px; margin-bottom: 2px; }
+    .market-val   { color: #c8cdd8; font-weight: 600; }
+    .ev-pos { color: #4caf50; font-weight: 700; }
+    .ev-neg { color: #ef5350; font-weight: 600; }
+    .kelly-badge {
+      display: inline-block; background: #1a2a1a; color: #66bb6a;
+      font-size: 0.62rem; padding: 1px 6px; border-radius: 4px;
+      border: 1px solid #2a4a2a; margin-top: 2px;
+    }
+
+    /* ── Team logos & pitcher headshots ── */
+    .team-logo {
+      width: 52px; height: 52px;
+      object-fit: contain;
+      display: block;
+      margin: 0 auto 6px auto;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,.5));
+    }
+    .team-block.away .team-logo { margin: 0 0 6px 0; }
+    .team-block.home .team-logo { margin: 0 0 6px auto; }
+
+    .pitcher-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid #252836;
+      gap: 8px;
+    }
+    .pitcher-block {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.78rem;
+      color: #8890a4;
+      max-width: 46%;
+    }
+    .pitcher-block.home { flex-direction: row-reverse; text-align: right; }
+    .pitcher-headshot {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 1px solid #333650;
+      flex-shrink: 0;
+    }
+    .pitcher-name { font-weight: 600; color: #c8cdd8; font-size: 0.8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .umpire-badge {
+      font-size: 0.7rem;
+      color: #8890a4;
+      text-align: center;
+      flex: 1;
+      white-space: nowrap;
+    }
+
     /* Prob bar */
     .prob-bar {
       height: 8px;
@@ -310,6 +388,22 @@
   </style>
 </head>
 <body>
+{%- set ESPN_LOGOS = {
+  "New York Yankees": "nyy", "Boston Red Sox": "bos", "Tampa Bay Rays": "tb",
+  "Toronto Blue Jays": "tor", "Baltimore Orioles": "bal",
+  "Chicago White Sox": "chw", "Cleveland Guardians": "cle", "Detroit Tigers": "det",
+  "Kansas City Royals": "kc", "Minnesota Twins": "min",
+  "Houston Astros": "hou", "Los Angeles Angels": "laa", "Oakland Athletics": "oak",
+  "Seattle Mariners": "sea", "Texas Rangers": "tex",
+  "Atlanta Braves": "atl", "Miami Marlins": "mia", "New York Mets": "nym",
+  "Philadelphia Phillies": "phi", "Washington Nationals": "wsh",
+  "Chicago Cubs": "chc", "Cincinnati Reds": "cin", "Milwaukee Brewers": "mil",
+  "Pittsburgh Pirates": "pit", "St. Louis Cardinals": "stl",
+  "Arizona Diamondbacks": "ari", "Colorado Rockies": "col",
+  "Los Angeles Dodgers": "lad", "San Diego Padres": "sd", "San Francisco Giants": "sf",
+  "Athletics": "oak", "Sacramento Athletics": "oak"
+} -%}
+
 
 <a class="back" href="/">← Back to game picker</a>
 
@@ -439,12 +533,26 @@
       <!-- Team names + win % -->
       <div class="matchup-row">
         <div class="team-block away">
+          {%- set away_abbrev = ESPN_LOGOS.get(r.away_team, "") %}
+          {%- if away_abbrev %}
+          <img class="team-logo"
+               src="https://a.espncdn.com/i/teamlogos/mlb/500/{{ away_abbrev }}.png"
+               alt="{{ r.away_team }}"
+               onerror="this.style.display='none'">
+          {%- endif %}
           <div class="team-name">{{ r.away_team }}</div>
           <div class="team-pct away">{{ r.away_win_pct }}%</div>
           <div class="team-label">win prob</div>
         </div>
         <div class="at-divider">@</div>
         <div class="team-block home">
+          {%- set home_abbrev = ESPN_LOGOS.get(r.home_team, "") %}
+          {%- if home_abbrev %}
+          <img class="team-logo"
+               src="https://a.espncdn.com/i/teamlogos/mlb/500/{{ home_abbrev }}.png"
+               alt="{{ r.home_team }}"
+               onerror="this.style.display='none'">
+          {%- endif %}
           <div class="team-name">{{ r.home_team }}</div>
           <div class="team-pct home">{{ r.home_win_pct }}%</div>
           <div class="team-label">win prob</div>
@@ -456,6 +564,42 @@
         <div class="bar-away" style="width:{{ r.away_win_pct }}%"></div>
         <div class="bar-home"></div>
       </div>
+
+      <!-- Pitcher headshots + umpire -->
+      {%- if r.away_pitcher_id or r.home_pitcher_id %}
+      <div class="pitcher-row">
+        <div class="pitcher-block away">
+          {%- if r.away_pitcher_id %}
+          <img class="pitcher-headshot"
+               src="https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/q_auto:best/v1/people/{{ r.away_pitcher_id }}/headshot/67/current"
+               alt="{{ r.away_pitcher_name }}"
+               onerror="this.src='https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png'">
+          {%- endif %}
+          <div>
+            <div class="pitcher-name">{{ r.away_pitcher_name }}</div>
+            <div style="font-size:0.7rem;color:#666">SP</div>
+          </div>
+        </div>
+        {%- if r.umpire %}
+        <div class="umpire-badge">
+          <div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:.4px;">HP Ump</div>
+          <div style="color:#c8cdd8;font-size:0.75rem;font-weight:600;">{{ r.umpire }}</div>
+        </div>
+        {%- endif %}
+        <div class="pitcher-block home">
+          <div>
+            <div class="pitcher-name">{{ r.home_pitcher_name }}</div>
+            <div style="font-size:0.7rem;color:#666">SP</div>
+          </div>
+          {%- if r.home_pitcher_id %}
+          <img class="pitcher-headshot"
+               src="https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/q_auto:best/v1/people/{{ r.home_pitcher_id }}/headshot/67/current"
+               alt="{{ r.home_pitcher_name }}"
+               onerror="this.src='https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png'">
+          {%- endif %}
+        </div>
+      </div>
+      {%- endif %}
 
       <!-- Predicted score + weather -->
       <div class="info-row">
@@ -496,35 +640,104 @@
         <div><span class="parlay-tag">🎯 PARLAY PICK</span></div>
       {% endif %}
 
-      <!-- Vegas odds comparison (if available) -->
+      <!-- Inning segments F3/F5/F7 -->
+      {%- if r.f3 %}
+      <div class="seg-row">
+        {%- for label, seg in [("F3", r.f3), ("F5", r.f5), ("F7", r.f7)] %}
+        <div class="seg-cell">
+          <div class="seg-label">Thru {{ label[-1] }}</div>
+          <div>
+            <span class="seg-away">{{ seg.away_win_pct }}%</span>
+            <span style="color:#555870;font-size:.65rem;"> / </span>
+            <span class="seg-home">{{ seg.home_win_pct }}%</span>
+          </div>
+          {%- if seg.tie_pct > 0 %}
+          <div class="seg-tie">Push {{ seg.tie_pct }}%</div>
+          {%- endif %}
+        </div>
+        {%- endfor %}
+      </div>
+      {%- endif %}
+
+      <!-- Moneyline Vegas odds + EV + Kelly -->
       {% if r.away_implied_pct %}
-      <div class="vegas-row">
-        <div class="vegas-cell">
-          <span style="color:#8890a4;">Vegas · {{ r.away_team }}</span>
-          <span class="vegas-odds">{{ r.away_avg_odds }}</span>
-          <span style="color:#8890a4;">{{ r.away_implied_pct }}% implied</span>
-          {% if r.away_edge is not none %}
-            {% if r.away_edge > 0 %}
-              <span class="vegas-edge-pos">+{{ r.away_edge }}% edge</span>
-            {% elif r.away_edge < 0 %}
-              <span class="vegas-edge-neg">{{ r.away_edge }}% vs line</span>
-            {% endif %}
+      <div class="market-row">
+        <div>
+          <div class="market-label">Moneyline</div>
+          <div><span class="market-val">{{ r.away_avg_odds }}</span>
+            <span style="color:#8890a4;"> · {{ r.away_implied_pct }}% impl</span></div>
+          {% if r.away_edge > 0 %}
+            <div class="vegas-edge-pos">+{{ r.away_edge }}% edge</div>
+            {%- if r.away_ev is not none %}<div class="ev-pos">EV +${{ r.away_ev }} / $100</div>{%- endif %}
+            {%- if r.away_kelly %}<div class="kelly-badge">Kelly: {{ r.away_kelly }}% of roll</div>{%- endif %}
+          {% elif r.away_edge < 0 %}
+            <div class="vegas-edge-neg">{{ r.away_edge }}% vs line</div>
+            {%- if r.away_ev is not none %}<div class="ev-neg">EV ${{ r.away_ev }} / $100</div>{%- endif %}
           {% endif %}
         </div>
-        <div class="vegas-cell" style="text-align:right;">
-          <span style="color:#8890a4;">Vegas · {{ r.home_team }}</span>
-          <span class="vegas-odds">{{ r.home_avg_odds }}</span>
-          <span style="color:#8890a4;">{{ r.home_implied_pct }}% implied</span>
-          {% if r.home_edge is not none %}
-            {% if r.home_edge > 0 %}
-              <span class="vegas-edge-pos">+{{ r.home_edge }}% edge</span>
-            {% elif r.home_edge < 0 %}
-              <span class="vegas-edge-neg">{{ r.home_edge }}% vs line</span>
-            {% endif %}
+        <div style="text-align:right;">
+          <div class="market-label">Moneyline</div>
+          <div><span class="market-val">{{ r.home_avg_odds }}</span>
+            <span style="color:#8890a4;"> · {{ r.home_implied_pct }}% impl</span></div>
+          {% if r.home_edge > 0 %}
+            <div class="vegas-edge-pos">+{{ r.home_edge }}% edge</div>
+            {%- if r.home_ev is not none %}<div class="ev-pos">EV +${{ r.home_ev }} / $100</div>{%- endif %}
+            {%- if r.home_kelly %}<div class="kelly-badge">Kelly: {{ r.home_kelly }}% of roll</div>{%- endif %}
+          {% elif r.home_edge < 0 %}
+            <div class="vegas-edge-neg">{{ r.home_edge }}% vs line</div>
+            {%- if r.home_ev is not none %}<div class="ev-neg">EV ${{ r.home_ev }} / $100</div>{%- endif %}
           {% endif %}
         </div>
       </div>
       {% endif %}
+
+      <!-- Over/Under -->
+      {%- if r.ou_line %}
+      <div class="market-row">
+        <div>
+          <div class="market-label">Over {{ r.ou_line }} · {{ r.ou_over_odds }}</div>
+          <div class="market-val">Model: {{ r.model_over_pct }}%</div>
+          {%- if r.ou_over_edge > 0 %}
+            <div class="ev-pos">+{{ r.ou_over_edge }}% edge &nbsp; EV +${{ r.ou_over_ev }}</div>
+          {%- else %}
+            <div class="ev-neg">{{ r.ou_over_edge }}% vs line</div>
+          {%- endif %}
+        </div>
+        <div style="text-align:right;">
+          <div class="market-label">Under {{ r.ou_line }} · {{ r.ou_under_odds }}</div>
+          <div class="market-val">Model: {{ r.model_under_pct }}%</div>
+          {%- if r.ou_under_edge > 0 %}
+            <div class="ev-pos">+{{ r.ou_under_edge }}% edge &nbsp; EV +${{ r.ou_under_ev }}</div>
+          {%- else %}
+            <div class="ev-neg">{{ r.ou_under_edge }}% vs line</div>
+          {%- endif %}
+        </div>
+      </div>
+      {%- endif %}
+
+      <!-- Run line -->
+      {%- if r.away_rl_odds %}
+      <div class="market-row">
+        <div>
+          <div class="market-label">Run line -1.5 · {{ r.away_rl_odds }}</div>
+          <div class="market-val">Model covers: {{ r.away_cover_pct }}%</div>
+          {%- if r.away_rl_edge > 0 %}
+            <div class="ev-pos">+{{ r.away_rl_edge }}% edge &nbsp; EV +${{ r.away_rl_ev }}</div>
+          {%- else %}
+            <div class="ev-neg">{{ r.away_rl_edge }}% vs line</div>
+          {%- endif %}
+        </div>
+        <div style="text-align:right;">
+          <div class="market-label">Run line -1.5 · {{ r.home_rl_odds }}</div>
+          <div class="market-val">Model covers: {{ r.home_cover_pct }}%</div>
+          {%- if r.home_rl_edge > 0 %}
+            <div class="ev-pos">+{{ r.home_rl_edge }}% edge &nbsp; EV +${{ r.home_rl_ev }}</div>
+          {%- else %}
+            <div class="ev-neg">{{ r.home_rl_edge }}% vs line</div>
+          {%- endif %}
+        </div>
+      </div>
+      {%- endif %}
 
     </div>
   {% endfor %}

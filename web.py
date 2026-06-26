@@ -16,7 +16,7 @@ load_dotenv()   # loads ODDS_API_KEY from .env file
 
 from flask import Flask, render_template, abort, request
 
-from data.odds_api import get_mlb_odds, get_mlb_events, get_player_props, format_odds, calc_edge, get_requests_remaining
+from data.odds_api import get_mlb_odds, get_mlb_events, get_player_props, format_odds, calc_edge, get_requests_remaining, get_mlb_totals, get_mlb_runline, calc_ev, calc_kelly
 from data.tracker import log_prediction, update_results, get_accuracy_stats, get_all_predictions
 from data.my_picks import add_pick, update_pick_results, get_all_picks, get_pick_stats
 from data.mlb_api import (
@@ -34,6 +34,7 @@ from data.mlb_api import (
     get_batter_vs_pitcher,
     get_team_rest_days,
     get_savant_stats_all,
+    get_game_umpire,
 )
 from simulation.engine import run_simulation
 
@@ -242,6 +243,12 @@ def build_game_result(game, n_sims, use_splits=True):
         away_batter_rest = None
         home_batter_rest = None
 
+    # Fetch umpire for K/BB tendency modifier
+    try:
+        umpire_name = get_game_umpire(game["gamePk"])
+    except Exception:
+        umpire_name = None
+
     # Fetch weather for this ballpark
     weather = get_ballpark_weather(game["venue"])
 
@@ -298,8 +305,18 @@ def build_game_result(game, n_sims, use_splits=True):
         home_batter_rest    = home_batter_rest,
         away_savant         = away_savant,
         home_savant         = home_savant,
+        umpire_name         = umpire_name,
         n                   = n_sims,
     )
+
+    # Attach IDs for logo/headshot URLs in templates
+    result["away_team_id"]     = game.get("away_id")
+    result["home_team_id"]     = game.get("home_id")
+    result["away_pitcher_id"]  = away_pitcher.get("id")
+    result["home_pitcher_id"]  = home_pitcher.get("id")
+    result["away_pitcher_name"] = away_pitcher.get("name", "TBD")
+    result["home_pitcher_name"] = home_pitcher.get("name", "TBD")
+    result["umpire"]           = umpire_name
 
     # Build per-batter stat rows for display (season + recent + L/R + SP/RP)
     def build_batter_display(batters, season_stats_list, recent_stats_list, extra_list):
@@ -522,6 +539,10 @@ def simulate(game_pk):
         result["home_avg_odds"]    = format_odds(game_odds["home_avg_odds"])
         result["away_edge"]        = calc_edge(result["away_win_pct"], game_odds["away_implied_pct"])
         result["home_edge"]        = calc_edge(result["home_win_pct"], game_odds["home_implied_pct"])
+        result["away_ev"]          = calc_ev(result["away_win_pct"], game_odds["away_avg_odds"])
+        result["home_ev"]          = calc_ev(result["home_win_pct"], game_odds["home_avg_odds"])
+        result["away_kelly"]       = calc_kelly(result["away_win_pct"], game_odds["away_avg_odds"])
+        result["home_kelly"]       = calc_kelly(result["home_win_pct"], game_odds["home_avg_odds"])
         result["books_used"]       = game_odds["books_used"]
     else:
         result["away_implied_pct"] = None
@@ -530,7 +551,52 @@ def simulate(game_pk):
         result["home_avg_odds"]    = None
         result["away_edge"]        = None
         result["home_edge"]        = None
+        result["away_ev"]          = None
+        result["home_ev"]          = None
+        result["away_kelly"]       = None
+        result["home_kelly"]       = None
         result["books_used"]       = 0
+
+    # ── Over/Under + Run line odds ────────────────────────────────────
+    try:
+        all_totals = get_mlb_totals()
+        ou = all_totals.get(odds_key, {})
+        if ou:
+            hist    = result.get("total_runs_hist", {})
+            n_sims  = result.get("simulations", 1)
+            ou_line = ou["line"]
+            over_count = sum(cnt for tot, cnt in hist.items() if tot > ou_line)
+            model_over  = round(over_count / n_sims * 100, 1)
+            model_under = round(100 - model_over, 1)
+            result["ou_line"]          = ou_line
+            result["model_over_pct"]   = model_over
+            result["model_under_pct"]  = model_under
+            result["ou_over_implied"]  = ou["over_implied"]
+            result["ou_under_implied"] = ou["under_implied"]
+            result["ou_over_odds"]     = format_odds(ou["over_odds"])
+            result["ou_under_odds"]    = format_odds(ou["under_odds"])
+            result["ou_over_edge"]     = round(model_over  - ou["over_implied"],  1)
+            result["ou_under_edge"]    = round(model_under - ou["under_implied"], 1)
+            result["ou_over_ev"]       = calc_ev(model_over,  ou["over_odds"])
+            result["ou_under_ev"]      = calc_ev(model_under, ou["under_odds"])
+    except Exception:
+        pass
+    try:
+        all_rl = get_mlb_runline()
+        rl = all_rl.get(odds_key, {})
+        if rl:
+            result["away_rl_odds"]    = format_odds(rl["away_rl_odds"])
+            result["home_rl_odds"]    = format_odds(rl["home_rl_odds"])
+            result["away_rl_implied"] = rl["away_rl_implied"]
+            result["home_rl_implied"] = rl["home_rl_implied"]
+            result["away_rl_edge"]    = round(result.get("away_cover_pct", 0) - rl["away_rl_implied"], 1)
+            result["home_rl_edge"]    = round(result.get("home_cover_pct", 0) - rl["home_rl_implied"], 1)
+            result["away_rl_ev"]      = calc_ev(result.get("away_cover_pct", 0), rl["away_rl_odds"])
+            result["home_rl_ev"]      = calc_ev(result.get("home_cover_pct", 0), rl["home_rl_odds"])
+            result["away_rl_kelly"]   = calc_kelly(result.get("away_cover_pct", 0), rl["away_rl_odds"])
+            result["home_rl_kelly"]   = calc_kelly(result.get("home_cover_pct", 0), rl["home_rl_odds"])
+    except Exception:
+        pass
 
     # Props are NOT auto-fetched here — user clicks "Load Props" button
     # which calls /props/<game_pk> separately (saves 2 API calls per simulation)
@@ -783,13 +849,49 @@ def simulate_all():
             r["home_avg_odds"]    = format_odds(game_odds["home_avg_odds"])
             r["away_edge"]        = calc_edge(r["away_win_pct"], game_odds["away_implied_pct"])
             r["home_edge"]        = calc_edge(r["home_win_pct"], game_odds["home_implied_pct"])
+            r["away_ev"]          = calc_ev(r["away_win_pct"], game_odds["away_avg_odds"])
+            r["home_ev"]          = calc_ev(r["home_win_pct"], game_odds["home_avg_odds"])
+            r["away_kelly"]       = calc_kelly(r["away_win_pct"], game_odds["away_avg_odds"])
+            r["home_kelly"]       = calc_kelly(r["home_win_pct"], game_odds["home_avg_odds"])
         else:
-            r["away_implied_pct"] = None
-            r["home_implied_pct"] = None
-            r["away_avg_odds"]    = None
-            r["home_avg_odds"]    = None
-            r["away_edge"]        = None
-            r["home_edge"]        = None
+            for k in ("away_implied_pct","home_implied_pct","away_avg_odds","home_avg_odds",
+                      "away_edge","home_edge","away_ev","home_ev","away_kelly","home_kelly"):
+                r[k] = None
+        # O/U + run line per game card
+        try:
+            all_totals = get_mlb_totals()
+            all_rl     = get_mlb_runline()
+            ok = frozenset([r["away_team"], r["home_team"]])
+            ou = all_totals.get(ok, {})
+            if ou:
+                hist = r.get("total_runs_hist", {})
+                ns   = r.get("simulations", 1)
+                oul  = ou["line"]
+                oc   = sum(cnt for tot, cnt in hist.items() if tot > oul)
+                mo   = round(oc / ns * 100, 1)
+                r["ou_line"]          = oul
+                r["model_over_pct"]   = mo
+                r["model_under_pct"]  = round(100 - mo, 1)
+                r["ou_over_implied"]  = ou["over_implied"]
+                r["ou_under_implied"] = ou["under_implied"]
+                r["ou_over_odds"]     = format_odds(ou["over_odds"])
+                r["ou_under_odds"]    = format_odds(ou["under_odds"])
+                r["ou_over_edge"]     = round(mo - ou["over_implied"], 1)
+                r["ou_under_edge"]    = round((100 - mo) - ou["under_implied"], 1)
+                r["ou_over_ev"]       = calc_ev(mo, ou["over_odds"])
+                r["ou_under_ev"]      = calc_ev(100 - mo, ou["under_odds"])
+            rl = all_rl.get(ok, {})
+            if rl:
+                r["away_rl_odds"]    = format_odds(rl["away_rl_odds"])
+                r["home_rl_odds"]    = format_odds(rl["home_rl_odds"])
+                r["away_rl_implied"] = rl["away_rl_implied"]
+                r["home_rl_implied"] = rl["home_rl_implied"]
+                r["away_rl_edge"]    = round(r.get("away_cover_pct", 0) - rl["away_rl_implied"], 1)
+                r["home_rl_edge"]    = round(r.get("home_cover_pct", 0) - rl["home_rl_implied"], 1)
+                r["away_rl_ev"]      = calc_ev(r.get("away_cover_pct", 0), rl["away_rl_odds"])
+                r["home_rl_ev"]      = calc_ev(r.get("home_cover_pct", 0), rl["home_rl_odds"])
+        except Exception:
+            pass
 
     # Also attach odds to best_bets entries
     for b in best_bets:
@@ -872,6 +974,10 @@ def trigger_update():
 
 
 if __name__ == "__main__":
+    import os
+    port = int(os.environ.get("PORT", 5000))
+    debug = os.environ.get("FLASK_ENV") != "production"
     print("\n  MLB Simulator is running!")
-    print("  Open this in your browser:  http://127.0.0.1:5000\n")
-    app.run(debug=True)
+    if debug:
+        print(f"  Open this in your browser:  http://127.0.0.1:{port}\n")
+    app.run(host="0.0.0.0", port=port, debug=debug)

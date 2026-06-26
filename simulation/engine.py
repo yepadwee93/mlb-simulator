@@ -18,6 +18,7 @@ How it works:
 import random
 from bisect import bisect
 from itertools import accumulate
+from collections import Counter
 
 # ── Outcome labels ──────────────────────────────────────────────
 SINGLE    = "single"
@@ -484,7 +485,8 @@ def precompute_lineup(lineup_stats: list, pitcher_stats: dict,
                       venue: str = None, matchup_stats_list: list = None,
                       daynight_stats_list: list = None,
                       batter_rest_days: int = None,
-                      savant_list: list = None) -> list:
+                      savant_list: list = None,
+                      umpire_name: str = None) -> list:
     """
     Pre-calculate cumulative probability arrays for every batter in a lineup.
     Doing this ONCE before the simulation loop (instead of inside it) is the
@@ -574,6 +576,10 @@ def precompute_lineup(lineup_stats: list, pitcher_stats: dict,
                 sv.get('barrel_pct',   0),
                 sv.get('hard_hit_pct', 0),
             )
+
+        # Umpire tendencies: wide/tight zone shifts K and BB rates
+        if umpire_name:
+            probs = apply_umpire_modifier(probs, umpire_name)
 
         cum_weights = list(accumulate(probs))
         result.append(cum_weights)
@@ -710,6 +716,82 @@ def advance_runners(b1: bool, b2: bool, b3: bool, outcome: str) -> tuple:
 
 # ── STEP 4: Simulate one half-inning ────────────────────────────
 
+# ── Umpire tendencies ────────────────────────────────────────────────────────
+# k_factor  > 1.0 = wider strike zone = more strikeouts
+# bb_factor > 1.0 = tighter zone = more walks
+# Both factors are applied to batter probs via apply_umpire_modifier().
+# Updated periodically based on UmpScorecards data.
+UMP_TENDENCIES = {
+    # Wide zone (more Ks, fewer BBs)
+    "Laz Diaz":             {"k": 1.14, "bb": 0.86},
+    "Alfonso Marquez":      {"k": 1.10, "bb": 0.91},
+    "Hunter Wendelstedt":   {"k": 1.08, "bb": 0.92},
+    "Jim Reynolds":         {"k": 1.08, "bb": 0.93},
+    "Mike Winters":         {"k": 1.07, "bb": 0.93},
+    "Marvin Hudson":        {"k": 1.06, "bb": 0.94},
+    "Brian Knight":         {"k": 1.05, "bb": 0.95},
+    "Fieldin Culbreth":     {"k": 1.05, "bb": 0.95},
+    "Doug Eddings":         {"k": 1.04, "bb": 0.96},
+    "Scott Barry":          {"k": 1.03, "bb": 0.97},
+    "Adam Beck":            {"k": 1.03, "bb": 0.97},
+    "Tripp Gibson":         {"k": 1.02, "bb": 0.98},
+    "Gabe Morales":         {"k": 1.02, "bb": 0.98},
+    "Chris Segal":          {"k": 1.02, "bb": 0.98},
+    "Stu Scheurwater":      {"k": 1.02, "bb": 0.98},
+    # Neutral / accurate
+    "Pat Hoberg":           {"k": 1.00, "bb": 1.00},
+    "Will Little":          {"k": 1.01, "bb": 0.99},
+    "Ben May":              {"k": 1.01, "bb": 0.99},
+    "Ryan Blakney":         {"k": 1.01, "bb": 0.99},
+    "Todd Tichenor":        {"k": 1.01, "bb": 0.99},
+    "Roberto Ortiz":        {"k": 1.00, "bb": 1.00},
+    "James Hoye":           {"k": 1.00, "bb": 1.00},
+    "Mark Carlson":         {"k": 0.99, "bb": 1.01},
+    "Erich Bacchus":        {"k": 0.99, "bb": 1.01},
+    "DJ Reyburn":           {"k": 1.01, "bb": 0.99},
+    "John Tumpane":         {"k": 0.99, "bb": 1.01},
+    "Paul Nauert":          {"k": 1.00, "bb": 1.00},
+    # Tight zone (fewer Ks, more BBs)
+    "Andy Fletcher":        {"k": 0.98, "bb": 1.02},
+    "Mark Wegner":          {"k": 0.98, "bb": 1.02},
+    "Chad Fairchild":       {"k": 0.98, "bb": 1.02},
+    "Kerwin Danley":        {"k": 0.98, "bb": 1.02},
+    "Lance Barksdale":      {"k": 0.97, "bb": 1.03},
+    "Sam Holbrook":         {"k": 0.96, "bb": 1.04},
+    "Dan Iassogna":         {"k": 0.95, "bb": 1.06},
+    "Ted Barrett":          {"k": 0.94, "bb": 1.07},
+    "Phil Cuzzi":           {"k": 0.93, "bb": 1.08},
+    "Vic Carapazza":        {"k": 0.93, "bb": 1.08},
+    "Tom Hallion":          {"k": 0.91, "bb": 1.10},
+    "Bill Miller":          {"k": 0.90, "bb": 1.12},
+    "CB Bucknor":           {"k": 0.87, "bb": 1.16},
+}
+
+
+def apply_umpire_modifier(probs: list, umpire_name: str) -> list:
+    """
+    Adjust strikeout and walk probabilities based on the home plate umpire.
+
+    Wide-zone umps (Laz Diaz, Alfonso Marquez) call more strikes, leading to
+    more Ks and fewer BBs. Tight-zone umps (CB Bucknor, Bill Miller) do the
+    opposite. This is one of the more predictable game-day edges.
+
+    OUTCOME_ORDER = [WALK, K, 1B, 2B, 3B, HR, OUT]
+                       0   1   2   3   4   5   6
+    """
+    if not umpire_name:
+        return probs
+    tend = UMP_TENDENCIES.get(umpire_name)
+    if not tend:
+        return probs
+
+    adjusted = list(probs)
+    adjusted[0] *= tend["bb"]   # WALK
+    adjusted[1] *= tend["k"]    # STRIKEOUT
+    total = sum(adjusted)
+    return [p / total for p in adjusted]
+
+
 # League-average error and wild pitch rates (2024 MLB season)
 # Error: ~0.50 errors per team per game / 27 outs = ~1.85% per non-K out
 # Wild pitch/PB: ~0.40 WP+PB per team per game = ~1.5% per AB with runners on
@@ -842,6 +924,7 @@ def simulate_game(
     innings: int = 9,
     bullpen_start: int = 5,             # 0-indexed: inning 6 in human terms
     mid_start:     int = 2,             # 0-indexed: inning 3 in human terms
+    resolve_ties:  bool = True,         # False = return tied score as-is (for F3/F5/F7 push calc)
 ) -> tuple:
     """
     Simulate one complete 9-inning game with 3 pitching phases + RISP clutch stats:
@@ -891,24 +974,25 @@ def simulate_game(
         home_runs += runs
 
     # Extra innings if tied (up to 3 extra) — use bullpen probs
-    extra_away = away_precomp_late or away_precomp_mid or away_precomp_early
-    extra_home = home_precomp_late or home_precomp_mid or home_precomp_early
-    extra = 0
-    while away_runs == home_runs and extra < 3:
-        runs, away_pos = simulate_half_inning(extra_away, away_pos,
-                                              away_precomp_risp, away_batter_rates)
-        away_runs += runs
-        runs, home_pos = simulate_half_inning(extra_home, home_pos,
-                                              home_precomp_risp, home_batter_rates)
-        home_runs += runs
-        extra += 1
-
-    # If still tied, random winner (very rare)
-    if away_runs == home_runs:
-        if random.random() < 0.5:
-            away_runs += 1
-        else:
-            home_runs += 1
+    # Skip if resolve_ties=False (segment bets: tied score = push)
+    if resolve_ties:
+        extra_away = away_precomp_late or away_precomp_mid or away_precomp_early
+        extra_home = home_precomp_late or home_precomp_mid or home_precomp_early
+        extra = 0
+        while away_runs == home_runs and extra < 3:
+            runs, away_pos = simulate_half_inning(extra_away, away_pos,
+                                                  away_precomp_risp, away_batter_rates)
+            away_runs += runs
+            runs, home_pos = simulate_half_inning(extra_home, home_pos,
+                                                  home_precomp_risp, home_batter_rates)
+            home_runs += runs
+            extra += 1
+        # If still tied, random winner (very rare)
+        if away_runs == home_runs:
+            if random.random() < 0.5:
+                away_runs += 1
+            else:
+                home_runs += 1
 
     return away_runs, home_runs
 
@@ -944,6 +1028,7 @@ def run_simulation(
     home_batter_rest:    int  = None,
     away_savant:         list = None,  # Statcast data per away batter
     home_savant:         list = None,  # Statcast data per home batter
+    umpire_name:         str  = None,  # home plate umpire for K/BB modifier
     n:                   int = 100_000,
 ) -> dict:
     """
@@ -976,20 +1061,20 @@ def run_simulation(
     # ── Phase 1: innings 1-2 (starter is fresh) ───────────────────────
     away_precomp_early = precompute_lineup(
         away_lineup, home_pitcher, weather, away_recent, venue,
-        away_matchup_stats, away_daynight_stats, away_batter_rest, away_savant)
+        away_matchup_stats, away_daynight_stats, away_batter_rest, away_savant, umpire_name)
     home_precomp_early = precompute_lineup(
         home_lineup, away_pitcher, weather, home_recent, venue,
-        home_matchup_stats, home_daynight_stats, home_batter_rest, home_savant)
+        home_matchup_stats, home_daynight_stats, home_batter_rest, home_savant, umpire_name)
 
     # ── Phase 2: innings 3-5 (starter showing fatigue) ───────────────
     home_pitcher_mid = build_fatigued_pitcher_stats(home_pitcher, home_fatigue["phase2"])
     away_pitcher_mid = build_fatigued_pitcher_stats(away_pitcher, away_fatigue["phase2"])
     away_precomp_mid = precompute_lineup(
         away_lineup, home_pitcher_mid, weather, away_recent, venue,
-        away_matchup_stats, away_daynight_stats, away_batter_rest, away_savant)
+        away_matchup_stats, away_daynight_stats, away_batter_rest, away_savant, umpire_name)
     home_precomp_mid = precompute_lineup(
         home_lineup, away_pitcher_mid, weather, home_recent, venue,
-        home_matchup_stats, home_daynight_stats, home_batter_rest, home_savant)
+        home_matchup_stats, home_daynight_stats, home_batter_rest, home_savant, umpire_name)
 
     # ── RISP: clutch stats when runner on 2nd or 3rd ─────────────────
     away_precomp_risp = None
@@ -998,12 +1083,12 @@ def run_simulation(
     if away_risp_stats and any(s for s in away_risp_stats if s and s.get("plateAppearances", 0) >= 20):
         away_precomp_risp = precompute_lineup(
             away_risp_stats, home_pitcher, weather, away_recent, venue,
-            away_matchup_stats, away_daynight_stats, away_batter_rest, away_savant
+            away_matchup_stats, away_daynight_stats, away_batter_rest, away_savant, umpire_name
         )
     if home_risp_stats and any(s for s in home_risp_stats if s and s.get("plateAppearances", 0) >= 20):
         home_precomp_risp = precompute_lineup(
             home_risp_stats, away_pitcher, weather, home_recent, venue,
-            home_matchup_stats, home_daynight_stats, home_batter_rest, home_savant
+            home_matchup_stats, home_daynight_stats, home_batter_rest, home_savant, umpire_name
         )
 
     # ── Late game: batters vs the bullpen (innings 6+) ───────────────
@@ -1036,21 +1121,60 @@ def run_simulation(
     home_wins  = 0
     away_total = 0
     home_total = 0
+    away_cover = 0      # wins by 2+ (covers -1.5 run line)
+    home_cover = 0
+    total_runs_hist = Counter()  # {total_runs: count} for O/U model
 
-    for _ in range(n):
-        a, h = simulate_game(
+    def _sim(**kw):
+        return simulate_game(
             away_precomp_early, home_precomp_early,
             away_precomp_mid,   home_precomp_mid,
             away_precomp_late,  home_precomp_late,
             away_precomp_risp,  home_precomp_risp,
             away_batter_rates,  home_batter_rates,
+            **kw
         )
+
+    for _ in range(n):
+        a, h = _sim()
         away_total += a
         home_total += h
+        total_runs_hist[a + h] += 1
         if a > h:
             away_wins += 1
+            if a - h >= 2:
+                away_cover += 1
         else:
             home_wins += 1
+            if h - a >= 2:
+                home_cover += 1
+
+    # ── F3 / F5 / F7 inning-segment simulations ──────────────────────
+    # Simulate a smaller batch to get win probs through each inning cutoff.
+    # Ties count as a push (neither team wins the bet), matching how F5
+    # betting markets work.
+    n_seg = max(n // 4, 10_000)
+    seg_results = {}
+    for label, inn in (("f3", 3), ("f5", 5), ("f7", 7)):
+        aw = hw = at = ht = ties = 0
+        for _ in range(n_seg):
+            a, h = _sim(innings=inn, resolve_ties=False)
+            at += a; ht += h
+            if a > h:
+                aw += 1
+            elif h > a:
+                hw += 1
+            else:
+                ties += 1
+        # Express win% among non-tied games (matches push-excluded betting market)
+        non_tie = n_seg - ties
+        seg_results[label] = {
+            "away_win_pct": round(aw / non_tie * 100, 1) if non_tie else 50.0,
+            "home_win_pct": round(hw / non_tie * 100, 1) if non_tie else 50.0,
+            "tie_pct":      round(ties / n_seg * 100, 1),
+            "away_avg_runs": round(at / n_seg, 2),
+            "home_avg_runs": round(ht / n_seg, 2),
+        }
 
     raw_away_pct = away_wins / n * 100
     raw_home_pct = home_wins / n * 100
@@ -1128,4 +1252,14 @@ def run_simulation(
         "away_rest_type":      away_rest_type,
         "home_rest_days":      home_rest_label,
         "home_rest_type":      home_rest_type,
+        # Run line coverage
+        "away_cover_pct":      round(away_cover / n * 100, 1),
+        "home_cover_pct":      round(home_cover / n * 100, 1),
+        # Over/Under: full distribution so web layer can calc P(total > any line)
+        "total_runs_hist":     dict(total_runs_hist),
+        "avg_total_runs":      round((away_total + home_total) / n, 2),
+        # Inning-segment results (F3/F5/F7)
+        "f3":                  seg_results["f3"],
+        "f5":                  seg_results["f5"],
+        "f7":                  seg_results["f7"],
     }

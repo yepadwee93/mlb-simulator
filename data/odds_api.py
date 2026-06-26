@@ -309,3 +309,196 @@ def calc_edge(our_pct: float, vegas_pct: float) -> float:
     Negative = we agree or think they're less likely.
     """
     return round(our_pct - vegas_pct, 1)
+
+
+# ── In-memory cache for totals (O/U) odds ──────────────────────────
+_TOTALS_CACHE = {"data": {}, "ts": 0.0}
+
+
+def get_mlb_totals() -> dict:
+    """
+    Fetch today's MLB over/under (totals) lines from The Odds API.
+
+    Returns a dict keyed by frozenset({away_team, home_team}).
+    Each value:
+      {
+        "line":        float,   # e.g. 8.5
+        "over_odds":   int,     # American odds for Over
+        "under_odds":  int,     # American odds for Under
+        "over_implied": float,  # implied probability of Over (0-100)
+        "under_implied": float,
+      }
+    Returns {} if API key missing or call fails.
+    """
+    if not ODDS_API_KEY:
+        return {}
+
+    if time.time() - _TOTALS_CACHE["ts"] < _CACHE_TTL and _TOTALS_CACHE["data"]:
+        return _TOTALS_CACHE["data"]
+
+    try:
+        resp = requests.get(
+            f"{ODDS_BASE}/sports/baseball_mlb/odds/",
+            params={
+                "apiKey":     ODDS_API_KEY,
+                "regions":    "us",
+                "markets":    "totals",
+                "oddsFormat": "american",
+            },
+            timeout=8,
+        )
+        resp.raise_for_status()
+        _update_remaining(resp)
+        games = resp.json()
+    except Exception:
+        return {}
+
+    result = {}
+    for game in games:
+        away = game.get("away_team", "")
+        home = game.get("home_team", "")
+        over_lines  = []
+        under_lines = []
+        over_odds_list  = []
+        under_odds_list = []
+
+        for book in game.get("bookmakers", []):
+            for market in book.get("markets", []):
+                if market["key"] != "totals":
+                    continue
+                for outcome in market.get("outcomes", []):
+                    name = outcome.get("name", "").lower()
+                    point = outcome.get("point", 0)
+                    price = outcome.get("price", 0)
+                    if name == "over":
+                        over_lines.append(point)
+                        over_odds_list.append(price)
+                    elif name == "under":
+                        under_lines.append(point)
+                        under_odds_list.append(price)
+
+        if not over_lines:
+            continue
+
+        avg_line       = round(sum(over_lines) / len(over_lines), 1)
+        avg_over_odds  = round(sum(over_odds_list) / len(over_odds_list))
+        avg_under_odds = round(sum(under_odds_list) / len(under_odds_list)) if under_odds_list else -110
+
+        over_impl  = _american_to_prob(avg_over_odds)
+        under_impl = _american_to_prob(avg_under_odds)
+        total_impl = over_impl + under_impl
+        over_impl_clean  = round(over_impl  / total_impl * 100, 1)
+        under_impl_clean = round(under_impl / total_impl * 100, 1)
+
+        key = frozenset([away, home])
+        result[key] = {
+            "line":          avg_line,
+            "over_odds":     avg_over_odds,
+            "under_odds":    avg_under_odds,
+            "over_implied":  over_impl_clean,
+            "under_implied": under_impl_clean,
+        }
+
+    _TOTALS_CACHE["data"] = result
+    _TOTALS_CACHE["ts"]   = time.time()
+    return result
+
+
+def get_mlb_runline() -> dict:
+    """
+    Fetch MLB run line (spread, always ±1.5) odds.
+    Returns dict keyed by frozenset({away, home}):
+      { "away_rl_odds": int, "home_rl_odds": int,
+        "away_rl_implied": float, "home_rl_implied": float }
+    """
+    if not ODDS_API_KEY:
+        return {}
+    # Use same cache window as moneyline
+    cache_key = "_rl"
+    if not hasattr(get_mlb_runline, "_cache"):
+        get_mlb_runline._cache = {"data": {}, "ts": 0.0}
+    c = get_mlb_runline._cache
+    if time.time() - c["ts"] < _CACHE_TTL and c["data"]:
+        return c["data"]
+    try:
+        resp = requests.get(
+            f"{ODDS_BASE}/sports/baseball_mlb/odds/",
+            params={"apiKey": ODDS_API_KEY, "regions": "us",
+                    "markets": "spreads", "oddsFormat": "american"},
+            timeout=8,
+        )
+        resp.raise_for_status()
+        _update_remaining(resp)
+        games = resp.json()
+    except Exception:
+        return {}
+    result = {}
+    for game in games:
+        away = game.get("away_team", "")
+        home = game.get("home_team", "")
+        away_list, home_list = [], []
+        for book in game.get("bookmakers", []):
+            for market in book.get("markets", []):
+                if market["key"] != "spreads":
+                    continue
+                for outcome in market.get("outcomes", []):
+                    if outcome.get("point", 0) < 0:   # negative spread = favorite covers
+                        if outcome["name"] == away:
+                            away_list.append(outcome["price"])
+                        else:
+                            home_list.append(outcome["price"])
+                    else:
+                        if outcome["name"] == away:
+                            away_list.append(outcome["price"])
+                        else:
+                            home_list.append(outcome["price"])
+        if not away_list or not home_list:
+            continue
+        avg_away = round(sum(away_list) / len(away_list))
+        avg_home = round(sum(home_list) / len(home_list))
+        ai = _american_to_prob(avg_away); hi = _american_to_prob(avg_home)
+        t = ai + hi
+        result[frozenset([away, home])] = {
+            "away_rl_odds":    avg_away,
+            "home_rl_odds":    avg_home,
+            "away_rl_implied": round(ai / t * 100, 1),
+            "home_rl_implied": round(hi / t * 100, 1),
+        }
+    c["data"] = result; c["ts"] = time.time()
+    return result
+
+
+def american_to_decimal(odds: int) -> float:
+    """Convert American odds to decimal (European) odds."""
+    if odds > 0:
+        return odds / 100 + 1.0
+    else:
+        return 100 / abs(odds) + 1.0
+
+
+def calc_ev(model_prob: float, american_odds: int) -> float:
+    """
+    Expected value per $100 bet.
+    model_prob: 0-100 (model's win probability %)
+    Returns EV in dollars (positive = +EV, negative = -EV).
+    """
+    p = model_prob / 100
+    dec = american_to_decimal(american_odds)
+    return round(p * (dec - 1) * 100 - (1 - p) * 100, 2)
+
+
+def calc_kelly(model_prob: float, american_odds: int, fraction: float = 0.5) -> float:
+    """
+    Fractional Kelly Criterion — recommended bet size as % of bankroll.
+    fraction: 0.5 = half Kelly (safer, reduces variance).
+    Returns % of bankroll to bet (e.g. 4.2 means bet 4.2% of your roll).
+    Clamped to 0-25%.
+    """
+    p = model_prob / 100
+    q = 1 - p
+    b = american_to_decimal(american_odds) - 1   # net profit per $1 risked
+    if b <= 0:
+        return 0.0
+    kelly = (b * p - q) / b
+    kelly_f = kelly * fraction
+    return round(max(0.0, min(kelly_f * 100, 25.0)), 1)   # as %

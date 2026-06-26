@@ -717,3 +717,18 @@ def get_savant_stats_all(year=None):
 
     except Exception:
         return {}
+
+
+def get_game_umpire(game_pk):
+    """
+    Return the home plate umpire name for a game, or None if not yet assigned.
+    Uses the boxscore officials list (same endpoint as get_game_lineup).
+    """
+    try:
+        data = _get(f"/game/{game_pk}/boxscore")
+        for official in data.get("officials", []):
+            if official.get("officialType", "").lower() == "home plate":
+                return official.get("official", {}).get("fullName")
+    except Exception:
+        pass
+    return None

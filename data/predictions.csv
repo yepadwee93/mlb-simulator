@@ -1,2 +1,3 @@
 logged_at,game_date,game_pk,away_team,home_team,away_win_pct,home_win_pct,away_avg_runs,home_avg_runs,predicted_winner,n_sims,actual_away_runs,actual_home_runs,actual_winner,correct_pick,run_diff_error
-2026-06-25T19:41:39,2026-06-25,824747,New York Yankees,Boston Red Sox,87.1,12.9,6.04,1.62,New York Yankees,100000,,,,,
+2026-06-25T19:41:39,2026-06-25,824747,New York Yankees,Boston Red Sox,86.2,13.8,5.79,1.63,New York Yankees,1000000,,,,,
+2026-06-25T21:31:59,2026-06-25,822961,Kansas City Royals,Tampa Bay Rays,39.7,60.3,4.99,5.75,Tampa Bay Rays,500000,,,,,
