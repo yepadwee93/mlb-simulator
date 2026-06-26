@@ -534,6 +534,102 @@ def get_batter_risp_stats(player_id, season=None):
     return get_batter_sitcode_stats(player_id, "risp", season=season)
 
 
+def get_pitcher_arsenal(pitcher_id, season=None) -> dict:
+    """
+    Build a pitcher's stat-based 'arsenal' profile from season stats.
+    Returns computed rates: K%, BB%, HR/9, GB%, FIP, and qualitative grades.
+    """
+    if season is None:
+        season = date.today().year
+
+    raw = get_player_season_stats(pitcher_id, group="pitching", season=season)
+    if not raw:
+        return {}
+
+    try:
+        ip_str = str(raw.get("inningsPitched", "0") or "0")
+        parts  = ip_str.split(".")
+        full   = int(parts[0])
+        outs   = int(parts[1]) if len(parts) > 1 and parts[1] else 0
+        ip     = full + outs / 3.0
+    except Exception:
+        ip = 0.0
+
+    if ip < 1:
+        return {}
+
+    bf   = int(raw.get("battersFaced", 0) or 0) or max(int(ip * 4.3), 1)
+    ks   = int(raw.get("strikeOuts",   0) or 0)
+    bb   = int(raw.get("baseOnBalls",  0) or 0)
+    hrs  = int(raw.get("homeRuns",     0) or 0)
+    er   = int(raw.get("earnedRuns",   0) or 0)
+    go   = int(raw.get("groundOuts",   0) or 0)
+    fo   = int(raw.get("flyOuts",      0) or 0)
+    hits = int(raw.get("hits",         0) or 0)
+
+    k_pct  = round(ks / bf * 100, 1)   if bf  > 0 else None
+    bb_pct = round(bb / bf * 100, 1)   if bf  > 0 else None
+    hr9    = round(hrs / ip * 9,  2)   if ip  > 0 else None
+    gb_pct = round(go / (go + fo) * 100, 1) if (go + fo) > 0 else None
+    era    = round(er / ip * 9,   2)   if ip  > 0 else None
+    # FIP = (13*HR + 3*BB - 2*K) / IP + 3.10 (constant)
+    fip    = round((13 * hrs + 3 * bb - 2 * ks) / ip + 3.10, 2) if ip > 0 else None
+    whip   = round((bb + hits) / ip, 2) if ip > 0 else None
+
+    def grade_k(v):
+        if v is None: return "—"
+        if v >= 28: return "Elite"
+        if v >= 23: return "Above Avg"
+        if v >= 18: return "Average"
+        return "Below Avg"
+
+    def grade_bb(v):
+        if v is None: return "—"
+        if v <= 5:  return "Elite"
+        if v <= 7:  return "Above Avg"
+        if v <= 9:  return "Average"
+        return "Below Avg"
+
+    def grade_hr9(v):
+        if v is None: return "—"
+        if v <= 0.9: return "Elite"
+        if v <= 1.2: return "Above Avg"
+        if v <= 1.5: return "Average"
+        return "Below Avg"
+
+    def grade_gb(v):
+        if v is None: return "—"
+        if v >= 52: return "Elite GB"
+        if v >= 46: return "Above Avg"
+        if v >= 40: return "Average"
+        return "Fly Ball"
+
+    wins   = int(raw.get("wins",   0) or 0)
+    losses = int(raw.get("losses", 0) or 0)
+    gs     = int(raw.get("gamesStarted", 0) or 0)
+    g      = int(raw.get("gamesPitched", 0) or 0)
+
+    return {
+        "ip":           round(ip, 1),
+        "gs":           gs,
+        "g":            g,
+        "wins":         wins,
+        "losses":       losses,
+        "era":          era,
+        "fip":          fip,
+        "whip":         whip,
+        "k_pct":        k_pct,
+        "bb_pct":       bb_pct,
+        "hr9":          hr9,
+        "gb_pct":       gb_pct,
+        "k_grade":      grade_k(k_pct),
+        "bb_grade":     grade_bb(bb_pct),
+        "hr9_grade":    grade_hr9(hr9),
+        "gb_grade":     grade_gb(gb_pct),
+        "k_bb_ratio":   round(k_pct / bb_pct, 2) if (k_pct and bb_pct and bb_pct > 0) else None,
+    }
+
+
 def get_pitcher_hand(pitcher_id):
     """
     Returns 'L' or 'R' — which hand the pitcher throws with.

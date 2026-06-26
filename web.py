@@ -50,6 +50,7 @@ from data.mlb_api import (
     get_team_streak,
     get_live_scores,
     compute_injury_impact,
+    get_pitcher_arsenal,
 )
 from simulation.engine import run_simulation, predict_pitcher_ks, detect_pitcher_form, predict_batter_props, optimize_batting_order
 
@@ -981,6 +982,14 @@ def simulate(game_pk):
     except Exception:
         result["away_order_opt"] = {}
         result["home_order_opt"] = {}
+
+    # ── Pitcher arsenal ───────────────────────────────────────────────
+    try:
+        result["away_arsenal"] = get_pitcher_arsenal(away_pitcher.get("id")) if away_pitcher.get("id") else {}
+        result["home_arsenal"] = get_pitcher_arsenal(home_pitcher.get("id")) if home_pitcher.get("id") else {}
+    except Exception:
+        result["away_arsenal"] = {}
+        result["home_arsenal"] = {}
 
     # ── Stadium profile ───────────────────────────────────────────────
     result["stadium_profile"] = _build_stadium_profile(
