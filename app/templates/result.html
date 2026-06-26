@@ -1154,10 +1154,18 @@ function loadProps() {
         compareRow.style.display = 'table-row';
       });
 
-      btn.textContent = '✓ Props Loaded';
-      btn.style.background = '#1b4332';
-      btn.style.color = '#4caf50';
-      btn.style.borderColor = '#4caf50';
+      var totalProps = Object.keys(props).length;
+      if (totalProps === 0) {
+        btn.textContent = '⚠ No props available';
+        btn.style.background = '#2a1a0a';
+        btn.style.color = '#ffa726';
+        btn.style.borderColor = '#ffa726';
+      } else {
+        btn.textContent = '✓ Props Loaded';
+        btn.style.background = '#1b4332';
+        btn.style.color = '#4caf50';
+        btn.style.borderColor = '#4caf50';
+      }
 
       // Re-populate batter prop content areas using stored name map
       window._propNameMap && window._propNameMap.forEach(function(entry) {
