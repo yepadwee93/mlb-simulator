@@ -268,6 +268,27 @@
 
 <body>
 
+{% if show_email_nudge and current_user.is_authenticated %}
+<div id="email-nudge" style="background:#1a2540;border-bottom:1px solid #2a3a5a;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+  <div style="display:flex;align-items:center;gap:10px;font-size:0.85rem;">
+    <span style="font-size:1.1rem;">📬</span>
+    <span style="color:#b0b8cc;">Get daily top play picks sent to your inbox every morning.</span>
+    <a href="/settings" style="background:#2563eb;color:#fff;padding:5px 14px;border-radius:6px;font-size:0.8rem;font-weight:700;text-decoration:none;white-space:nowrap;">Sign up for alerts</a>
+  </div>
+  <button onclick="dismissNudge()" style="background:none;border:none;color:#555870;font-size:1.2rem;cursor:pointer;padding:0 4px;line-height:1;" title="Dismiss">✕</button>
+</div>
+<script>
+function dismissNudge() {
+  document.getElementById('email-nudge').style.display = 'none';
+  try { localStorage.setItem('email_nudge_dismissed', '1'); } catch(e) {}
+}
+if (localStorage.getItem('email_nudge_dismissed') === '1') {
+  var el = document.getElementById('email-nudge');
+  if (el) el.style.display = 'none';
+}
+</script>
+{% endif %}
+
 <header>
   <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
     <h1>⚾ MLB Simulator</h1>

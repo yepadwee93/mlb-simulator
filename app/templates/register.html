@@ -28,7 +28,13 @@
              padding: 10px 14px; color: #ef9a9a; font-size: 0.85rem; margin-bottom: 16px; }
     .footer { text-align: center; margin-top: 24px; font-size: 0.85rem; color: #b0b8cc; }
     .footer a { color: #64b5f6; }
-  
+    .switch { position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0; }
+    .switch input { opacity:0;width:0;height:0; }
+    .slider { position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#333650;border-radius:24px;transition:.2s; }
+    .slider:before { position:absolute;content:"";height:18px;width:18px;left:3px;bottom:3px;background:white;border-radius:50%;transition:.2s; }
+    input:checked + .slider { background:#4caf50; }
+    input:checked + .slider:before { transform:translateX(20px); }
+
 .nav-dropdown { position:relative; display:inline-block; }
 .nav-dropdown > a { color:#ffb74d;text-decoration:none;font-weight:600; }
 .nav-dropdown-menu {
@@ -142,6 +148,17 @@
       <label>Confirm Password</label>
       <input type="password" name="confirm" id="confirm" autocomplete="new-password" required>
       <div id="match-msg" style="font-size:0.72rem;margin-top:4px;display:none;"></div>
+    </div>
+    <div class="form-group" style="margin-top:4px;">
+      <label>Email <span style="color:#555870;font-size:0.68rem;text-transform:none;letter-spacing:0;">(optional — for daily top play alerts)</span></label>
+      <input type="email" name="email" autocomplete="email" placeholder="you@example.com">
+      <div style="display:flex;align-items:center;gap:10px;margin-top:10px;">
+        <label class="switch" style="flex-shrink:0;">
+          <input type="checkbox" name="email_alerts" id="reg-alerts" checked>
+          <span class="slider"></span>
+        </label>
+        <span style="font-size:0.8rem;color:#b0b8cc;">Send me daily top play picks</span>
+      </div>
     </div>
     <button class="btn" type="submit">Create Account</button>
     <script>

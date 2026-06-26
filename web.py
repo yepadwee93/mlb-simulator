@@ -705,6 +705,15 @@ def register_page():
             if ok:
                 user_data = get_user_by_id(result)
                 login_user(User(user_data), remember=True)
+                # Save email + alerts preference if provided at signup
+                email = request.form.get("email", "").strip()
+                alerts = bool(request.form.get("email_alerts"))
+                if email:
+                    try:
+                        from data.email_alerts import update_user_email
+                        update_user_email(result, email, alerts)
+                    except Exception:
+                        pass
                 return redirect(url_for("index"))
             else:
                 error = result
@@ -744,6 +753,16 @@ def index():
     except Exception:
         pub_pcts = {}
 
+    # Check if logged-in user has an email set (for the signup nudge banner)
+    show_email_nudge = False
+    if current_user.is_authenticated:
+        try:
+            from data.email_alerts import get_user_email_settings
+            prefs = get_user_email_settings(current_user.id)
+            show_email_nudge = not prefs.get("email")
+        except Exception:
+            pass
+
     return render_template("index.html",
                            games=games,
                            date=label,
@@ -752,7 +771,8 @@ def index():
                            next_date=next_date,
                            is_today=is_today,
                            pub_pcts=pub_pcts,
-                           api_remaining=get_requests_remaining())
+                           api_remaining=get_requests_remaining(),
+                           show_email_nudge=show_email_nudge)
 
 
 @app.route("/simulate/<int:game_pk>")
