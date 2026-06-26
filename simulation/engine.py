@@ -497,6 +497,30 @@ def precompute_lineup(lineup_stats: list, pitcher_stats: dict,
         # Pitcher quality modifier
         probs = apply_pitcher_modifier(probs, pitcher_stats)
 
+        # Lineup protection: pitchers issue more walks to good hitters when
+        # the next batter is significantly better (don't want to face the
+        # cleanup guy with a runner on). Conversely, they attack the zone
+        # more aggressively when a weak hitter follows.
+        # OUTCOME_ORDER index 0 = WALK
+        try:
+            n_batters = len(lineup_stats)
+            curr_ops = float(stats.get('ops', '0') or '0')
+            next_stats = lineup_stats[(i + 1) % n_batters]
+            next_ops = float(next_stats.get('ops', '0') or '0')
+            ops_diff = next_ops - curr_ops
+            if ops_diff >= 0.120:
+                probs[0] *= 1.18   # next batter is a monster -- lots of nibbling
+            elif ops_diff >= 0.060:
+                probs[0] *= 1.10   # next batter is clearly better
+            elif ops_diff >= 0.030:
+                probs[0] *= 1.05   # next batter is somewhat better
+            elif ops_diff <= -0.060:
+                probs[0] *= 0.94   # next batter is weaker -- pitcher attacks zone
+            total = sum(probs)
+            probs = [p / total for p in probs]
+        except (ValueError, TypeError, ZeroDivisionError):
+            pass   # missing OPS data -- skip protection modifier
+
         # Ballpark factor (dimensions, altitude, park tendencies)
         if venue:
             probs = apply_ballpark_factor(probs, venue)
