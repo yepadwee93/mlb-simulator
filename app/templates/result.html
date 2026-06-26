@@ -683,7 +683,7 @@ document.querySelectorAll('[data-prop-player]').forEach(function(wrapper) {
 (function() {
   try {
     var simData = JSON.parse(localStorage.getItem('simData') || '{}');
-    simData['{{ game_pk }}'] = {
+    simData['{{ gamePk }}'] = {
       away_pct:  '{{ away_win_pct }}',
       home_pct:  '{{ home_win_pct }}',
       away_runs: '{{ away_avg_runs }}',

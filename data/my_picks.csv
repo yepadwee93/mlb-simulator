@@ -1,0 +1,2 @@
+logged_at,game_date,game_pk,away_team,home_team,my_pick,my_notes,sim_pick,sim_away_pct,sim_home_pct,sim_away_runs,sim_home_runs,actual_away_runs,actual_home_runs,actual_winner,my_pick_correct,sim_pick_correct,run_diff_error
+2026-06-25T19:40:34,2026-06-26,824747,New York Yankees,Boston Red Sox,New York Yankees,over 3.5 run simulater said 4 runs for the yanks,,,,,,,,,,,

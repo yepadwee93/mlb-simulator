@@ -385,7 +385,7 @@ def simulate(game_pk):
     # which calls /props/<game_pk> separately (saves 2 API calls per simulation)
     result["props_by_player"] = {}
 
-    return render_template("result.html", **result)
+    return render_template("result.html", game_pk=game_pk, **result)
 
 
 @app.route("/props/<int:game_pk>")
