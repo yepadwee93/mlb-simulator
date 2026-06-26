@@ -1454,7 +1454,10 @@ def api_live_scores():
 def api_scores():
     """JSON: today's games with live scores for the scoreboard bar."""
     from data.mlb_api import get_live_scores
-    games = get_live_scores()
+    try:
+        games = get_live_scores() or []
+    except Exception:
+        games = []
     out = []
     for g in games:
         out.append({
@@ -1464,9 +1467,9 @@ def api_scores():
             "home_score": g.get("home_score", ""),
             "status": g.get("status", ""),
             "inning": g.get("inning", ""),
-            "inning_half": g.get("inning_half", ""),
+            "inning_half": (g.get("inning_half", "") or "").lower(),
             "game_time": g.get("game_time_utc", ""),
-            "gamePk": g.get("game_pk", ""),
+            "gamePk": g.get("gamePk", ""),
         })
     return jsonify(out)
 
