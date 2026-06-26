@@ -1346,52 +1346,6 @@ def settle_bets_route():
     return jsonify({"settled": n})
 
 
-# ── Auth routes ───────────────────────────────────────────────────
-
-@app.route("/login", methods=["GET", "POST"])
-def login_page():
-    if current_user.is_authenticated:
-        return redirect(url_for("simulate_all"))
-    error = None
-    if request.method == "POST":
-        username  = request.form.get("username", "").strip()
-        password  = request.form.get("password", "")
-        user_data = check_password(username, password)
-        if user_data:
-            login_user(User(user_data), remember=True)
-            return redirect(request.args.get("next") or url_for("simulate_all"))
-        error = "Invalid username or password."
-    return render_template("login.html", error=error)
-
-
-@app.route("/register", methods=["GET", "POST"])
-def register_page():
-    if current_user.is_authenticated:
-        return redirect(url_for("simulate_all"))
-    error = None
-    if request.method == "POST":
-        username = request.form.get("username", "").strip()
-        password = request.form.get("password", "")
-        confirm  = request.form.get("confirm", "")
-        if password != confirm:
-            error = "Passwords don't match."
-        else:
-            ok, result = create_user(username, password)
-            if ok:
-                login_user(User(get_user_by_id(result)), remember=True)
-                return redirect(url_for("simulate_all"))
-            else:
-                error = result
-    return render_template("register.html", error=error)
-
-
-@app.route("/logout")
-@login_required
-def logout():
-    logout_user()
-    return redirect(url_for("login_page"))
-
-
 if __name__ == "__main__":
     port  = int(os.environ.get("PORT", 5000))
     debug = os.environ.get("FLASK_ENV") != "production"
