@@ -207,6 +207,47 @@
     .market-val   { color: #c8cdd8; font-weight: 600; }
     .ev-pos { color: #4caf50; font-weight: 700; }
     .ev-neg { color: #ef5350; font-weight: 600; }
+    .log-bet-btn {
+      display:inline-block; margin-top:10px; padding:6px 14px; font-size:0.75rem;
+      font-weight:700; border-radius:8px; cursor:pointer;
+      background:#14261a; color:#4caf50; border:1px solid #2a5a3a;
+    }
+    .log-bet-btn:hover { background:#1b3a24; }
+    .log-bet-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:1000; align-items:center; justify-content:center; }
+    .log-bet-modal.open { display:flex; }
+    .log-bet-box { background:#161923; border:1px solid #333650; border-radius:16px; padding:24px 28px; min-width:320px; max-width:460px; width:90%; }
+    .log-bet-box h3 { font-size:1rem; font-weight:800; margin-bottom:16px; }
+    .lbf-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
+    .lbf-grp label { display:block; font-size:0.65rem; color:#8890a4; text-transform:uppercase; letter-spacing:.4px; margin-bottom:4px; }
+    .lbf-grp input, .lbf-grp select {
+      width:100%; background:#0f1117; border:1px solid #333650; border-radius:7px;
+      color:#e8eaf0; padding:7px 9px; font-size:0.82rem;
+    }
+    .lbf-btns { display:flex; gap:10px; margin-top:14px; }
+    .lbf-submit { flex:1; background:#14261a; color:#4caf50; border:1px solid #2a5a3a; border-radius:8px; padding:9px; font-weight:700; cursor:pointer; font-size:0.85rem; }
+    .lbf-cancel { background:#1a1d28; color:#8890a4; border:1px solid #333650; border-radius:8px; padding:9px 16px; cursor:pointer; font-size:0.85rem; }
+    .lbf-msg { font-size:0.78rem; margin-top:8px; }
+    .lbf-msg.ok  { color:#4caf50; }
+    .lbf-msg.err { color:#ef5350; }
+    .log-bet-btn {
+      display:inline-block; margin-top:10px; padding:6px 14px; font-size:0.75rem;
+      font-weight:700; border-radius:8px; cursor:pointer;
+      background:#14261a; color:#4caf50; border:1px solid #2a5a3a;
+    }
+    .log-bet-btn:hover { background:#1b3a24; }
+    .log-bet-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:1000; align-items:center; justify-content:center; }
+    .log-bet-modal.open { display:flex; }
+    .log-bet-box { background:#161923; border:1px solid #333650; border-radius:16px; padding:24px 28px; min-width:320px; max-width:460px; width:90%; }
+    .log-bet-box h3 { font-size:1rem; font-weight:800; margin-bottom:16px; }
+    .lbf-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
+    .lbf-grp label { display:block; font-size:0.65rem; color:#8890a4; text-transform:uppercase; letter-spacing:.4px; margin-bottom:4px; }
+    .lbf-grp input, .lbf-grp select { width:100%; background:#0f1117; border:1px solid #333650; border-radius:7px; color:#e8eaf0; padding:7px 9px; font-size:0.82rem; }
+    .lbf-btns { display:flex; gap:10px; margin-top:14px; }
+    .lbf-submit { flex:1; background:#14261a; color:#4caf50; border:1px solid #2a5a3a; border-radius:8px; padding:9px; font-weight:700; cursor:pointer; font-size:0.85rem; }
+    .lbf-cancel { background:#1a1d28; color:#8890a4; border:1px solid #333650; border-radius:8px; padding:9px 16px; cursor:pointer; font-size:0.85rem; }
+    .lbf-msg { font-size:0.78rem; margin-top:8px; }
+    .lbf-msg.ok  { color:#4caf50; }
+    .lbf-msg.err { color:#ef5350; }
     .kelly-badge {
       display: inline-block; background: #1a2a1a; color: #66bb6a;
       font-size: 0.62rem; padding: 1px 6px; border-radius: 4px;
@@ -250,6 +291,11 @@
       flex-shrink: 0;
     }
     .pitcher-name { font-weight: 600; color: #c8cdd8; font-size: 0.8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sharp-badge {
+      display:inline-block; font-size:0.62rem; padding:1px 7px;
+      border-radius:4px; font-weight:700; letter-spacing:.4px;
+      background:#1a2a3a; color:#29b6f6; border:1px solid #1565c0;
+    }
     .bp-badge {
       display: inline-block; font-size: 0.62rem; padding: 1px 7px;
       border-radius: 4px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px;
@@ -524,7 +570,7 @@
 </div>
 
 <!-- ── All Game Cards ── -->
-<div class="section-title">ALL GAMES TODAY</div>
+<div class="section-title" style="display:flex;justify-content:space-between;align-items:center;">ALL GAMES TODAY <a href="/bets" style="font-size:0.78rem;font-weight:700;color:#4caf50;background:#14261a;border:1px solid #2a5a3a;border-radius:6px;padding:4px 10px;text-decoration:none;">💰 Bet Tracker</a></div>
 
 <div class="games-grid">
   {% for r in results %}
@@ -653,6 +699,30 @@
         <div><span class="parlay-tag">🎯 PARLAY PICK</span></div>
       {% endif %}
 
+      <!-- Pitcher K predictions -->
+      {%- if r.away_k_pred or r.home_k_pred %}
+      <div class="market-row" style="padding-bottom:4px;">
+        <div>
+          <div class="market-label">{{ r.away_pitcher_name }} K model</div>
+          {%- if r.away_k_pred.model_k %}
+          <div class="market-val">{{ r.away_k_pred.model_k }} Ks
+            <span style="color:#555870;font-size:.65rem;">({{ r.away_k_pred.model_k_low }}–{{ r.away_k_pred.model_k_high }})</span>
+          </div>
+          <div style="color:#8890a4;font-size:.65rem;">~{{ r.away_k_pred.expected_ip }} IP expected</div>
+          {%- endif %}
+        </div>
+        <div style="text-align:right;">
+          <div class="market-label">{{ r.home_pitcher_name }} K model</div>
+          {%- if r.home_k_pred.model_k %}
+          <div class="market-val">{{ r.home_k_pred.model_k }} Ks
+            <span style="color:#555870;font-size:.65rem;">({{ r.home_k_pred.model_k_low }}–{{ r.home_k_pred.model_k_high }})</span>
+          </div>
+          <div style="color:#8890a4;font-size:.65rem;">~{{ r.home_k_pred.expected_ip }} IP expected</div>
+          {%- endif %}
+        </div>
+      </div>
+      {%- endif %}
+
       <!-- Inning segments F3/F5/F7 -->
       {%- if r.f3 %}
       <div class="seg-row">
@@ -676,7 +746,10 @@
       {% if r.away_implied_pct %}
       <div class="market-row">
         <div>
-          <div class="market-label">Moneyline</div>
+          <div class="market-label">Moneyline
+            {%- if r.sharp_away %} <span class="sharp-badge">SHARP MOVE</span>{%- endif %}
+            {%- if r.away_open_odds and r.away_open_odds != r.away_avg_odds %} <span style="color:#555870;font-size:.62rem;">open {{ r.away_open_odds }}</span>{%- endif %}
+          </div>
           <div><span class="market-val">{{ r.away_avg_odds }}</span>
             <span style="color:#8890a4;"> · {{ r.away_implied_pct }}% impl</span></div>
           {% if r.away_edge > 0 %}
@@ -689,7 +762,10 @@
           {% endif %}
         </div>
         <div style="text-align:right;">
-          <div class="market-label">Moneyline</div>
+          <div class="market-label">Moneyline
+            {%- if r.sharp_home %} <span class="sharp-badge">SHARP MOVE</span>{%- endif %}
+            {%- if r.home_open_odds and r.home_open_odds != r.home_avg_odds %} <span style="color:#555870;font-size:.62rem;">open {{ r.home_open_odds }}</span>{%- endif %}
+          </div>
           <div><span class="market-val">{{ r.home_avg_odds }}</span>
             <span style="color:#8890a4;"> · {{ r.home_implied_pct }}% impl</span></div>
           {% if r.home_edge > 0 %}
@@ -752,9 +828,80 @@
       </div>
       {%- endif %}
 
+    <div style="text-align:center;padding-bottom:4px;">
+      <button class="log-bet-btn" onclick="openBetModal('{{ r.game_pk }}','{{ r.game_date }}','{{ r.away_team | replace("'","\'") }}','{{ r.home_team | replace("'","\'") }}','{{ (r.away_team if r.away_win_pct > r.home_win_pct else r.home_team) | replace("'","\'") }}','{{ r.away_avg_odds if r.away_win_pct > r.home_win_pct else r.home_avg_odds }}')">+ Log Bet</button>
     </div>
+  </div>
   {% endfor %}
 </div>
+
+<!-- Log Bet Modal -->
+<div class="log-bet-modal" id="log-bet-modal">
+  <div class="log-bet-box">
+    <h3>Log a Bet</h3>
+    <div class="lbf-row">
+      <div class="lbf-grp">
+        <label>Bet On</label>
+        <input id="lbf-beton" type="text" placeholder="Team / OVER 8.5">
+      </div>
+      <div class="lbf-grp">
+        <label>Bet Type</label>
+        <select id="lbf-type">
+          <option value="ML">Moneyline</option>
+          <option value="RL">Run Line</option>
+          <option value="OVER">Over</option>
+          <option value="UNDER">Under</option>
+          <option value="F5">F5</option>
+        </select>
+      </div>
+    </div>
+    <div class="lbf-row">
+      <div class="lbf-grp">
+        <label>Odds (American)</label>
+        <input id="lbf-odds" type="number" placeholder="-110">
+      </div>
+      <div class="lbf-grp">
+        <label>Amount ($)</label>
+        <input id="lbf-amount" type="number" value="100">
+      </div>
+    </div>
+    <div class="lbf-btns">
+      <button class="lbf-submit" onclick="submitBet()">Log Bet</button>
+      <button class="lbf-cancel" onclick="closeModal()">Cancel</button>
+    </div>
+    <div class="lbf-msg" id="lbf-msg"></div>
+  </div>
+</div>
+
+<script>
+let _betCtx = {};
+function openBetModal(gamePk, gameDate, awayTeam, homeTeam, defaultBetOn, defaultOdds) {
+  _betCtx = { gamePk, gameDate, awayTeam, homeTeam };
+  document.getElementById('lbf-beton').value = defaultBetOn || '';
+  document.getElementById('lbf-odds').value  = defaultOdds  || '';
+  document.getElementById('lbf-msg').textContent = '';
+  document.getElementById('log-bet-modal').classList.add('open');
+}
+function closeModal() { document.getElementById('log-bet-modal').classList.remove('open'); }
+document.getElementById('log-bet-modal').addEventListener('click', e => { if (e.target.id === 'log-bet-modal') closeModal(); });
+async function submitBet() {
+  const msg = document.getElementById('lbf-msg');
+  const betOn = document.getElementById('lbf-beton').value.trim();
+  const odds  = document.getElementById('lbf-odds').value;
+  const amt   = document.getElementById('lbf-amount').value;
+  const bt    = document.getElementById('lbf-type').value;
+  if (!betOn || !odds || !amt) { msg.className='lbf-msg err'; msg.textContent='Fill in all fields.'; return; }
+  try {
+    const r = await fetch('/bets/log', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ game_pk:_betCtx.gamePk, game_date:_betCtx.gameDate,
+        away_team:_betCtx.awayTeam, home_team:_betCtx.homeTeam,
+        bet_on:betOn, bet_type:bt, odds:parseInt(odds), amount:parseFloat(amt) }) });
+    const d = await r.json();
+    if (d.status==='ok') { msg.className='lbf-msg ok'; msg.textContent='Bet logged!'; setTimeout(closeModal, 900); }
+    else { msg.className='lbf-msg err'; msg.textContent=d.msg||'Error.'; }
+  } catch(e) { msg.className='lbf-msg err'; msg.textContent='Network error.'; }
+}
+</script>
 
 <footer>
   Data: MLB Stats API + Open-Meteo · Predictions for entertainment only

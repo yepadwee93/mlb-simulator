@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bet Tracker — MLB Simulator</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0f1117; color: #e8eaf0; font-family: 'Segoe UI', Arial, sans-serif; padding: 32px 20px; }
+    a { color: #64b5f6; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .back { display: inline-block; margin-bottom: 24px; font-size: 0.9rem; }
+    h1 { font-size: 1.6rem; font-weight: 800; margin-bottom: 6px; }
+    .subtitle { color: #8890a4; font-size: 0.9rem; margin-bottom: 28px; }
+
+    /* ── Summary cards ── */
+    .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 28px; }
+    .stat-card { background: #161923; border: 1px solid #252836; border-radius: 12px; padding: 14px 16px; }
+    .stat-label { font-size: 0.68rem; color: #8890a4; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
+    .stat-val { font-size: 1.5rem; font-weight: 800; }
+    .green { color: #4caf50; }
+    .red   { color: #ef5350; }
+    .blue  { color: #64b5f6; }
+    .gold  { color: #ffa726; }
+
+    /* ── By bet type ── */
+    .type-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-bottom: 28px; }
+    .type-card { background: #161923; border: 1px solid #252836; border-radius: 10px; padding: 12px 14px; font-size: 0.82rem; }
+    .type-name { font-weight: 700; color: #c8cdd8; margin-bottom: 6px; font-size: 0.9rem; }
+    .type-row  { display: flex; justify-content: space-between; color: #8890a4; margin-top: 3px; }
+
+    /* ── Bets table ── */
+    .section-title { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: #8890a4; margin-bottom: 10px; }
+    .bets-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+    .bets-table th { text-align: left; color: #8890a4; font-size: 0.68rem; text-transform: uppercase; letter-spacing: .4px; padding: 8px 10px; border-bottom: 1px solid #252836; }
+    .bets-table td { padding: 9px 10px; border-bottom: 1px solid #1a1d28; vertical-align: middle; }
+    .bets-table tr:hover td { background: #161923; }
+    .badge { display: inline-block; font-size: 0.65rem; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+    .badge-win  { background: #1b3a2a; color: #4caf50; border: 1px solid #2a5a3a; }
+    .badge-loss { background: #3a1a1a; color: #ef5350; border: 1px solid #5a2a2a; }
+    .badge-push { background: #252836; color: #8890a4; border: 1px solid #333650; }
+    .badge-open { background: #1a2030; color: #64b5f6; border: 1px solid #1a3a5a; }
+    .badge-type { background: #1a1230; color: #c084fc; border: 1px solid #3a2a6a; font-size: 0.6rem; }
+    .no-bets { color: #8890a4; text-align: center; padding: 40px; }
+
+    /* ── Log bet form ── */
+    .log-form { background: #161923; border: 1px solid #252836; border-radius: 14px; padding: 20px 24px; margin-bottom: 28px; }
+    .log-form h3 { font-size: 0.95rem; font-weight: 700; color: #c8cdd8; margin-bottom: 16px; }
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+    .form-group label { display: block; font-size: 0.68rem; color: #8890a4; text-transform: uppercase; letter-spacing: .4px; margin-bottom: 5px; }
+    .form-group input, .form-group select {
+      width: 100%; background: #0f1117; border: 1px solid #333650; border-radius: 8px;
+      color: #e8eaf0; padding: 8px 10px; font-size: 0.85rem;
+    }
+    .form-group input:focus, .form-group select:focus { outline: none; border-color: #64b5f6; }
+    .btn-log { margin-top: 16px; background: #1a3a5a; color: #64b5f6; border: 1px solid #1565c0;
+               border-radius: 8px; padding: 9px 20px; font-size: 0.85rem; font-weight: 700;
+               cursor: pointer; }
+    .btn-log:hover { background: #1e4a70; }
+    .msg { margin-top: 10px; font-size: 0.8rem; }
+    .msg.ok  { color: #4caf50; }
+    .msg.err { color: #ef5350; }
+  </style>
+</head>
+<body>
+
+<a class="back" href="/simulate-all">← Back to Games</a>
+<h1>Bet Tracker</h1>
+<p class="subtitle">Log your bets, track results, measure your edge over the book.</p>
+
+<!-- Summary stats -->
+<div class="summary-grid">
+  <div class="stat-card">
+    <div class="stat-label">Total Bets</div>
+    <div class="stat-val blue">{{ total_bets }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Win Rate</div>
+    <div class="stat-val {% if win_rate and win_rate >= 55 %}green{% elif win_rate %}red{% endif %}">
+      {% if win_rate %}{{ win_rate }}%{% else %}—{% endif %}
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Record</div>
+    <div class="stat-val">{{ wins }}-{{ losses }}{% if pushes %}-{{ pushes }}{% endif %}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Total Wagered</div>
+    <div class="stat-val">${{ "%.0f"|format(total_wagered) }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Total P&L</div>
+    <div class="stat-val {% if total_pl > 0 %}green{% elif total_pl < 0 %}red{% endif %}">
+      {% if total_pl >= 0 %}+{% endif %}${{ "%.2f"|format(total_pl) }}
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">ROI</div>
+    <div class="stat-val {% if roi and roi > 0 %}green{% elif roi %}red{% endif %}">
+      {% if roi %}{% if roi > 0 %}+{% endif %}{{ roi }}%{% else %}—{% endif %}
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Pending</div>
+    <div class="stat-val gold">{{ pending }}</div>
+  </div>
+</div>
+
+<!-- By bet type -->
+{% if by_type %}
+<div class="section-title">Breakdown by Type</div>
+<div class="type-grid" style="margin-bottom:28px;">
+  {% for bt, d in by_type.items() %}
+  <div class="type-card">
+    <div class="type-name">{{ bt }}</div>
+    <div class="type-row"><span>Record</span><span>{{ d.w }}-{{ d.l }}</span></div>
+    <div class="type-row"><span>P&L</span>
+      <span class="{% if d.pl > 0 %}green{% elif d.pl < 0 %}red{% endif %}">
+        {% if d.pl >= 0 %}+{% endif %}${{ "%.2f"|format(d.pl) }}
+      </span></div>
+    <div class="type-row"><span>ROI</span>
+      <span>{% if d.wagered > 0 %}{% set r = (d.pl / d.wagered * 100) %}
+        <span class="{% if r > 0 %}green{% else %}red{% endif %}">{% if r > 0 %}+{% endif %}{{ "%.1f"|format(r) }}%</span>
+      {% else %}—{% endif %}</span></div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Log a bet -->
+<div class="log-form">
+  <h3>Log a Bet</h3>
+  <div class="form-grid">
+    <div class="form-group">
+      <label>Game PK</label>
+      <input id="lb-gpk" type="number" placeholder="e.g. 745519">
+    </div>
+    <div class="form-group">
+      <label>Game Date</label>
+      <input id="lb-date" type="date" value="{{ today }}">
+    </div>
+    <div class="form-group">
+      <label>Away Team</label>
+      <input id="lb-away" type="text" placeholder="e.g. Dodgers">
+    </div>
+    <div class="form-group">
+      <label>Home Team</label>
+      <input id="lb-home" type="text" placeholder="e.g. Yankees">
+    </div>
+    <div class="form-group">
+      <label>Bet On</label>
+      <input id="lb-beton" type="text" placeholder="Team name / OVER 8.5">
+    </div>
+    <div class="form-group">
+      <label>Bet Type</label>
+      <select id="lb-type">
+        <option>ML</option>
+        <option>RL</option>
+        <option>OVER</option>
+        <option>UNDER</option>
+        <option>F5</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Odds (American)</label>
+      <input id="lb-odds" type="number" placeholder="-110">
+    </div>
+    <div class="form-group">
+      <label>Amount ($)</label>
+      <input id="lb-amount" type="number" value="100">
+    </div>
+    <div class="form-group">
+      <label>Model Edge %</label>
+      <input id="lb-edge" type="number" step="0.1" placeholder="optional">
+    </div>
+  </div>
+  <button class="btn-log" onclick="logBet()">Log Bet</button>
+  <div class="msg" id="lb-msg"></div>
+</div>
+
+<!-- Recent bets table -->
+<div class="section-title">Recent Bets</div>
+{% if recent_bets %}
+<table class="bets-table">
+  <thead>
+    <tr>
+      <th>Date</th>
+      <th>Matchup</th>
+      <th>Bet</th>
+      <th>Type</th>
+      <th>Odds</th>
+      <th>Amount</th>
+      <th>Edge</th>
+      <th>Result</th>
+      <th>P&L</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for b in recent_bets %}
+    <tr>
+      <td style="color:#8890a4;">{{ b.game_date }}</td>
+      <td>{{ b.away_team }} @ {{ b.home_team }}</td>
+      <td style="font-weight:600;">{{ b.bet_on }}</td>
+      <td><span class="badge badge-type">{{ b.bet_type }}</span></td>
+      <td>{{ b.odds }}</td>
+      <td>${{ b.amount }}</td>
+      <td>{% if b.model_edge %}<span class="{% if b.model_edge|float > 0 %}green{% else %}red{% endif %}">{{ b.model_edge }}%</span>{% else %}—{% endif %}</td>
+      <td>
+        {% if b.result == "WIN" %}<span class="badge badge-win">WIN</span>
+        {% elif b.result == "LOSS" %}<span class="badge badge-loss">LOSS</span>
+        {% elif b.result == "PUSH" %}<span class="badge badge-push">PUSH</span>
+        {% else %}<span class="badge badge-open">OPEN</span>{% endif %}
+      </td>
+      <td>{% if b.profit_loss %}
+        <span class="{% if b.profit_loss|float > 0 %}green{% elif b.profit_loss|float < 0 %}red{% endif %}">
+          {% if b.profit_loss|float >= 0 %}+{% endif %}${{ "%.2f"|format(b.profit_loss|float) }}
+        </span>
+      {% else %}—{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="no-bets">No bets logged yet. Use the form above or click "Log Bet" on any game card.</div>
+{% endif %}
+
+<script>
+const today = new Date().toISOString().slice(0, 10);
+document.getElementById('lb-date').value = today;
+
+async function logBet() {
+  const msg = document.getElementById('lb-msg');
+  const payload = {
+    game_pk:    document.getElementById('lb-gpk').value,
+    game_date:  document.getElementById('lb-date').value,
+    away_team:  document.getElementById('lb-away').value,
+    home_team:  document.getElementById('lb-home').value,
+    bet_on:     document.getElementById('lb-beton').value,
+    bet_type:   document.getElementById('lb-type').value,
+    odds:       document.getElementById('lb-odds').value,
+    amount:     document.getElementById('lb-amount').value,
+    model_edge: document.getElementById('lb-edge').value,
+  };
+  if (!payload.game_pk || !payload.bet_on || !payload.odds || !payload.amount) {
+    msg.className = 'msg err'; msg.textContent = 'Fill in Game PK, Bet On, Odds, and Amount.'; return;
+  }
+  try {
+    const r = await fetch('/bets/log', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const d = await r.json();
+    if (d.status === 'ok') {
+      msg.className = 'msg ok'; msg.textContent = 'Bet logged!';
+      setTimeout(() => location.reload(), 800);
+    } else {
+      msg.className = 'msg err'; msg.textContent = d.msg || 'Error logging bet.';
+    }
+  } catch(e) {
+    msg.className = 'msg err'; msg.textContent = 'Network error.';
+  }
+}
+</script>
+
+</body>
+</html>

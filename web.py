@@ -16,9 +16,10 @@ load_dotenv()   # loads ODDS_API_KEY from .env file
 
 from flask import Flask, render_template, abort, request
 
-from data.odds_api import get_mlb_odds, get_mlb_events, get_player_props, format_odds, calc_edge, get_requests_remaining, get_mlb_totals, get_mlb_runline, calc_ev, calc_kelly
+from data.odds_api import get_mlb_odds, get_mlb_events, get_player_props, format_odds, calc_edge, get_requests_remaining, get_mlb_totals, get_mlb_runline, calc_ev, calc_kelly, get_line_movement
 from data.tracker import log_prediction, update_results, get_accuracy_stats, get_all_predictions
 from data.my_picks import add_pick, update_pick_results, get_all_picks, get_pick_stats
+from data.bet_tracker import log_bet, settle_bets, get_bet_stats, get_all_bets
 from data.mlb_api import (
     get_today_schedule,
     get_game_lineup,
@@ -37,7 +38,7 @@ from data.mlb_api import (
     get_game_umpire,
     get_team_bullpen_usage,
 )
-from simulation.engine import run_simulation
+from simulation.engine import run_simulation, predict_pitcher_ks
 
 app = Flask(__name__, template_folder="app/templates")
 
@@ -318,6 +319,26 @@ def build_game_result(game, n_sims, use_splits=True):
         home_bp_fatigue     = home_bp_fatigue,
         n                   = n_sims,
     )
+
+    # ── Pitcher K prop predictions ──────────────────────────────────────
+    try:
+        away_k_pred = predict_pitcher_ks(
+            away_pitcher_stats, home_batter_stats,
+            umpire_name=umpire_name,
+            pitcher_log=away_pitcher_log,
+            fatigue=away_fatigue if "away_fatigue" in dir() else None,
+        )
+        home_k_pred = predict_pitcher_ks(
+            home_pitcher_stats, away_batter_stats,
+            umpire_name=umpire_name,
+            pitcher_log=home_pitcher_log,
+            fatigue=home_fatigue if "home_fatigue" in dir() else None,
+        )
+    except Exception:
+        away_k_pred = {}
+        home_k_pred = {}
+    result["away_k_pred"] = away_k_pred
+    result["home_k_pred"] = home_k_pred
 
     # Attach IDs for logo/headshot URLs in templates
     result["away_team_id"]     = game.get("away_id")
@@ -907,6 +928,20 @@ def simulate_all():
         except Exception:
             pass
 
+    # ── Line movement / sharp money signals ─────────────────────────
+    try:
+        movement = get_line_movement()
+        for r in results:
+            mv = movement.get(frozenset([r["away_team"], r["home_team"]]), {})
+            r["sharp_away"]      = mv.get("sharp_away", False)
+            r["sharp_home"]      = mv.get("sharp_home", False)
+            r["away_impl_move"]  = mv.get("away_impl_move", 0)
+            r["home_impl_move"]  = mv.get("home_impl_move", 0)
+            r["away_open_odds"]  = format_odds(mv["away_open"]) if mv.get("away_open") else None
+            r["home_open_odds"]  = format_odds(mv["home_open"]) if mv.get("home_open") else None
+    except Exception:
+        pass
+
     # Also attach odds to best_bets entries
     for b in best_bets:
         r_match = next((r for r in results if r["gamePk"] == b["gamePk"]), {})
@@ -985,6 +1020,47 @@ def trigger_update():
         "correct_picks": stats["correct_picks"],
         "results_available": stats["results_available"],
     })
+
+
+@app.route("/bets")
+def bets_dashboard():
+    """ROI tracker — shows all placed bets, win rate, and total P&L."""
+    settle_bets()   # auto-settle any finished games
+    stats = get_bet_stats()
+    from datetime import date as _d
+    stats["today"] = _d.today().isoformat()
+    return render_template("bets.html", **stats)
+
+
+@app.route("/bets/log", methods=["POST"])
+def log_bet_route():
+    """AJAX endpoint — log a new bet from the game card."""
+    from flask import jsonify, request as req
+    data = req.get_json() or req.form
+    try:
+        log_bet(
+            game_pk   = data["game_pk"],
+            game_date = data.get("game_date", ""),
+            away_team = data["away_team"],
+            home_team = data["home_team"],
+            bet_on    = data["bet_on"],
+            bet_type  = data.get("bet_type", "ML"),
+            odds      = int(data["odds"]),
+            amount    = float(data.get("amount", 100)),
+            model_edge= data.get("model_edge"),
+            ev        = data.get("ev"),
+            kelly     = data.get("kelly"),
+        )
+        return jsonify({"status": "ok"})
+    except Exception as e:
+        return jsonify({"status": "error", "msg": str(e)}), 400
+
+
+@app.route("/bets/settle", methods=["POST"])
+def settle_bets_route():
+    from flask import jsonify
+    n = settle_bets()
+    return jsonify({"settled": n})
 
 
 if __name__ == "__main__":

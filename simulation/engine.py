@@ -1281,3 +1281,88 @@ def run_simulation(
         "f5":                  seg_results["f5"],
         "f7":                  seg_results["f7"],
     }
+
+
+# ── Pitcher strikeout prop model ─────────────────────────────────────────────
+
+def predict_pitcher_ks(pitcher_stats: dict, lineup_stats: list,
+                        umpire_name: str = None,
+                        pitcher_log: list = None,
+                        fatigue: dict = None) -> dict:
+    """
+    Predict how many strikeouts a starting pitcher will record.
+
+    Formula:
+      1. Pitcher K/9 from season stats
+      2. Opposing lineup K rate (how often each batter strikes out)
+      3. Umpire K factor (wide-zone umps add Ks)
+      4. Expected innings (from recent game log avg IP, capped at 6.0)
+      5. Fatigue: short-rest pitchers tend to go fewer innings
+
+    Returns:
+      {
+        "model_k":        float,   # predicted strikeout total
+        "model_k_low":    float,   # 16th percentile (roughly -1 std)
+        "model_k_high":   float,   # 84th percentile (roughly +1 std)
+        "expected_ip":    float,
+      }
+    """
+    # ── Pitcher K/9 ────────────────────────────────────────────────
+    ip_season = float(pitcher_stats.get("inningsPitched", 0) or 0)
+    k_season  = int(pitcher_stats.get("strikeOuts", 0) or 0)
+    if ip_season >= 10:
+        k_per_9 = k_season / ip_season * 9
+    else:
+        k_per_9 = 8.5   # league average starter K/9
+
+    # ── Opposing lineup K rate ────────────────────────────────────
+    opp_k_rates = []
+    for s in lineup_stats:
+        pa = s.get("plateAppearances", 0) or 0
+        ks = s.get("strikeOuts", 0) or 0
+        if pa >= 20:
+            opp_k_rates.append(ks / pa)
+    opp_k_rate = sum(opp_k_rates) / len(opp_k_rates) if opp_k_rates else 0.224  # lg avg
+
+    # Blend: pitcher K rate adjusted for opponent K tendency
+    # League avg batter K rate ~22.4% — if opp is 25%, pitcher gets +1 K/9 boost
+    LG_K_RATE = 0.224
+    opp_factor = opp_k_rate / LG_K_RATE   # >1 = strikeout-prone lineup
+    blended_k9 = k_per_9 * (0.70 + 0.30 * opp_factor)
+
+    # ── Umpire adjustment ─────────────────────────────────────────
+    ump_k_factor = 1.0
+    if umpire_name:
+        tend = UMP_TENDENCIES.get(umpire_name, {})
+        ump_k_factor = tend.get("k", 1.0)
+    blended_k9 *= ump_k_factor
+
+    # ── Expected innings ──────────────────────────────────────────
+    if pitcher_log:
+        recent_ip = [g.get("ip", 0) for g in pitcher_log[-5:] if g.get("ip")]
+        avg_ip = sum(recent_ip) / len(recent_ip) if recent_ip else 5.0
+    else:
+        avg_ip = 5.0
+
+    # Fatigue: if pitcher is on short rest, expect fewer innings
+    if fatigue:
+        phase2 = fatigue.get("phase2", 1.0)
+        if phase2 >= 1.14:    # short rest / gasses quickly
+            avg_ip = min(avg_ip, 4.5)
+        elif phase2 >= 1.08:
+            avg_ip = min(avg_ip, 5.5)
+
+    expected_ip = min(avg_ip, 6.0)   # rarely goes beyond 6 in modern game
+
+    # ── Final K prediction ─────────────────────────────────────────
+    model_k = blended_k9 / 9 * expected_ip
+
+    # Rough variance: K totals follow Poisson-ish distribution
+    # std dev ~ sqrt(mean) but empirically ~1.5 for starters
+    std = max(1.5, model_k ** 0.5)
+    return {
+        "model_k":      round(model_k, 1),
+        "model_k_low":  round(max(0, model_k - std), 1),
+        "model_k_high": round(model_k + std, 1),
+        "expected_ip":  round(expected_ip, 1),
+    }

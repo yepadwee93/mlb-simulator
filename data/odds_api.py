@@ -502,3 +502,112 @@ def calc_kelly(model_prob: float, american_odds: int, fraction: float = 0.5) -> 
     kelly = (b * p - q) / b
     kelly_f = kelly * fraction
     return round(max(0.0, min(kelly_f * 100, 25.0)), 1)   # as %
+
+
+# ── Line movement tracker ────────────────────────────────────────────────────
+# Snapshots the moneyline odds to a JSON file once per session day.
+# On subsequent fetches, compares the current line to the opening snapshot
+# and flags games where the line moved 10+ cents (sharp money signal).
+
+import json as _json
+
+_MOVEMENT_PATH = os.path.join(os.path.dirname(__file__), "line_movement.json")
+
+
+def _load_snapshot() -> dict:
+    try:
+        with open(_MOVEMENT_PATH) as f:
+            return _json.load(f)
+    except Exception:
+        return {}
+
+
+def _save_snapshot(data: dict):
+    try:
+        with open(_MOVEMENT_PATH, "w") as f:
+            _json.dump(data, f)
+    except Exception:
+        pass
+
+
+def get_line_movement() -> dict:
+    """
+    Compare current moneyline odds to today's opening snapshot.
+
+    Returns a dict keyed by frozenset({away, home}) with:
+      {
+        "away_open":    int,    # opening American odds for away
+        "home_open":    int,    # opening American odds for home
+        "away_current": int,    # current odds
+        "home_current": int,
+        "away_move":    int,    # current - open (positive = line moved toward away)
+        "home_move":    int,
+        "sharp_away":   bool,   # True if away line moved 10+ cents toward away (sharp money)
+        "sharp_home":   bool,
+      }
+    Returns {} if no current odds available.
+    """
+    current = get_mlb_odds()
+    if not current:
+        return {}
+
+    today = __import__("datetime").date.today().isoformat()
+    snap  = _load_snapshot()
+
+    # If snapshot is from a different day, reset it
+    if snap.get("date") != today:
+        snap = {"date": today, "games": {}}
+
+    result   = {}
+    snap_games = snap.get("games", {})
+
+    for key, odds in current.items():
+        away = odds["away_team"]
+        home = odds["home_team"]
+        game_key = f"{away}|{home}"
+
+        away_cur = odds["away_avg_odds"]
+        home_cur = odds["home_avg_odds"]
+
+        if game_key not in snap_games:
+            # First time seeing this game today — save as opening line
+            snap_games[game_key] = {
+                "away_open": away_cur,
+                "home_open": home_cur,
+            }
+            away_open = away_cur
+            home_open = home_cur
+        else:
+            away_open = snap_games[game_key]["away_open"]
+            home_open = snap_games[game_key]["home_open"]
+
+        away_move = away_cur - away_open
+        home_move = home_cur - home_open
+
+        # "Sharp move toward away" = away odds got shorter (negative move for away fav)
+        # A moneyline moving from +120 to +105 = move of -15 = sharp on away
+        # A moneyline moving from -130 to -145 = move of -15 = sharp on away (favorite getting heavier)
+        # Simple rule: sharp_away if away line moved 10+ points toward being shorter (away implied prob went up)
+        away_impl_open = _american_to_prob(away_open) * 100
+        away_impl_cur  = _american_to_prob(away_cur)  * 100
+        home_impl_open = _american_to_prob(home_open) * 100
+        home_impl_cur  = _american_to_prob(home_cur)  * 100
+
+        away_impl_move = away_impl_cur - away_impl_open   # positive = sharp on away
+        home_impl_move = home_impl_cur - home_impl_open
+
+        fkey = frozenset([away, home])
+        result[fkey] = {
+            "away_open":       away_open,
+            "home_open":       home_open,
+            "away_current":    away_cur,
+            "home_current":    home_cur,
+            "away_impl_move":  round(away_impl_move, 1),
+            "home_impl_move":  round(home_impl_move, 1),
+            "sharp_away":      away_impl_move >= 3.0,   # 3+ pp implies sharp money
+            "sharp_home":      home_impl_move >= 3.0,
+        }
+
+    snap["games"] = snap_games
+    _save_snapshot(snap)
+    return result
