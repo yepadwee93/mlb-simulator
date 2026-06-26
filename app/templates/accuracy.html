@@ -229,6 +229,113 @@
 </div>
 {% endif %}
 
+{% if all_single and all_single | length >= 3 %}
+{% set settled = all_single | selectattr('correct_pick') | list | reverse | list %}
+{% if settled | length >= 3 %}
+<div class="section" style="margin-bottom:24px;">
+  <div class="section-title">📊 Model Confidence History</div>
+  <div style="font-size:0.72rem;color:#9aa0b8;margin-bottom:12px;">
+    Rolling 5-game accuracy vs model confidence over time · green = correct · red = wrong
+  </div>
+  <canvas id="history-chart" style="width:100%;height:260px;"></canvas>
+  <script>
+  (function(){
+    const settled = {{ settled | tojson }};
+    // Show up to 50 most recent settled games, chronological order
+    const data = settled.slice(0, 50).reverse();
+    const labels = data.map(r => r.game_date ? r.game_date.slice(5) : '');
+    const conf   = data.map(r => Math.max(parseFloat(r.away_win_pct||50), parseFloat(r.home_win_pct||50)));
+    const ptColors = data.map(r => (r.correct_pick=='1'||r.correct_pick===1) ? '#4caf50' : '#ef5350');
+    const correct  = data.map(r => (r.correct_pick=='1'||r.correct_pick===1) ? 1 : 0);
+
+    // Rolling 5-game accuracy
+    const rolling = data.map((_, i) => {
+      const window = correct.slice(Math.max(0, i-4), i+1);
+      return Math.round(window.reduce((a,b)=>a+b,0) / window.length * 100);
+    });
+
+    // Overall avg confidence line
+    const avgConf = conf.reduce((a,b)=>a+b,0)/conf.length;
+
+    const Chart = window.Chart;
+    new Chart(document.getElementById('history-chart'), {
+      data: {
+        labels,
+        datasets: [
+          {
+            type: 'bar',
+            label: 'Model Confidence %',
+            data: conf,
+            backgroundColor: data.map(r =>
+              (r.correct_pick=='1'||r.correct_pick===1)
+                ? 'rgba(76,175,80,0.2)' : 'rgba(239,83,80,0.2)'
+            ),
+            borderColor: ptColors,
+            borderWidth: 1,
+            yAxisID: 'y',
+          },
+          {
+            type: 'line',
+            label: '5-Game Rolling Accuracy %',
+            data: rolling,
+            borderColor: '#ffd54f',
+            backgroundColor: 'transparent',
+            pointRadius: 3,
+            pointBackgroundColor: '#ffd54f',
+            tension: 0.4,
+            yAxisID: 'y',
+            borderWidth: 2,
+          },
+          {
+            type: 'line',
+            label: 'Avg Confidence',
+            data: data.map(() => Math.round(avgConf)),
+            borderColor: 'rgba(100,181,246,0.4)',
+            borderDash: [4,4],
+            pointRadius: 0,
+            tension: 0,
+            yAxisID: 'y',
+            borderWidth: 1,
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        interaction: { mode: 'index' },
+        scales: {
+          y: { min: 40, max: 105, grid: { color: '#1a1d28' }, ticks: { color: '#b0b8cc', callback: v => v + '%' } },
+          x: { ticks: { color: '#b0b8cc', font: { size: 9 }, maxRotation: 45 }, grid: { display: false } }
+        },
+        plugins: {
+          legend: { labels: { color: '#b0b8cc', font: { size: 11 } } },
+          tooltip: {
+            callbacks: {
+              afterBody: function(items) {
+                const i = items[0].dataIndex;
+                const r = data[i];
+                return [
+                  r.away_team + ' @ ' + r.home_team,
+                  'Pick: ' + r.predicted_winner,
+                  'Result: ' + (r.actual_winner || 'Pending'),
+                ];
+              }
+            }
+          }
+        }
+      }
+    });
+  })();
+  </script>
+  <div style="display:flex;gap:16px;font-size:0.7rem;color:#9aa0b8;margin-top:10px;flex-wrap:wrap;">
+    <span><span style="display:inline-block;width:10px;height:10px;background:rgba(76,175,80,0.4);border:1px solid #4caf50;border-radius:2px;margin-right:4px;"></span>Correct</span>
+    <span><span style="display:inline-block;width:10px;height:10px;background:rgba(239,83,80,0.4);border:1px solid #ef5350;border-radius:2px;margin-right:4px;"></span>Wrong</span>
+    <span><span style="display:inline-block;width:16px;height:2px;background:#ffd54f;margin-right:4px;vertical-align:middle;"></span>5-game rolling accuracy</span>
+    <span><span style="display:inline-block;width:16px;height:2px;background:#64b5f6;border-top:1px dashed #64b5f6;margin-right:4px;vertical-align:middle;"></span>Avg confidence</span>
+  </div>
+</div>
+{% endif %}
+{% endif %}
+
 <div class="section-title" style="margin-bottom:10px;">My Simulations</div>
 {% if all_single %}
 <div class="section" style="padding:0;overflow-x:auto;">
