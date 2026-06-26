@@ -468,6 +468,35 @@ if (localStorage.getItem('email_nudge_dismissed') === '1') {
         <span class="btn-disabled">Not available</span>
       {% endif %}
 
+      {% if current_user.is_authenticated %}
+      {% set gk = game.gamePk | string %}
+      {% set existing_note = game_notes.get(gk) %}
+      <div class="game-note-section" style="margin-top:10px;">
+        {% if existing_note %}
+        <div class="note-display" id="note-display-{{ gk }}" style="background:#1a1e2e;border:1px solid #353a52;border-radius:8px;padding:8px 10px;font-size:0.78rem;color:#e8eaf0;position:relative;">
+          <span style="color:#ffd54f;font-weight:700;font-size:0.65rem;display:block;margin-bottom:3px;">📝 MY NOTE</span>
+          <span id="note-text-{{ gk }}">{{ existing_note.note }}</span>
+          <div style="display:flex;gap:8px;margin-top:6px;">
+            <button onclick="editNote('{{ gk }}','{{ game.away_team | replace("'","\\'")|replace('"','\\"') }}','{{ game.home_team | replace("'","\\'")|replace('"','\\"') }}')" style="font-size:0.68rem;background:none;border:1px solid #555870;color:#9aa0b8;padding:2px 8px;border-radius:4px;cursor:pointer;">Edit</button>
+            <button onclick="deleteNote('{{ gk }}')" style="font-size:0.68rem;background:none;border:1px solid #5a2a2a;color:#ef9a9a;padding:2px 8px;border-radius:4px;cursor:pointer;">Delete</button>
+          </div>
+        </div>
+        {% endif %}
+        <div id="note-form-{{ gk }}" style="{% if existing_note %}display:none;{% endif %}">
+          {% if not existing_note %}
+          <button onclick="showNoteForm('{{ gk }}')" id="note-add-btn-{{ gk }}" style="font-size:0.7rem;background:none;border:1px solid #353a52;color:#9aa0b8;padding:4px 10px;border-radius:6px;cursor:pointer;margin-top:2px;width:100%;">+ Add note</button>
+          {% endif %}
+          <div id="note-input-area-{{ gk }}" style="display:none;">
+            <textarea id="note-ta-{{ gk }}" placeholder="Your notes on this game…" style="width:100%;background:#1a1e2e;border:1px solid #353a52;color:#e8eaf0;border-radius:8px;padding:8px;font-size:0.78rem;resize:vertical;min-height:60px;margin-top:4px;box-sizing:border-box;"></textarea>
+            <div style="display:flex;gap:6px;margin-top:4px;">
+              <button onclick="saveNote('{{ gk }}','{{ game.away_team | replace("'","\\'")|replace('"','\\"') }}','{{ game.home_team | replace("'","\\'")|replace('"','\\"') }}','{{ game.game_date }}')" style="font-size:0.72rem;background:#1b3a2a;border:1px solid #2a5a3a;color:#81c784;padding:4px 12px;border-radius:6px;cursor:pointer;">Save</button>
+              <button onclick="cancelNote('{{ gk }}')" style="font-size:0.72rem;background:none;border:1px solid #353a52;color:#9aa0b8;padding:4px 10px;border-radius:6px;cursor:pointer;">Cancel</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
     </div>
   {% endfor %}
 </div>
@@ -490,6 +519,85 @@ document.querySelectorAll('.game-time-utc').forEach(function(el) {
     el.textContent = d.toLocaleTimeString([], {hour:'numeric', minute:'2-digit', timeZoneName:'short'});
   } catch(e) {}
 });
+</script>
+
+<script>
+function showNoteForm(gk) {
+  document.getElementById('note-add-btn-' + gk).style.display = 'none';
+  document.getElementById('note-input-area-' + gk).style.display = 'block';
+  document.getElementById('note-ta-' + gk).focus();
+}
+function cancelNote(gk) {
+  document.getElementById('note-input-area-' + gk).style.display = 'none';
+  var btn = document.getElementById('note-add-btn-' + gk);
+  if (btn) btn.style.display = 'block';
+}
+function editNote(gk, away, home) {
+  var display = document.getElementById('note-display-' + gk);
+  var currentText = document.getElementById('note-text-' + gk).textContent;
+  if (display) display.style.display = 'none';
+  var form = document.getElementById('note-form-' + gk);
+  form.style.display = 'block';
+  document.getElementById('note-input-area-' + gk).style.display = 'block';
+  document.getElementById('note-ta-' + gk).value = currentText;
+  document.getElementById('note-ta-' + gk).focus();
+}
+function saveNote(gk, away, home, gameDate) {
+  var note = document.getElementById('note-ta-' + gk).value.trim();
+  if (!note) return;
+  fetch('/api/notes/' + gk, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({note: note, away_team: away, home_team: home, game_date: gameDate})
+  }).then(function(r) { return r.json(); }).then(function(res) {
+    if (res.ok) {
+      var display = document.getElementById('note-display-' + gk);
+      if (display) {
+        document.getElementById('note-text-' + gk).textContent = note;
+        display.style.display = 'block';
+      } else {
+        // First time — inject display block
+        var section = document.getElementById('note-form-' + gk).closest('.game-note-section');
+        var div = document.createElement('div');
+        div.className = 'note-display';
+        div.id = 'note-display-' + gk;
+        div.style.cssText = 'background:#1a1e2e;border:1px solid #353a52;border-radius:8px;padding:8px 10px;font-size:0.78rem;color:#e8eaf0;';
+        div.innerHTML = '<span style="color:#ffd54f;font-weight:700;font-size:0.65rem;display:block;margin-bottom:3px;">📝 MY NOTE</span>'
+          + '<span id="note-text-' + gk + '">' + note + '</span>'
+          + '<div style="display:flex;gap:8px;margin-top:6px;">'
+          + '<button onclick="editNote(\'' + gk + '\',\'' + away.replace(/'/g,"\\'") + '\',\'' + home.replace(/'/g,"\\'") + '\')" style="font-size:0.68rem;background:none;border:1px solid #555870;color:#9aa0b8;padding:2px 8px;border-radius:4px;cursor:pointer;">Edit</button>'
+          + '<button onclick="deleteNote(\'' + gk + '\')" style="font-size:0.68rem;background:none;border:1px solid #5a2a2a;color:#ef9a9a;padding:2px 8px;border-radius:4px;cursor:pointer;">Delete</button>'
+          + '</div>';
+        section.insertBefore(div, document.getElementById('note-form-' + gk));
+      }
+      document.getElementById('note-form-' + gk).style.display = 'none';
+      document.getElementById('note-input-area-' + gk).style.display = 'none';
+    }
+  });
+}
+function deleteNote(gk) {
+  if (!confirm('Delete this note?')) return;
+  fetch('/api/notes/' + gk, {method: 'DELETE'})
+    .then(function(r) { return r.json(); }).then(function(res) {
+      if (res.ok) {
+        var display = document.getElementById('note-display-' + gk);
+        if (display) display.remove();
+        var form = document.getElementById('note-form-' + gk);
+        form.style.display = 'block';
+        var area = document.getElementById('note-input-area-' + gk);
+        area.style.display = 'none';
+        // Re-add the "+ Add note" button if missing
+        if (!document.getElementById('note-add-btn-' + gk)) {
+          var btn = document.createElement('button');
+          btn.id = 'note-add-btn-' + gk;
+          btn.onclick = function() { showNoteForm(gk); };
+          btn.style.cssText = 'font-size:0.7rem;background:none;border:1px solid #353a52;color:#9aa0b8;padding:4px 10px;border-radius:6px;cursor:pointer;margin-top:2px;width:100%;';
+          btn.textContent = '+ Add note';
+          form.insertBefore(btn, area);
+        }
+      }
+    });
+}
 </script>
 
 </body>

@@ -129,6 +129,37 @@ def get_odds_history(limit=100):
     return res.data or []
 
 
+def save_game_note(user_id, game_pk, game_date, away_team, home_team, note):
+    existing = supa().table("game_notes").select("id") \
+        .eq("user_id", str(user_id)).eq("game_pk", str(game_pk)).execute()
+    row = {
+        "user_id":   str(user_id),
+        "game_pk":   str(game_pk),
+        "game_date": str(game_date),
+        "away_team": away_team,
+        "home_team": home_team,
+        "note":      note.strip(),
+        "updated_at": datetime.utcnow().isoformat(),
+    }
+    if existing.data:
+        supa().table("game_notes").update(row) \
+            .eq("user_id", str(user_id)).eq("game_pk", str(game_pk)).execute()
+    else:
+        supa().table("game_notes").insert(row).execute()
+
+
+def delete_game_note(user_id, game_pk):
+    supa().table("game_notes").delete() \
+        .eq("user_id", str(user_id)).eq("game_pk", str(game_pk)).execute()
+
+
+def get_game_notes(user_id):
+    """Returns all notes for a user keyed by game_pk."""
+    res = supa().table("game_notes").select("*") \
+        .eq("user_id", str(user_id)).execute()
+    return {r["game_pk"]: r for r in (res.data or [])}
+
+
 def get_all_predictions():
     """Returns all predictions, newest first."""
     res = supa().table("predictions").select("*") \

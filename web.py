@@ -20,7 +20,7 @@ from flask_login import (LoginManager, UserMixin, login_user,
                          logout_user, login_required, current_user)
 
 from data.odds_api import get_mlb_odds, get_mlb_events, get_player_props, format_odds, calc_edge, get_requests_remaining, get_mlb_totals, get_mlb_runline, calc_ev, calc_kelly, get_line_movement, get_public_betting_pcts
-from data.tracker import log_prediction, update_results, get_accuracy_stats, get_all_predictions, log_odds, get_odds_history
+from data.tracker import log_prediction, update_results, get_accuracy_stats, get_all_predictions, log_odds, get_odds_history, save_game_note, delete_game_note, get_game_notes
 from data.my_picks import add_pick, update_pick_results, get_all_picks, get_pick_stats
 from data.bet_tracker import log_bet, settle_bets, get_bet_stats, get_all_bets
 from data.auth import create_user, check_password, get_user_by_id
@@ -778,6 +778,7 @@ def index():
                            is_today=is_today,
                            pub_pcts=pub_pcts,
                            line_movement=line_movement,
+                           game_notes=get_game_notes(current_user.id) if current_user.is_authenticated else {},
                            api_remaining=get_requests_remaining(),
                            show_email_nudge=show_email_nudge)
 
@@ -1051,6 +1052,37 @@ def _build_stadium_profile(venue, away_batters, home_batters):
         "away_impacts": batter_impact(away_batters),
         "home_impacts": batter_impact(home_batters),
     }
+
+
+@app.route("/api/notes/<int:game_pk>", methods=["POST"])
+@login_required
+def api_save_note(game_pk):
+    data = request.get_json() or {}
+    note = (data.get("note") or "").strip()
+    if not note:
+        return jsonify({"ok": False, "error": "empty"}), 400
+    try:
+        save_game_note(
+            user_id    = current_user.id,
+            game_pk    = game_pk,
+            game_date  = data.get("game_date", date.today().isoformat()),
+            away_team  = data.get("away_team", ""),
+            home_team  = data.get("home_team", ""),
+            note       = note,
+        )
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/notes/<int:game_pk>", methods=["DELETE"])
+@login_required
+def api_delete_note(game_pk):
+    try:
+        delete_game_note(current_user.id, game_pk)
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 
 _props_cache = {}  # game_pk → (timestamp, props dict)
