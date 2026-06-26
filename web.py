@@ -1279,6 +1279,48 @@ def simulate_all():
     )
 
 
+@app.route("/parlay")
+def parlay_builder():
+    """Interactive parlay builder — pick legs from today's games."""
+    from datetime import date as _date
+    today_str = _date.today().strftime("%A, %B %d %Y")
+
+    # Load today's schedule so the user can pick from real matchups
+    try:
+        games = get_today_schedule()
+    except Exception:
+        games = []
+
+    # Fetch current ML odds for each game to compute parlay book odds accurately
+    try:
+        all_odds = get_mlb_odds()
+    except Exception:
+        all_odds = {}
+
+    # Build a clean game list with odds attached
+    game_list = []
+    for g in games:
+        key = frozenset([g["away_team"], g["home_team"]])
+        odds = all_odds.get(key, {})
+        game_list.append({
+            "gamePk":       g["gamePk"],
+            "away_team":    g["away_team"],
+            "home_team":    g["home_team"],
+            "away_probable": g.get("away_probable", "TBD"),
+            "home_probable": g.get("home_probable", "TBD"),
+            "venue":        g.get("venue", ""),
+            "away_odds":    format_odds(odds["away_avg_odds"]) if odds.get("away_avg_odds") else None,
+            "home_odds":    format_odds(odds["home_avg_odds"]) if odds.get("home_avg_odds") else None,
+            "away_implied": odds.get("away_implied_pct"),
+            "home_implied": odds.get("home_implied_pct"),
+        })
+
+    return render_template("parlay.html",
+                           games=game_list,
+                           date=today_str,
+                           api_remaining=get_requests_remaining())
+
+
 @app.route("/my-picks", methods=["GET", "POST"])
 @login_required
 def my_picks():
