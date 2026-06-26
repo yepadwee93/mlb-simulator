@@ -88,7 +88,7 @@ def _user_bets_csv():
 
 _score_pairs_cache = {}   # game_pk -> score_pairs dict for SGP correlated prob
 
-N_SIMS_SINGLE = 100_000   # simulations for one-game view
+N_SIMS_SINGLE =  50_000   # simulations for one-game view (50k ≈ same accuracy as 100k, 2x faster)
 N_SIMS_ALL    =  25_000   # simulations per game in simulate-all (faster)
 PARLAY_THRESHOLD  = 65.0   # min win % to include in best parlay
 BET_THRESHOLD     = 62.0   # min win % to show in best bets section
@@ -764,7 +764,7 @@ def simulate(game_pk):
         abort(404)
 
     # Read sim count from URL e.g. /simulate/822961?sims=500000
-    allowed = {100_000, 500_000, 1_000_000}
+    allowed = {50_000, 100_000, 500_000, 1_000_000}
     try:
         n_sims = int(request.args.get("sims", N_SIMS_SINGLE))
         if n_sims not in allowed:

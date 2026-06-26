@@ -8,10 +8,16 @@ No API key needed — MLB makes this data public.
 """
 
 import requests
+import time
 from datetime import date
 
 # The root URL for every API call we make
 BASE_URL = "https://statsapi.mlb.com/api/v1"
+
+# ── In-memory TTL cache for all MLB API calls ─────────────────────
+# Stats/lineups don't change mid-sim, so caching for 10 min is safe.
+_API_CACHE = {}          # key -> (timestamp, data)
+_API_CACHE_TTL = 600     # seconds (10 min)
 
 # ── Ballpark coordinates for weather lookups ─────────────────────
 # (latitude, longitude) for each MLB venue name
@@ -76,13 +82,21 @@ PARK_CF_DIRECTION = {
 
 def _get(path, params=None):
     """
-    Internal helper: send a GET request and return the JSON response.
-    Raises an exception if the request fails so we hear about it immediately.
+    Internal helper: GET with in-memory TTL cache (10 min).
+    Identical params → same cache key, so repeated batter stat fetches in one sim are free.
     """
+    import hashlib, json as _json
+    key = path + (("?" + _json.dumps(params, sort_keys=True)) if params else "")
+    now = time.time()
+    cached = _API_CACHE.get(key)
+    if cached and (now - cached[0]) < _API_CACHE_TTL:
+        return cached[1]
     url = f"{BASE_URL}{path}"
     response = requests.get(url, params=params, timeout=10)
-    response.raise_for_status()   # throws an error if status != 200
-    return response.json()
+    response.raise_for_status()
+    data = response.json()
+    _API_CACHE[key] = (now, data)
+    return data
 
 
 # ──────────────────────────────────────────────
