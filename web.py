@@ -28,6 +28,7 @@ from data.mlb_api import (
     get_batter_sitcode_stats,
     get_pitcher_hand,
     get_ballpark_weather,
+    get_team_bullpen_stats,
 )
 from simulation.engine import run_simulation
 
@@ -97,9 +98,19 @@ def build_game_result(game, n_sims, use_splits=True):
         away_batter_stats = [get_player_season_stats(b["id"], group="hitting") if b.get("id") else {} for b in lineup["away_batters"]]
         home_batter_stats = [get_player_season_stats(b["id"], group="hitting") if b.get("id") else {} for b in lineup["home_batters"]]
 
-    # Fetch pitcher season stats
-    away_pitcher_stats = get_player_season_stats(away_pitcher["id"], group="pitching") if away_pitcher.get("id") else {}
-    home_pitcher_stats = get_player_season_stats(home_pitcher["id"], group="pitching") if home_pitcher.get("id") else {}
+    # Fetch pitcher season stats + team bullpen stats in parallel
+    def _fetch_pitcher_and_bullpen(pitcher_id, team_id):
+        sp    = get_player_season_stats(pitcher_id, group="pitching") if pitcher_id else {}
+        bp    = get_team_bullpen_stats(team_id) if team_id else {"era": "4.20", "whip": "1.30"}
+        return sp, bp
+
+    with ThreadPoolExecutor(max_workers=2) as ex:
+        away_p_future = ex.submit(_fetch_pitcher_and_bullpen,
+                                  away_pitcher.get("id"), game.get("away_id"))
+        home_p_future = ex.submit(_fetch_pitcher_and_bullpen,
+                                  home_pitcher.get("id"), game.get("home_id"))
+        away_pitcher_stats, away_bullpen_stats = away_p_future.result()
+        home_pitcher_stats, home_bullpen_stats = home_p_future.result()
 
     # Fetch recent form + display splits for each batter — single-game mode only
     # In parallel we fetch: recent 20 games, vs LHP, vs RHP, vs SP, vs RP
@@ -164,21 +175,25 @@ def build_game_result(game, n_sims, use_splits=True):
     # Run the simulation — all factors now wired in:
     #   - L/R pitcher splits (base stats)
     #   - Recent form blend (last 20 games)
-    #   - Weather effects on HR
+    #   - Ballpark factors (Coors, Oracle Park, Yankee Stadium, etc.)
+    #   - Weather effects on HR (wind, temperature on top of park baseline)
     #   - SP vs RP: innings 1-5 starter, innings 6-9 bullpen
     result = run_simulation(
-        away_team      = game["away_team"],
-        home_team      = game["home_team"],
-        away_lineup    = away_batter_stats,
-        home_lineup    = home_batter_stats,
-        away_pitcher   = away_pitcher_stats,
-        home_pitcher   = home_pitcher_stats,
-        weather        = weather,
-        away_recent    = away_recent if use_splits else None,
-        home_recent    = home_recent if use_splits else None,
-        away_rp_stats  = away_rp_stats if use_splits else None,
-        home_rp_stats  = home_rp_stats if use_splits else None,
-        n              = n_sims,
+        away_team        = game["away_team"],
+        home_team        = game["home_team"],
+        away_lineup      = away_batter_stats,
+        home_lineup      = home_batter_stats,
+        away_pitcher     = away_pitcher_stats,
+        home_pitcher     = home_pitcher_stats,
+        weather          = weather,
+        away_recent      = away_recent if use_splits else None,
+        home_recent      = home_recent if use_splits else None,
+        away_rp_stats    = away_rp_stats if use_splits else None,
+        home_rp_stats    = home_rp_stats if use_splits else None,
+        away_bullpen     = away_bullpen_stats,
+        home_bullpen     = home_bullpen_stats,
+        venue            = game["venue"],
+        n                = n_sims,
     )
 
     # Build per-batter stat rows for display (season + recent + L/R + SP/RP)
@@ -278,9 +293,13 @@ def build_game_result(game, n_sims, use_splits=True):
         "away_era":           away_pitcher_stats.get("era",  "N/A"),
         "away_whip":          away_pitcher_stats.get("whip", "N/A"),
         "away_wl":            f"{away_pitcher_stats.get('wins',0)}-{away_pitcher_stats.get('losses',0)}",
+        "away_bp_era":        away_bullpen_stats.get("era",  "N/A"),
+        "away_bp_whip":       away_bullpen_stats.get("whip", "N/A"),
         "home_era":           home_pitcher_stats.get("era",  "N/A"),
         "home_whip":          home_pitcher_stats.get("whip", "N/A"),
         "home_wl":            f"{home_pitcher_stats.get('wins',0)}-{home_pitcher_stats.get('losses',0)}",
+        "home_bp_era":        home_bullpen_stats.get("era",  "N/A"),
+        "home_bp_whip":       home_bullpen_stats.get("whip", "N/A"),
         "away_batters":       away_display,
         "home_batters":       home_display,
         "weather":            weather,
@@ -523,6 +542,7 @@ def simulate_all():
             away_pitcher = away_ps,
             home_pitcher = home_ps,
             weather      = weather,
+            venue        = game["venue"],
             n            = N_SIMS_ALL,
         )
         result.update({

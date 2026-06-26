@@ -35,6 +35,87 @@ OUTCOME_ORDER = [WALK, STRIKEOUT, SINGLE, DOUBLE, TRIPLE, HR, OUT]
 LEAGUE_AVG_ERA  = 4.00
 LEAGUE_AVG_WHIP = 1.28
 
+# ── Ballpark factors ─────────────────────────────────────────────
+#
+# Each park has multipliers for:
+#   hr_factor   — how much the park boosts or suppresses home runs
+#                 (1.0 = league average, 1.30 = 30% more HRs, 0.75 = 25% fewer)
+#   hit_factor  — affects singles and doubles (line drives, gaps)
+#   run_factor  — overall run environment scaling
+#
+# Sources: multi-year MLB park factors (Statcast/Baseball Reference)
+#
+# OUTCOME_ORDER = [WALK, STRIKEOUT, SINGLE, DOUBLE, TRIPLE, HR, OUT]
+#                    0        1        2       3       4      5   6
+
+BALLPARK_FACTORS = {
+    # ── Hitter-friendly parks ──────────────────────────────────────
+    "Coors Field":              {"hr": 1.30, "hit": 1.15, "run": 1.20},  # altitude, thin air
+    "Great American Ball Park": {"hr": 1.18, "hit": 1.05, "run": 1.10},  # small park, Ohio wind
+    "Globe Life Field":         {"hr": 1.12, "hit": 1.04, "run": 1.06},  # hitter-friendly indoors
+    "Minute Maid Park":         {"hr": 1.10, "hit": 1.03, "run": 1.05},  # short left field
+    "Yankee Stadium":           {"hr": 1.15, "hit": 1.02, "run": 1.07},  # short porch in right
+    "Citizens Bank Park":       {"hr": 1.12, "hit": 1.04, "run": 1.07},  # Philly wind, small gaps
+    "American Family Field":    {"hr": 1.08, "hit": 1.03, "run": 1.05},
+    "Truist Park":              {"hr": 1.06, "hit": 1.02, "run": 1.04},
+    "Kauffman Stadium":         {"hr": 1.05, "hit": 1.02, "run": 1.03},
+    "Angel Stadium":            {"hr": 1.04, "hit": 1.01, "run": 1.02},
+    "Daikin Park":              {"hr": 1.04, "hit": 1.01, "run": 1.03},
+    "Oriole Park at Camden Yards": {"hr": 1.08, "hit": 1.03, "run": 1.05},
+
+    # ── Neutral parks ─────────────────────────────────────────────
+    "Dodger Stadium":           {"hr": 1.00, "hit": 1.00, "run": 1.00},
+    "Wrigley Field":            {"hr": 1.02, "hit": 1.01, "run": 1.01},  # varies with wind
+    "Target Field":             {"hr": 0.98, "hit": 1.00, "run": 0.99},
+    "Busch Stadium":            {"hr": 0.97, "hit": 0.99, "run": 0.98},
+    "Progressive Field":        {"hr": 0.98, "hit": 1.00, "run": 0.99},
+    "Comerica Park":            {"hr": 0.96, "hit": 1.00, "run": 0.98},
+    "Rogers Centre":            {"hr": 1.01, "hit": 1.00, "run": 1.00},
+    "Nationals Park":           {"hr": 0.99, "hit": 1.00, "run": 0.99},
+    "Chase Field":              {"hr": 1.01, "hit": 1.01, "run": 1.01},  # retractable roof
+    "loanDepot park":           {"hr": 0.97, "hit": 0.99, "run": 0.98},  # pitcher-friendly
+
+    # ── Pitcher-friendly parks ─────────────────────────────────────
+    "Oracle Park":              {"hr": 0.82, "hit": 0.96, "run": 0.88},  # sea breeze kills HRs
+    "T-Mobile Park":            {"hr": 0.88, "hit": 0.97, "run": 0.92},  # marine layer
+    "Petco Park":               {"hr": 0.86, "hit": 0.97, "run": 0.90},  # large dimensions
+    "PNC Park":                 {"hr": 0.90, "hit": 0.98, "run": 0.93},
+    "Fenway Park":              {"hr": 0.92, "hit": 1.02, "run": 0.97},  # Green Monster = hits not HRs
+    "Citi Field":               {"hr": 0.88, "hit": 0.97, "run": 0.91},
+    "Tropicana Field":          {"hr": 0.90, "hit": 0.97, "run": 0.92},
+    "Guaranteed Rate Field":    {"hr": 0.93, "hit": 0.98, "run": 0.95},
+    "Sutter Health Park":       {"hr": 0.95, "hit": 0.99, "run": 0.97},
+    "Sahlen Field":             {"hr": 0.95, "hit": 0.99, "run": 0.97},
+}
+
+# Default for any park not in the list (league average)
+DEFAULT_PARK_FACTOR = {"hr": 1.0, "hit": 1.0, "run": 1.0}
+
+
+def apply_ballpark_factor(probs: list, venue: str) -> list:
+    """
+    Adjust batter outcome probabilities based on the ballpark.
+
+    Coors Field: thin air at 5,280 ft — balls carry further → +30% HR, +15% hits
+    Oracle Park: ocean breeze blows balls back in → -18% HR, -4% hits
+    Fenway Park: Green Monster turns HRs into doubles → lower HR, higher hits
+    etc.
+
+    OUTCOME_ORDER = [WALK, K, 1B, 2B, 3B, HR, OUT]
+                       0   1   2   3   4   5   6
+    """
+    factors = BALLPARK_FACTORS.get(venue, DEFAULT_PARK_FACTOR)
+
+    adjusted = list(probs)
+    adjusted[2] *= factors["hit"]   # singles
+    adjusted[3] *= factors["hit"]   # doubles
+    adjusted[4] *= factors["hit"]   # triples
+    adjusted[5] *= factors["hr"]    # home runs
+
+    # Normalize so probabilities still sum to 1.0
+    total = sum(adjusted)
+    return [p / total for p in adjusted]
+
 
 # ── STEP 1: Build batter probability distribution ───────────────
 
@@ -186,15 +267,22 @@ def blend_probs(season_probs: list, recent_probs: list, recent_weight: float = 0
 
 
 def precompute_lineup(lineup_stats: list, pitcher_stats: dict,
-                      weather: dict = None, recent_stats_list: list = None) -> list:
+                      weather: dict = None, recent_stats_list: list = None,
+                      venue: str = None) -> list:
     """
     Pre-calculate cumulative probability arrays for every batter in a lineup.
     Doing this ONCE before the simulation loop (instead of inside it) is the
     key performance optimization — we avoid repeating the same math 100,000 times.
 
-    Now also applies weather modifiers (wind, temperature) to HR probability.
+    Applies (in order):
+      1. Recent form blend (season 60% + last-20-games 40%)
+      2. Pitcher modifier (ERA/WHIP)
+      3. Ballpark factor (Coors, Oracle Park, etc.)
+      4. Weather modifier (wind, temperature)
 
-    Returns a list of cumulative weight arrays, one per batter.
+    Ballpark is applied before weather so that park-specific conditions
+    (altitude, dimensions) are set first, then today's specific weather
+    fine-tunes on top of that.
     """
     result = []
     for i, stats in enumerate(lineup_stats):
@@ -204,14 +292,21 @@ def precompute_lineup(lineup_stats: list, pitcher_stats: dict,
         # Blend in recent form if available (last 20 games)
         if recent_stats_list and i < len(recent_stats_list):
             recent = recent_stats_list[i]
-            # Only use recent stats if we have at least 5 games of data
             if recent and recent.get("plateAppearances", 0) >= 20:
                 recent_probs = build_batter_probs(recent)
                 probs = blend_probs(probs, recent_probs, recent_weight=0.4)
 
+        # Pitcher quality modifier
         probs = apply_pitcher_modifier(probs, pitcher_stats)
+
+        # Ballpark factor (dimensions, altitude, park tendencies)
+        if venue:
+            probs = apply_ballpark_factor(probs, venue)
+
+        # Today's weather on top of ballpark baseline
         if weather:
             probs = apply_weather_modifier(probs, weather)
+
         cum_weights = list(accumulate(probs))
         result.append(cum_weights)
     return result
@@ -389,6 +484,9 @@ def run_simulation(
     home_recent:    list = None, # last-20-game stats for home batters
     away_rp_stats:  list = None, # away batters' stats vs relief pitchers (bullpen)
     home_rp_stats:  list = None, # home batters' stats vs relief pitchers (bullpen)
+    away_bullpen:   dict = None, # away team's actual bullpen ERA/WHIP (for innings 6-9)
+    home_bullpen:   dict = None, # home team's actual bullpen ERA/WHIP (for innings 6-9)
+    venue:          str  = None, # ballpark name for park factor adjustment
     n:              int = 100_000,
 ) -> dict:
     """
@@ -406,23 +504,25 @@ def run_simulation(
     LEAGUE_AVG_PITCHER = {"era": "4.20", "whip": "1.30"}
 
     # ── Early game: batters vs the starting pitcher ──────────────────
-    away_precomp_early = precompute_lineup(away_lineup, home_pitcher, weather, away_recent)
-    home_precomp_early = precompute_lineup(home_lineup, away_pitcher, weather, home_recent)
+    away_precomp_early = precompute_lineup(away_lineup, home_pitcher, weather, away_recent, venue)
+    home_precomp_early = precompute_lineup(home_lineup, away_pitcher, weather, home_recent, venue)
 
     # ── Late game: batters vs the bullpen ────────────────────────────
-    # If we have vs_rp stats for each batter, build a separate set of probs
-    # for innings 6+. Still blend in recent form, but now the base stats
-    # reflect how that batter historically performs against relievers.
+    # Use real team bullpen ERA/WHIP if available, otherwise league average.
+    # A team with a 3.00 bullpen ERA gets a real edge in innings 6-9.
+    away_bp_pitcher = away_bullpen if away_bullpen else LEAGUE_AVG_PITCHER
+    home_bp_pitcher = home_bullpen if home_bullpen else LEAGUE_AVG_PITCHER
+
     away_precomp_late = None
     home_precomp_late = None
 
     if away_rp_stats and any(s for s in away_rp_stats if s):
         away_precomp_late = precompute_lineup(
-            away_rp_stats, LEAGUE_AVG_PITCHER, weather, away_recent
+            away_rp_stats, home_bp_pitcher, weather, away_recent, venue
         )
     if home_rp_stats and any(s for s in home_rp_stats if s):
         home_precomp_late = precompute_lineup(
-            home_rp_stats, LEAGUE_AVG_PITCHER, weather, home_recent
+            home_rp_stats, away_bp_pitcher, weather, home_recent, venue
         )
 
     # ── Run the simulation loop ───────────────────────────────────────
@@ -443,13 +543,35 @@ def run_simulation(
         else:
             home_wins += 1
 
+    raw_away_pct = away_wins / n * 100
+    raw_home_pct = home_wins / n * 100
+
+    # ── Home field advantage adjustment ──────────────────────────────
+    # MLB home teams win ~54% of games historically, even controlling for
+    # team quality. This captures crowd noise, familiarity, no travel fatigue,
+    # and the psychological edge of playing at home.
+    # We apply a small shift: nudge home team +2% and away team -2%,
+    # then re-normalize so the two still sum to 100%.
+    HOME_FIELD_BOOST = 2.0   # percentage points
+    adj_home = raw_home_pct + HOME_FIELD_BOOST
+    adj_away = raw_away_pct - HOME_FIELD_BOOST
+    # Clamp so neither goes below 1% or above 99%
+    adj_home = min(max(adj_home, 1.0), 99.0)
+    adj_away = min(max(adj_away, 1.0), 99.0)
+    # Re-normalize to exactly 100
+    total    = adj_away + adj_home
+    adj_away = round(adj_away / total * 100, 1)
+    adj_home = round(adj_home / total * 100, 1)
+
     return {
-        "away_team":        away_team,
-        "home_team":        home_team,
-        "simulations":      n,
-        "away_win_pct":     round(away_wins  / n * 100, 1),
-        "home_win_pct":     round(home_wins  / n * 100, 1),
-        "away_avg_runs":    round(away_total / n, 2),
-        "home_avg_runs":    round(home_total / n, 2),
+        "away_team":         away_team,
+        "home_team":         home_team,
+        "simulations":       n,
+        "away_win_pct":      adj_away,
+        "home_win_pct":      adj_home,
+        "away_win_pct_raw":  round(raw_away_pct, 1),  # pre-HFA, for display
+        "home_win_pct_raw":  round(raw_home_pct, 1),
+        "away_avg_runs":     round(away_total / n, 2),
+        "home_avg_runs":     round(home_total / n, 2),
         "uses_bullpen_data": away_precomp_late is not None,
     }

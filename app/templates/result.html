@@ -323,7 +323,36 @@
     <div class="score-value">{{ away_team }} {{ away_avg_runs }} — {{ home_avg_runs }} {{ home_team }}</div>
   </div>
 
-  <div class="sim-note">Based on {{ simulations | int | string | replace('000000','M') }} simulated games</div>
+  <div class="sim-note">
+    Based on {{ simulations | int | string | replace('000000','M') }} simulated games
+    {% if weather and weather.temp_f %}
+      · {{ weather.temp_f }}°F · {{ weather.wind_label }}
+    {% endif %}
+  </div>
+  <div class="sim-note" style="margin-top:4px; color:#64b5f6;">
+    🏟 {{ venue }}
+    {% set park_ratings = {
+      "Coors Field": "🔴 Extreme hitter's park (+30% HR)",
+      "Great American Ball Park": "🔴 Hitter's park (+18% HR)",
+      "Yankee Stadium": "🟠 Hitter-friendly (+15% HR)",
+      "Citizens Bank Park": "🟠 Hitter-friendly (+12% HR)",
+      "Globe Life Field": "🟠 Hitter-friendly (+12% HR)",
+      "Minute Maid Park": "🟠 Hitter-friendly (+10% HR)",
+      "Oriole Park at Camden Yards": "🟠 Hitter-friendly (+8% HR)",
+      "Oracle Park": "🟢 Pitcher's park (-18% HR)",
+      "Petco Park": "🟢 Pitcher's park (-14% HR)",
+      "Citi Field": "🟢 Pitcher's park (-12% HR)",
+      "T-Mobile Park": "🟢 Pitcher-friendly (-12% HR)",
+      "Tropicana Field": "🟢 Pitcher-friendly (-10% HR)",
+      "PNC Park": "🟢 Pitcher-friendly (-10% HR)",
+      "Fenway Park": "🟡 Neutral (Green Monster = fewer HRs, more hits)"
+    } %}
+    {% if venue in park_ratings %}
+      · {{ park_ratings[venue] }}
+    {% else %}
+      · Neutral park
+    {% endif %}
+  </div>
 </div>
 
 <!-- ── Odds comparison card ── -->
@@ -381,9 +410,9 @@
 <div class="card">
   <div class="section-title">Starting Pitchers</div>
 
-  {% for pitcher_name, team_name, era, whip, wl in [
-      (away_pitcher_name, away_team, away_era, away_whip, away_wl),
-      (home_pitcher_name, home_team, home_era, home_whip, home_wl)
+  {% for pitcher_name, team_name, era, whip, wl, bp_era, bp_whip in [
+      (away_pitcher_name, away_team, away_era, away_whip, away_wl, away_bp_era, away_bp_whip),
+      (home_pitcher_name, home_team, home_era, home_whip, home_wl, home_bp_era, home_bp_whip)
   ] %}
   <div class="pitcher-row">
     <div>
@@ -408,6 +437,11 @@
       </div>
     </div>
   </div>
+  {% if bp_era and bp_era != 'N/A' %}
+  <div style="padding: 6px 0 10px 0; font-size:0.78rem; color:#8890a4; border-top:1px solid #1e2130; margin-top:8px;">
+    Bullpen (inn. 6-9): ERA <strong style="color:#e8eaf0;">{{ bp_era }}</strong> · WHIP <strong style="color:#e8eaf0;">{{ bp_whip }}</strong>
+  </div>
+  {% endif %}
   {% endfor %}
 </div>
 

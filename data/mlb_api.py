@@ -304,6 +304,85 @@ def get_player_recent_stats(player_id, group="hitting", num_games=20, season=Non
 # 5. BATTER VS LEFT / RIGHT PITCHER SPLITS
 # ──────────────────────────────────────────────
 
+def get_team_bullpen_stats(team_id, season=None):
+    """
+    Returns the aggregated ERA and WHIP for a team's relief pitchers (bullpen).
+
+    We fetch all pitchers on the team's roster, pull their season stats,
+    filter to those with gamesStarted < 3 (relief pitchers), and average
+    their ERA and WHIP weighted by innings pitched.
+
+    This replaces the league-average bullpen modifier we used before,
+    so teams with dominant bullpens (e.g. Dodgers) or terrible ones
+    actually affect late-inning probabilities.
+
+    Returns a dict like: {"era": "3.21", "whip": "1.18"}
+    Falls back to league average if data unavailable.
+    """
+    if season is None:
+        season = date.today().year
+
+    LEAGUE_AVG = {"era": "4.20", "whip": "1.30"}
+
+    try:
+        # Get team roster — pitchers only
+        roster_data = _get(f"/teams/{team_id}/roster", params={
+            "rosterType": "active",
+            "season":     season,
+        })
+        pitchers = [
+            p["person"]["id"]
+            for p in roster_data.get("roster", [])
+            if p.get("position", {}).get("code") == "1"   # position code 1 = pitcher
+        ]
+
+        if not pitchers:
+            return LEAGUE_AVG
+
+        # Fetch stats for all pitchers (limit to avoid too many calls)
+        total_ip  = 0.0
+        era_sum   = 0.0
+        whip_sum  = 0.0
+
+        for pid in pitchers[:25]:   # cap at 25 pitchers
+            try:
+                stats = get_player_season_stats(pid, group="pitching", season=season)
+                gs   = stats.get("gamesStarted", 0)
+                ip   = float(stats.get("inningsPitched", 0) or 0)
+
+                # Only include relief pitchers (< 3 starts)
+                if gs >= 3 or ip < 5:
+                    continue
+
+                try:
+                    era  = float(stats.get("era",  0) or 0)
+                    whip = float(stats.get("whip", 0) or 0)
+                except (ValueError, TypeError):
+                    continue
+
+                if era == 0 or whip == 0:
+                    continue
+
+                # Weight by innings pitched so a closer with 60 IP matters more
+                # than a mop-up guy with 5 IP
+                era_sum  += era  * ip
+                whip_sum += whip * ip
+                total_ip += ip
+            except Exception:
+                continue
+
+        if total_ip < 10:
+            return LEAGUE_AVG
+
+        return {
+            "era":  str(round(era_sum  / total_ip, 2)),
+            "whip": str(round(whip_sum / total_ip, 2)),
+        }
+
+    except Exception:
+        return LEAGUE_AVG
+
+
 def get_pitcher_hand(pitcher_id):
     """
     Returns 'L' or 'R' — which hand the pitcher throws with.
