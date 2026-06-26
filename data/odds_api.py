@@ -676,3 +676,150 @@ def get_line_movement() -> dict:
     snap["games"] = snap_games
     _save_snapshot(snap)
     return result
+
+
+# ── Public Betting % (Action Network) ───────────────────────────────────────
+
+_PUBLIC_BET_CACHE: dict = {}
+_PUBLIC_BET_TTL = 60 * 30   # 30 minutes
+
+
+def get_public_betting_pcts() -> dict:
+    """
+    Fetch today's MLB public betting percentages from Action Network.
+    Returns a dict keyed by frozenset({away_team, home_team}):
+      {
+        "away_bet_pct":   int,   # % of bets on away ML
+        "home_bet_pct":   int,   # % of bets on home ML
+        "away_money_pct": int,   # % of money on away ML
+        "home_money_pct": int,   # % of money on home ML
+        "sharp_indicator": str,  # "away" / "home" / None
+      }
+    """
+    cache_key = "public_bet_pcts"
+    cached = _file_cache_get(cache_key, _PUBLIC_BET_TTL)
+    if cached:
+        return {frozenset(k.split("|")): v for k, v in cached.items()}
+
+    from datetime import date
+    today = date.today().strftime("%Y%m%d")
+
+    try:
+        resp = requests.get(
+            "https://api.actionnetwork.com/web/v1/games",
+            params={"sport": "mlb", "date": today},
+            headers={"User-Agent": "Mozilla/5.0"},
+            timeout=8,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception:
+        return {}
+
+    # Action Network team name → MLB short name mapping
+    AN_TEAMS = {
+        "Arizona Diamondbacks": "Arizona Diamondbacks",
+        "Atlanta Braves": "Atlanta Braves",
+        "Baltimore Orioles": "Baltimore Orioles",
+        "Boston Red Sox": "Boston Red Sox",
+        "Chicago Cubs": "Chicago Cubs",
+        "Chicago White Sox": "Chicago White Sox",
+        "Cincinnati Reds": "Cincinnati Reds",
+        "Cleveland Guardians": "Cleveland Guardians",
+        "Colorado Rockies": "Colorado Rockies",
+        "Detroit Tigers": "Detroit Tigers",
+        "Houston Astros": "Houston Astros",
+        "Kansas City Royals": "Kansas City Royals",
+        "Los Angeles Angels": "Los Angeles Angels",
+        "Los Angeles Dodgers": "Los Angeles Dodgers",
+        "Miami Marlins": "Miami Marlins",
+        "Milwaukee Brewers": "Milwaukee Brewers",
+        "Minnesota Twins": "Minnesota Twins",
+        "New York Mets": "New York Mets",
+        "New York Yankees": "New York Yankees",
+        "Oakland Athletics": "Oakland Athletics",
+        "Philadelphia Phillies": "Philadelphia Phillies",
+        "Pittsburgh Pirates": "Pittsburgh Pirates",
+        "San Diego Padres": "San Diego Padres",
+        "San Francisco Giants": "San Francisco Giants",
+        "Seattle Mariners": "Seattle Mariners",
+        "St. Louis Cardinals": "St. Louis Cardinals",
+        "Tampa Bay Rays": "Tampa Bay Rays",
+        "Texas Rangers": "Texas Rangers",
+        "Toronto Blue Jays": "Toronto Blue Jays",
+        "Washington Nationals": "Washington Nationals",
+    }
+
+    result = {}
+    teams_lookup = data.get("teams", {})
+
+    for game in data.get("games", []):
+        try:
+            away_id = game.get("away_team_id")
+            home_id = game.get("home_team_id")
+
+            away_name = teams_lookup.get(str(away_id), {}).get("full_name", "")
+            home_name = teams_lookup.get(str(home_id), {}).get("full_name", "")
+
+            away_name = AN_TEAMS.get(away_name, away_name)
+            home_name = AN_TEAMS.get(home_name, home_name)
+
+            if not away_name or not home_name:
+                continue
+
+            # Moneyline bet/money %
+            odds_list = game.get("odds", [])
+            away_bet = home_bet = away_money = home_money = None
+
+            for o in odds_list:
+                if o.get("book_id") in (15, 16, 17, 138):  # popular books on AN
+                    ml = o.get("ml_away_bet_pct") or o.get("away_ml_bet_pct")
+                    if ml is not None:
+                        away_bet  = int(ml)
+                        home_bet  = 100 - away_bet
+                    mm = o.get("ml_away_money_pct") or o.get("away_ml_money_pct")
+                    if mm is not None:
+                        away_money = int(mm)
+                        home_money = 100 - away_money
+                    if away_bet is not None:
+                        break
+
+            # Fallback: use first odds entry with any bet pct
+            if away_bet is None:
+                for o in odds_list:
+                    for key in ("ml_away_bet_pct", "away_ml_bet_pct", "away_bet_pct"):
+                        if o.get(key) is not None:
+                            away_bet  = int(o[key])
+                            home_bet  = 100 - away_bet
+                            break
+                    if away_bet is not None:
+                        break
+
+            if away_bet is None:
+                continue
+
+            # Sharp indicator: money % diverges significantly from bet %
+            # "Reverse line movement" — lots of public bets on one side
+            # but more money on the other = sharp money on the other side
+            sharp = None
+            if away_money is not None:
+                if away_money - away_bet >= 15:
+                    sharp = "away"    # sharp money on away despite public on home
+                elif home_money - home_bet >= 15:
+                    sharp = "home"
+
+            fkey = frozenset([away_name, home_name])
+            result[fkey] = {
+                "away_bet_pct":    away_bet,
+                "home_bet_pct":    home_bet,
+                "away_money_pct":  away_money,
+                "home_money_pct":  home_money,
+                "sharp_indicator": sharp,
+            }
+        except Exception:
+            continue
+
+    # Cache with string keys (frozensets can't be JSON-serialized)
+    serializable = {"|".join(sorted(k)): v for k, v in result.items()}
+    _file_cache_set(cache_key, serializable)
+    return result

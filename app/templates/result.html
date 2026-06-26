@@ -421,6 +421,42 @@
     Edge = Our model % minus Vegas implied %. Positive (green) = our model likes this team more than Vegas does.
     For entertainment only — not financial advice.
   </p>
+
+  <!-- Public betting % -->
+  {% if away_bet_pct is not none %}
+  <div style="border-top:1px solid #252836; margin-top:14px; padding-top:14px;">
+    <div style="font-size:0.72rem; color:#9aa0b8; text-transform:uppercase; letter-spacing:.5px; margin-bottom:10px;">
+      Public Betting %
+      {% if sharp_indicator %}
+        <span style="margin-left:8px; background:#ffd54f22; color:#ffd54f; font-size:0.68rem; font-weight:700;
+                     padding:2px 8px; border-radius:20px; border:1px solid #ffd54f44;">
+          ⚡ Sharp money on {{ home_team if sharp_indicator == 'home' else away_team }}
+        </span>
+      {% endif %}
+    </div>
+    {% for side, team, bet_pct, money_pct in [
+        ('away', away_team, away_bet_pct, away_money_pct),
+        ('home', home_team, home_bet_pct, home_money_pct)
+    ] %}
+    <div style="margin-bottom:8px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:3px;">
+        <span style="font-size:0.82rem; font-weight:600; color:#e8eaf0;">{{ team }}</span>
+        <span style="font-size:0.82rem; color:#b0b8cc;">
+          <span style="color:#64b5f6; font-weight:700;">{{ bet_pct }}%</span> bets
+          {% if money_pct is not none %} · <span style="color:#ffd54f; font-weight:700;">{{ money_pct }}%</span> money{% endif %}
+        </span>
+      </div>
+      <!-- Bet % bar -->
+      <div style="height:6px; background:#1a1e2e; border-radius:3px; overflow:hidden;">
+        <div style="height:100%; width:{{ bet_pct }}%; background:{% if side=='away' %}#64b5f6{% else %}#81c784{% endif %}; border-radius:3px; transition:width 0.3s;"></div>
+      </div>
+    </div>
+    {% endfor %}
+    <div style="font-size:0.68rem; color:#555870; margin-top:6px;">
+      Via Action Network · Bets = ticket count · Money = dollar volume
+    </div>
+  </div>
+  {% endif %}
 </div>
 {% endif %}
 

@@ -19,7 +19,7 @@ from flask import Flask, render_template, abort, request, redirect, url_for, jso
 from flask_login import (LoginManager, UserMixin, login_user,
                          logout_user, login_required, current_user)
 
-from data.odds_api import get_mlb_odds, get_mlb_events, get_player_props, format_odds, calc_edge, get_requests_remaining, get_mlb_totals, get_mlb_runline, calc_ev, calc_kelly, get_line_movement
+from data.odds_api import get_mlb_odds, get_mlb_events, get_player_props, format_odds, calc_edge, get_requests_remaining, get_mlb_totals, get_mlb_runline, calc_ev, calc_kelly, get_line_movement, get_public_betting_pcts
 from data.tracker import log_prediction, update_results, get_accuracy_stats, get_all_predictions
 from data.my_picks import add_pick, update_pick_results, get_all_picks, get_pick_stats
 from data.bet_tracker import log_bet, settle_bets, get_bet_stats, get_all_bets
@@ -734,6 +734,14 @@ def index():
     games = get_today_schedule(game_date=selected_date.isoformat())
     label = selected_date.strftime("%A, %B %d %Y")
 
+    # Public betting % — keyed by frozenset so game cards can look up by team names
+    try:
+        pub_pcts_raw = get_public_betting_pcts()
+        # Convert frozenset keys to sorted-tuple so Jinja can iterate
+        pub_pcts = {tuple(sorted(k)): v for k, v in pub_pcts_raw.items()}
+    except Exception:
+        pub_pcts = {}
+
     return render_template("index.html",
                            games=games,
                            date=label,
@@ -741,6 +749,7 @@ def index():
                            prev_date=prev_date,
                            next_date=next_date,
                            is_today=is_today,
+                           pub_pcts=pub_pcts,
                            api_remaining=get_requests_remaining())
 
 
@@ -858,6 +867,20 @@ def simulate(game_pk):
             result["home_rl_kelly"]   = calc_kelly(result.get("home_cover_pct", 0), rl["home_rl_odds"])
     except Exception:
         pass
+
+    # ── Public betting percentages (Action Network) ──────────────────
+    try:
+        pub_pcts = get_public_betting_pcts()
+        pub = pub_pcts.get(odds_key, {})
+        result["away_bet_pct"]    = pub.get("away_bet_pct")
+        result["home_bet_pct"]    = pub.get("home_bet_pct")
+        result["away_money_pct"]  = pub.get("away_money_pct")
+        result["home_money_pct"]  = pub.get("home_money_pct")
+        result["sharp_indicator"] = pub.get("sharp_indicator")
+    except Exception:
+        result["away_bet_pct"] = result["home_bet_pct"] = None
+        result["away_money_pct"] = result["home_money_pct"] = None
+        result["sharp_indicator"] = None
 
     # Props are NOT auto-fetched here — user clicks "Load Props" button
     # which calls /props/<game_pk> separately (saves 2 API calls per simulation)

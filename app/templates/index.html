@@ -361,6 +361,28 @@
         <span class="venue">{{ game.venue }}</span>
       </div>
 
+      <!-- Public betting % -->
+      {% set pk = (game.away_team, game.home_team) | sort | list | join(',') %}
+      {% set pub = pub_pcts.get((game.away_team, game.home_team) | sort | tuple) %}
+      {% if pub %}
+      <div style="margin:6px 0 4px 0; font-size:0.72rem; color:#9aa0b8;">
+        <div style="display:flex; justify-content:space-between; margin-bottom:3px;">
+          <span>{{ game.away_team.split(' ')[-1] }} <b style="color:#64b5f6;">{{ pub.away_bet_pct }}%</b></span>
+          <span style="color:#555870; font-size:0.65rem;">public bets</span>
+          <span><b style="color:#81c784;">{{ pub.home_bet_pct }}%</b> {{ game.home_team.split(' ')[-1] }}</span>
+        </div>
+        <div style="height:5px; background:#1a1e2e; border-radius:3px; overflow:hidden; display:flex;">
+          <div style="width:{{ pub.away_bet_pct }}%; background:#64b5f6; border-radius:3px 0 0 3px;"></div>
+          <div style="width:{{ pub.home_bet_pct }}%; background:#81c784; border-radius:0 3px 3px 0;"></div>
+        </div>
+        {% if pub.sharp_indicator %}
+        <div style="margin-top:4px; color:#ffd54f; font-size:0.68rem; font-weight:600;">
+          ⚡ Sharp money: {{ home_team if pub.sharp_indicator == 'home' else away_team }}
+        </div>
+        {% endif %}
+      </div>
+      {% endif %}
+
       <!-- Simulate buttons -->
       {% if badge in ['live', 'final', 'delayed'] %}
         <!-- Lineup is available — show sim count picker -->
