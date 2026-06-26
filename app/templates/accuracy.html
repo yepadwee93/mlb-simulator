@@ -228,17 +228,17 @@
 </div>
 {% endif %}
 
-<div class="section-title" style="margin-bottom:10px;">Recent Predictions</div>
-{% if recent %}
+<div class="section-title" style="margin-bottom:10px;">My Simulations</div>
+{% if all_single %}
 <div class="section" style="padding:0;overflow-x:auto;">
 <table class="pred-table">
   <thead>
     <tr>
-      <th>Date</th><th>Matchup</th><th>Pick</th><th>Confidence</th><th>Actual Winner</th><th>Score</th><th>Result</th>
+      <th>Date</th><th>Matchup</th><th>My Pick</th><th>Confidence</th><th>Actual Winner</th><th>Score</th><th>Result</th>
     </tr>
   </thead>
   <tbody>
-    {% for r in recent %}
+    {% for r in all_single %}
     <tr>
       <td style="color:#b0b8cc;white-space:nowrap;">{{ r.game_date }}</td>
       <td style="white-space:nowrap;">{{ r.away_team }} @ {{ r.home_team }}</td>
@@ -249,11 +249,11 @@
       </td>
       <td>{{ r.actual_winner or '—' }}</td>
       <td style="color:#b0b8cc;">
-        {% if r.actual_away_runs %}{{ r.actual_away_runs }}-{{ r.actual_home_runs }}{% else %}—{% endif %}
+        {% if r.actual_away_runs is not none and r.actual_away_runs != '' %}{{ r.actual_away_runs }}-{{ r.actual_home_runs }}{% else %}—{% endif %}
       </td>
       <td>
-        {% if r.correct_pick == '1' %}<span class="badge badge-win">✓ Correct</span>
-        {% elif r.correct_pick == '0' %}<span class="badge badge-loss">✗ Wrong</span>
+        {% if r.correct_pick == '1' or r.correct_pick == 1 %}<span class="badge badge-win">✓ Correct</span>
+        {% elif r.correct_pick == '0' or r.correct_pick == 0 %}<span class="badge badge-loss">✗ Wrong</span>
         {% else %}<span class="badge badge-pend">Pending</span>{% endif %}
       </td>
     </tr>
@@ -262,7 +262,7 @@
 </table>
 </div>
 {% else %}
-<div class="no-data">No predictions yet — run the simulator and check back after games finish.</div>
+<div class="no-data">No simulations yet — pick a game on the home page and run it to start tracking here.</div>
 {% endif %}
 
 </body>

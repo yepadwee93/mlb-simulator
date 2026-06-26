@@ -799,6 +799,7 @@ def simulate(game_pk):
             away_avg_runs = result["away_avg_runs"],
             home_avg_runs = result["home_avg_runs"],
             n_sims        = n_sims,
+            source        = "single",
         )
     except Exception:
         pass  # never let logging break the simulation

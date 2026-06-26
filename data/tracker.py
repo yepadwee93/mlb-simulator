@@ -12,7 +12,7 @@ from data.mlb_api import _get
 
 def log_prediction(game_pk, game_date, away_team, home_team,
                    away_win_pct, home_win_pct,
-                   away_avg_runs, home_avg_runs, n_sims):
+                   away_avg_runs, home_avg_runs, n_sims, source="bulk"):
     """
     Upsert one simulation result. If this game_pk already has a row,
     update the prediction values but preserve any real results already filled in.
@@ -34,6 +34,7 @@ def log_prediction(game_pk, game_date, away_team, home_team,
         "home_avg_runs":    round(float(home_avg_runs), 2),
         "predicted_winner": predicted_winner,
         "n_sims":           int(n_sims),
+        "source":           source,
     }
 
     if existing.data:
@@ -97,13 +98,22 @@ def get_all_predictions():
     return res.data or []
 
 
+def get_single_game_predictions():
+    """Returns only manually-run (single-game) predictions, newest first."""
+    res = supa().table("predictions").select("*") \
+        .eq("source", "single") \
+        .order("logged_at", desc=True).execute()
+    return res.data or []
+
+
 def get_accuracy_stats():
     """
     Accuracy metrics for the /accuracy page.
+    Only counts manually-run (single-game) simulations.
     Returns dict with total_predictions, results_available, correct_picks,
-    accuracy_pct, avg_run_diff_error, by_confidence, recent.
+    accuracy_pct, avg_run_diff_error, by_confidence, recent, all_single.
     """
-    all_rows  = get_all_predictions()
+    all_rows  = get_single_game_predictions()
     completed = [r for r in all_rows if r.get("correct_pick") is not None]
 
     if not completed:
@@ -155,4 +165,5 @@ def get_accuracy_stats():
         "avg_run_diff_error": avg_err,
         "by_confidence":      by_confidence,
         "recent":             completed[:20],
+        "all_single":         all_rows,   # all single-game sims, pending + settled
     }
