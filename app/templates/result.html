@@ -615,6 +615,79 @@
   {% endfor %}
 </div>
 
+<!-- ── Pitcher Arsenal Breakdown ── -->
+{% if away_arsenal or home_arsenal %}
+<div class="card" style="max-width:900px;">
+  <div style="font-size:1rem;font-weight:800;margin-bottom:16px;">⚾ Pitcher Arsenal Breakdown</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+  {% for pitcher_name, team_name, ars in [
+      (away_pitcher_name, away_team, away_arsenal),
+      (home_pitcher_name, home_team, home_arsenal),
+  ] %}
+  {% if ars %}
+  <div>
+    <div style="font-size:0.78rem;font-weight:700;color:#e8eaf0;margin-bottom:4px;">{{ pitcher_name }}</div>
+    <div style="font-size:0.68rem;color:#9aa0b8;margin-bottom:12px;">{{ team_name }} · {{ ars.g }} G{% if ars.gs %} ({{ ars.gs }} GS){% endif %} · {{ ars.ip }} IP{% if ars.wins is not none %} · {{ ars.wins }}-{{ ars.losses }}{% endif %}</div>
+
+    {# ERA vs FIP comparison #}
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px;">
+      {% for label, val, color in [
+        ('ERA',  ars.era  | string if ars.era  else '—', '#ef5350' if ars.era and ars.era > 4.5 else '#81c784' if ars.era and ars.era < 3.5 else '#e8eaf0'),
+        ('FIP',  ars.fip  | string if ars.fip  else '—', '#ef5350' if ars.fip and ars.fip > 4.5 else '#81c784' if ars.fip and ars.fip < 3.5 else '#e8eaf0'),
+        ('WHIP', ars.whip | string if ars.whip else '—', '#ef5350' if ars.whip and ars.whip > 1.35 else '#81c784' if ars.whip and ars.whip < 1.1 else '#e8eaf0'),
+        ('K/BB', ars.k_bb_ratio | string if ars.k_bb_ratio else '—', '#81c784' if ars.k_bb_ratio and ars.k_bb_ratio > 3 else '#ef5350' if ars.k_bb_ratio and ars.k_bb_ratio < 2 else '#e8eaf0'),
+      ] %}
+      <div style="background:#13162a;border-radius:8px;padding:8px;text-align:center;">
+        <div style="font-size:1.05rem;font-weight:800;color:{{ color }};">{{ val }}</div>
+        <div style="font-size:0.62rem;color:#9aa0b8;text-transform:uppercase;letter-spacing:.4px;margin-top:2px;">{{ label }}</div>
+      </div>
+      {% endfor %}
+    </div>
+
+    {# Rate stats with grade bars #}
+    {% for label, val, pct, grade, good_high in [
+      ('K%',   (ars.k_pct  | string + '%') if ars.k_pct  else '—', ars.k_pct  or 0, ars.k_grade,  True),
+      ('BB%',  (ars.bb_pct | string + '%') if ars.bb_pct else '—', ars.bb_pct or 0, ars.bb_grade, False),
+      ('HR/9', (ars.hr9    | string)        if ars.hr9    else '—', (ars.hr9 or 0) * 15, ars.hr9_grade, False),
+      ('GB%',  (ars.gb_pct | string + '%') if ars.gb_pct else '—', ars.gb_pct or 0, ars.gb_grade, True),
+    ] %}
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:0.78rem;">
+      <div style="width:36px;color:#9aa0b8;font-size:0.7rem;flex-shrink:0;">{{ label }}</div>
+      <div style="flex:1;background:#0d1120;border-radius:3px;height:8px;overflow:hidden;">
+        <div style="width:{{ [pct, 100]|min }}%;height:100%;background:
+          {%- if grade in ['Elite'] -%}#4caf50
+          {%- elif grade in ['Above Avg'] -%}#81c784
+          {%- elif grade in ['Average'] -%}#ffd54f
+          {%- else -%}#ef5350{%- endif -%};border-radius:3px;"></div>
+      </div>
+      <div style="width:42px;font-weight:700;color:#e8eaf0;">{{ val }}</div>
+      <div style="font-size:0.65rem;color:
+        {%- if grade == 'Elite' -%}#4caf50
+        {%- elif grade == 'Above Avg' -%}#81c784
+        {%- elif grade == 'Average' -%}#9aa0b8
+        {%- else -%}#ef5350{%- endif -%};">{{ grade }}</div>
+    </div>
+    {% endfor %}
+
+    {% if ars.fip and ars.era %}
+    <div style="font-size:0.68rem;color:#9aa0b8;margin-top:6px;padding:6px 8px;background:#13162a;border-radius:6px;">
+      {% set diff = ars.era - ars.fip %}
+      {% if diff > 0.4 %}
+        📉 ERA {{ "%.2f"|format(diff) }} above FIP — due for regression (ERA likely to drop)
+      {% elif diff < -0.4 %}
+        📈 ERA {{ "%.2f"|format(-diff) }} below FIP — may be due for ERA increase
+      {% else %}
+        ✓ ERA and FIP aligned — sustainable performance
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+  {% endfor %}
+  </div>
+</div>
+{% endif %}
+
 <!-- ── Weather Card ── -->
 {% if weather and weather.temp_f %}
 <div class="card" style="max-width:900px; padding:16px 20px;">
