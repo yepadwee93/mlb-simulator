@@ -636,3 +636,84 @@ def get_team_rest_days(team_name, today=None):
             pass
 
     return 1
+
+
+# ── Baseball Savant Statcast data ────────────────────────────────────────────
+# Fetches barrel rate and hard-hit % for all batters from Baseball Savant's
+# free leaderboard CSV. Cached in memory for the session.
+
+_SAVANT_CACHE = {"data": {}, "year": None}
+
+SAVANT_URL = (
+    "https://baseballsavant.mlb.com/leaderboard/expected_statistics"
+    "?type=batter&year={year}&position=&team=&min=10&csv=true"
+)
+
+# Known column name variants across Savant CSV versions
+_BARREL_COLS   = ("barrel_batted_rate", "barrel_bip_rate", "barrel_rate")
+_HARDHIT_COLS  = ("hard_hit_percent", "hard_hit_rate", "hard_hit_pct")
+_EV_COLS       = ("exit_velocity_avg", "avg_exit_velocity", "launch_speed")
+_PID_COLS      = ("player_id", "mlbam_id", "batter")
+
+
+def get_savant_stats_all(year=None):
+    """
+    Fetch all batters' Statcast barrel rate and hard-hit % from Baseball Savant.
+    Returns dict keyed by MLB player_id (int):
+      {"barrel_pct": float, "hard_hit_pct": float, "exit_velo_avg": float}
+    Returns empty dict if the fetch fails -- sim runs fine without it.
+    """
+    import csv, io
+    from datetime import date as _date
+
+    if year is None:
+        year = _date.today().year
+
+    if _SAVANT_CACHE["year"] == year and _SAVANT_CACHE["data"]:
+        return _SAVANT_CACHE["data"]
+
+    url = SAVANT_URL.format(year=year)
+    try:
+        import requests as _req
+        resp = _req.get(url, timeout=15,
+                        headers={"User-Agent": "Mozilla/5.0 (compatible)"})
+        resp.raise_for_status()
+        reader = csv.DictReader(io.StringIO(resp.text))
+        headers = reader.fieldnames or []
+
+        def pick(cols):
+            for c in cols:
+                if c in headers:
+                    return c
+            return None
+
+        col_pid  = pick(_PID_COLS)
+        col_brl  = pick(_BARREL_COLS)
+        col_hh   = pick(_HARDHIT_COLS)
+        col_ev   = pick(_EV_COLS)
+
+        if not col_pid:
+            return {}
+
+        result = {}
+        for row in reader:
+            try:
+                pid = int(row[col_pid])
+                barrel   = float(row[col_brl]  or 0) if col_brl  else 7.0
+                hard_hit = float(row[col_hh]   or 0) if col_hh   else 38.0
+                exit_velo = float(row[col_ev]  or 0) if col_ev   else 88.5
+                if pid:
+                    result[pid] = {
+                        "barrel_pct":    barrel,
+                        "hard_hit_pct":  hard_hit,
+                        "exit_velo_avg": exit_velo,
+                    }
+            except (ValueError, TypeError):
+                continue
+
+        _SAVANT_CACHE["data"] = result
+        _SAVANT_CACHE["year"] = year
+        return result
+
+    except Exception:
+        return {}

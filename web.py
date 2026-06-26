@@ -33,6 +33,7 @@ from data.mlb_api import (
     get_pitcher_game_log,
     get_batter_vs_pitcher,
     get_team_rest_days,
+    get_savant_stats_all,
 )
 from simulation.engine import run_simulation
 
@@ -224,6 +225,15 @@ def build_game_result(game, n_sims, use_splits=True):
         away_display_extra = [{"vs_lhp": d[1], "vs_rhp": d[2], "vs_sp": d[3], "vs_rp": d[4], "risp": d[5], "vs_pitcher": d[6], "day_night": d[7]} for d in away_data]
         home_display_extra = [{"vs_lhp": d[1], "vs_rhp": d[2], "vs_sp": d[3], "vs_rp": d[4], "risp": d[5], "vs_pitcher": d[6], "day_night": d[7]} for d in home_data]
 
+    # Fetch Statcast barrel rate + hard-hit % from Baseball Savant (cached per session)
+    try:
+        savant_all = get_savant_stats_all()
+        away_savant = [savant_all.get(b.get('id'), {}) for b in lineup['away_batters']]
+        home_savant = [savant_all.get(b.get('id'), {}) for b in lineup['home_batters']]
+    except Exception:
+        away_savant = None
+        home_savant = None
+
     # How many days rest do the batters on each team have?
     try:
         away_batter_rest = get_team_rest_days(game["away_team"])
@@ -286,6 +296,8 @@ def build_game_result(game, n_sims, use_splits=True):
         home_daynight_stats = home_daynight_stats if use_splits else None,
         away_batter_rest    = away_batter_rest,
         home_batter_rest    = home_batter_rest,
+        away_savant         = away_savant,
+        home_savant         = home_savant,
         n                   = n_sims,
     )
 
