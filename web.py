@@ -742,6 +742,40 @@ def simulate_all():
 
     best_bets.sort(key=lambda b: b["win_pct"], reverse=True)
 
+    # ── Fetch Vegas odds and attach to each result ────────────────────────────
+    # Uses the same cached call as the single-game view (30-min cache).
+    # Matches by frozenset({away_team, home_team}) so order doesn't matter.
+    try:
+        all_odds = get_mlb_odds()
+    except Exception:
+        all_odds = {}
+
+    for r in results:
+        odds_key  = frozenset([r["away_team"], r["home_team"]])
+        game_odds = all_odds.get(odds_key, {})
+        if game_odds:
+            r["away_implied_pct"] = game_odds["away_implied_pct"]
+            r["home_implied_pct"] = game_odds["home_implied_pct"]
+            r["away_avg_odds"]    = format_odds(game_odds["away_avg_odds"])
+            r["home_avg_odds"]    = format_odds(game_odds["home_avg_odds"])
+            r["away_edge"]        = calc_edge(r["away_win_pct"], game_odds["away_implied_pct"])
+            r["home_edge"]        = calc_edge(r["home_win_pct"], game_odds["home_implied_pct"])
+        else:
+            r["away_implied_pct"] = None
+            r["home_implied_pct"] = None
+            r["away_avg_odds"]    = None
+            r["home_avg_odds"]    = None
+            r["away_edge"]        = None
+            r["home_edge"]        = None
+
+    # Also attach odds to best_bets entries
+    for b in best_bets:
+        r_match = next((r for r in results if r["gamePk"] == b["gamePk"]), {})
+        is_away = (b["team"] == r_match.get("away_team"))
+        b["implied_pct"] = r_match.get("away_implied_pct" if is_away else "home_implied_pct")
+        b["odds_str"]    = r_match.get("away_avg_odds"    if is_away else "home_avg_odds")
+        b["edge"]        = r_match.get("away_edge"        if is_away else "home_edge")
+
     today = date.today().strftime("%A, %B %d %Y")
     return render_template(
         "all_results.html",

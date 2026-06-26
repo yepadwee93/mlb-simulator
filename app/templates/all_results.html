@@ -94,6 +94,31 @@
       padding: 12px 0;
     }
 
+    /* ── Vegas odds line ── */
+    .vegas-line {
+      font-size: 0.77rem;
+      color: #8890a4;
+      margin-top: 4px;
+    }
+    .edge-pos { color: #4caf50; font-weight: 700; }
+    .edge-neg { color: #ef5350; font-weight: 700; }
+    .edge-flat { color: #8890a4; }
+
+    /* Vegas comparison row in game cards */
+    .vegas-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.74rem;
+      color: #8890a4;
+      margin-top: 8px;
+      border-top: 1px solid rgba(255,255,255,0.05);
+      padding-top: 7px;
+    }
+    .vegas-cell { display: flex; flex-direction: column; gap: 2px; }
+    .vegas-odds { font-weight: 600; color: #b0bec5; }
+    .vegas-edge-pos { color: #4caf50; font-weight: 700; font-size: 0.72rem; }
+    .vegas-edge-neg { color: #ef5350; font-weight: 600; font-size: 0.72rem; }
+
     .disclaimer {
       margin-top: 16px;
       font-size: 0.73rem;
@@ -302,57 +327,51 @@
     {% set good     = best_bets | selectattr("tier", "eq", "good")     | list %}
     {% set moderate = best_bets | selectattr("tier", "eq", "moderate") | list %}
 
+    {% macro bet_row_html(b, pct_color, badge_class, badge_text) %}
+    <div class="bet-row">
+      <div>
+        <div class="bet-team">{{ b.team }}</div>
+        <div class="bet-opp">vs {{ b.opponent }} · {{ b.venue }}</div>
+        {% if b.implied_pct %}
+        <div class="vegas-line">
+          Vegas: {{ b.implied_pct }}% implied · {{ b.odds_str or "N/A" }}
+          {% if b.edge is not none %}
+            {% if b.edge > 0 %}
+              · <span class="edge-pos">+{{ b.edge }}% edge ✓</span>
+            {% elif b.edge < 0 %}
+              · <span class="edge-neg">{{ b.edge }}% vs line</span>
+            {% else %}
+              · <span class="edge-flat">even with line</span>
+            {% endif %}
+          {% endif %}
+        </div>
+        {% endif %}
+      </div>
+      <div style="display:flex; align-items:center;">
+        <div class="bet-pct" style="color:{{ pct_color }};">{{ b.win_pct }}%</div>
+        <span class="bet-badge {{ badge_class }}">{{ badge_text }}</span>
+      </div>
+    </div>
+    {% endmacro %}
+
     {% if strong %}
     <div class="bet-tier-group">
       <div class="bet-tier-label">🔥 Strong lean — 70%+</div>
-      {% for b in strong %}
-      <div class="bet-row">
-        <div>
-          <div class="bet-team">{{ b.team }}</div>
-          <div class="bet-opp">vs {{ b.opponent }} · {{ b.venue }}</div>
-        </div>
-        <div style="display:flex; align-items:center;">
-          <div class="bet-pct" style="color:#ef5350;">{{ b.win_pct }}%</div>
-          <span class="bet-badge conf-strong">STRONG</span>
-        </div>
-      </div>
-      {% endfor %}
+      {% for b in strong %}{{ bet_row_html(b, "#ef5350", "conf-strong", "STRONG") }}{% endfor %}
     </div>
     {% endif %}
 
     {% if good %}
     <div class="bet-tier-group">
       <div class="bet-tier-label">✅ Good value — 65-69%</div>
-      {% for b in good %}
-      <div class="bet-row">
-        <div>
-          <div class="bet-team">{{ b.team }}</div>
-          <div class="bet-opp">vs {{ b.opponent }} · {{ b.venue }}</div>
-        </div>
-        <div style="display:flex; align-items:center;">
-          <div class="bet-pct" style="color:#4caf50;">{{ b.win_pct }}%</div>
-          <span class="bet-badge conf-good">GOOD</span>
-        </div>
-      </div>
-      {% endfor %}
+      {% for b in good %}{{ bet_row_html(b, "#4caf50", "conf-good", "GOOD") }}{% endfor %}
     </div>
     {% endif %}
 
     {% if moderate %}
     <div class="bet-tier-group">
       <div class="bet-tier-label">💛 Moderate edge — 62-64%</div>
-      {% for b in moderate %}
-      <div class="bet-row">
-        <div>
-          <div class="bet-team">{{ b.team }}</div>
-          <div class="bet-opp">vs {{ b.opponent }} · {{ b.venue }}</div>
-        </div>
-        <div style="display:flex; align-items:center;">
-          <div class="bet-pct" style="color:#ffd54f;">{{ b.win_pct }}%</div>
-          <span class="bet-badge conf-moderate">MODERATE</span>
-        </div>
-      </div>
-      {% endfor %}
+      {% for b in moderate %}{{ bet_row_html(b, "#ffd54f", "conf-moderate", "MODERATE") }}{% endfor %}
     </div>
     {% endif %}
 
@@ -475,6 +494,36 @@
         <div><span class="parlay-tag" style="background:#854d0e;">💛 {{ top_team }} — Moderate ({{ top_pct }}%)</span></div>
       {% elif is_parlay %}
         <div><span class="parlay-tag">🎯 PARLAY PICK</span></div>
+      {% endif %}
+
+      <!-- Vegas odds comparison (if available) -->
+      {% if r.away_implied_pct %}
+      <div class="vegas-row">
+        <div class="vegas-cell">
+          <span style="color:#8890a4;">Vegas · {{ r.away_team }}</span>
+          <span class="vegas-odds">{{ r.away_avg_odds }}</span>
+          <span style="color:#8890a4;">{{ r.away_implied_pct }}% implied</span>
+          {% if r.away_edge is not none %}
+            {% if r.away_edge > 0 %}
+              <span class="vegas-edge-pos">+{{ r.away_edge }}% edge</span>
+            {% elif r.away_edge < 0 %}
+              <span class="vegas-edge-neg">{{ r.away_edge }}% vs line</span>
+            {% endif %}
+          {% endif %}
+        </div>
+        <div class="vegas-cell" style="text-align:right;">
+          <span style="color:#8890a4;">Vegas · {{ r.home_team }}</span>
+          <span class="vegas-odds">{{ r.home_avg_odds }}</span>
+          <span style="color:#8890a4;">{{ r.home_implied_pct }}% implied</span>
+          {% if r.home_edge is not none %}
+            {% if r.home_edge > 0 %}
+              <span class="vegas-edge-pos">+{{ r.home_edge }}% edge</span>
+            {% elif r.home_edge < 0 %}
+              <span class="vegas-edge-neg">{{ r.home_edge }}% vs line</span>
+            {% endif %}
+          {% endif %}
+        </div>
+      </div>
       {% endif %}
 
     </div>
