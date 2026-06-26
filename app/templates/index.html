@@ -306,6 +306,26 @@ if (localStorage.getItem('email_nudge_dismissed') === '1') {
     </div>
   </div>
 
+  <!-- Multi-day schedule strip -->
+  <div style="display:flex;gap:6px;margin-bottom:14px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none;">
+    {% for d in multi_day %}
+    <a href="/?date={{ d.date }}" style="
+      flex-shrink:0;
+      display:flex;flex-direction:column;align-items:center;
+      padding:8px 12px;border-radius:10px;text-decoration:none;
+      border:1px solid {% if d.selected %}#64b5f6{% elif d.is_today %}#353a52{% else %}#252836{% endif %};
+      background:{% if d.selected %}#0d2a4a{% elif d.is_today %}#1a1e2e{% else %}#13162a{% endif %};
+      min-width:52px;
+    ">
+      <span style="font-size:0.65rem;color:{% if d.selected %}#64b5f6{% elif d.is_today %}#ffd54f{% else %}#9aa0b8{% endif %};font-weight:700;text-transform:uppercase;letter-spacing:.3px;">{{ d.label }}</span>
+      <span style="font-size:1.1rem;font-weight:800;color:{% if d.selected %}#64b5f6{% else %}#e8eaf0{% endif %};margin:2px 0;">{{ d.day_num }}</span>
+      <span style="font-size:0.62rem;color:{% if d.count > 0 %}#81c784{% else %}#555870{% endif %};">
+        {% if d.count > 0 %}{{ d.count }}G{% else %}—{% endif %}
+      </span>
+    </a>
+    {% endfor %}
+  </div>
+
   <!-- Date navigator -->
   <div class="date-nav">
     <a class="date-arrow" href="/?date={{ prev_date }}" title="Previous day">‹</a>
