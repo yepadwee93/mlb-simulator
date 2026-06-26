@@ -1323,6 +1323,11 @@ def bets_dashboard():
             "avg_clv": None, "by_type": {},
         }
     stats["today"] = date.today().isoformat()
+    stats["total_pl"] = stats.get("total_profit", 0)
+    stats["profit_loss"] = stats.get("total_profit", 0)
+    stats["win_rate"] = stats.get("win_pct", None)
+    stats["wagered"] = stats.get("total_wagered", 0)
+    stats["recent_bets"] = stats.get("bets", [])[:20]
     return render_template("bets.html", **stats, username=current_user.username)
 
 
