@@ -67,6 +67,14 @@
 <a class="back" href="/simulate-all">← Back to Games</a>
 <h1>Bet Tracker</h1>
 <p class="subtitle">Log your bets, track results, measure your edge over the book.</p>
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;background:#161923;border:1px solid #252836;border-radius:10px;padding:12px 16px;">
+  <span style="font-size:0.82rem;color:#8890a4;">Unit Size:</span>
+  <span style="font-size:0.82rem;color:#8890a4;">$</span>
+  <input id="unit-size" type="number" value="100" min="1" style="width:80px;background:#0f1117;border:1px solid #333650;border-radius:6px;color:#e8eaf0;padding:5px 8px;font-size:0.85rem;">
+  <button onclick="saveUnit()" style="background:#1a3a5a;color:#64b5f6;border:1px solid #1565c0;border-radius:6px;padding:5px 12px;cursor:pointer;font-size:0.78rem;font-weight:700;">Save</button>
+  <span id="unit-msg" style="font-size:0.78rem;color:#4caf50;"></span>
+  <span style="margin-left:auto;font-size:0.78rem;color:#8890a4;">All Kelly % outputs = units to bet based on this size.</span>
+</div>
 
 <!-- Summary stats -->
 <div class="summary-grid">
@@ -192,6 +200,7 @@
       <th>Amount</th>
       <th>Edge</th>
       <th>Result</th>
+      <th>CLV</th>
       <th>P&L</th>
     </tr>
   </thead>
@@ -205,6 +214,7 @@
       <td>{{ b.odds }}</td>
       <td>${{ b.amount }}</td>
       <td>{% if b.model_edge %}<span class="{% if b.model_edge|float > 0 %}green{% else %}red{% endif %}">{{ b.model_edge }}%</span>{% else %}—{% endif %}</td>
+      <td>{% if b.clv %}<span class="{% if b.clv|float > 0 %}green{% else %}red{% endif %}">{% if b.clv|float > 0 %}+{% endif %}{{ b.clv }}pp</span>{% else %}—{% endif %}</td>
       <td>
         {% if b.result == "WIN" %}<span class="badge badge-win">WIN</span>
         {% elif b.result == "LOSS" %}<span class="badge badge-loss">LOSS</span>
@@ -227,6 +237,25 @@
 <script>
 const today = new Date().toISOString().slice(0, 10);
 document.getElementById('lb-date').value = today;
+
+// Unit system
+const UNIT_KEY = 'mlb_unit_size';
+function loadUnit() {
+  const v = localStorage.getItem(UNIT_KEY);
+  if (v) {
+    document.getElementById('unit-size').value = v;
+    document.getElementById('lb-amount').value = v;
+  }
+}
+function saveUnit() {
+  const v = document.getElementById('unit-size').value;
+  localStorage.setItem(UNIT_KEY, v);
+  document.getElementById('lb-amount').value = v;
+  const msg = document.getElementById('unit-msg');
+  msg.textContent = 'Saved!';
+  setTimeout(() => msg.textContent = '', 1500);
+}
+window.addEventListener('load', loadUnit);
 
 async function logBet() {
   const msg = document.getElementById('lb-msg');

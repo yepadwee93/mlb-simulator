@@ -8,8 +8,8 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      background: #0f1117;
-      color: #e8eaf0;
+      background: var(--bg);
+      color: var(--text);
       font-family: 'Segoe UI', Arial, sans-serif;
       min-height: 100vh;
       padding: 40px 20px;
@@ -207,12 +207,92 @@
     .market-val   { color: #c8cdd8; font-weight: 600; }
     .ev-pos { color: #4caf50; font-weight: 700; }
     .ev-neg { color: #ef5350; font-weight: 600; }
+    .hr-badge { display:inline-block; font-size:0.6rem; font-weight:700; padding:1px 7px;
+      border-radius:4px; margin:2px; }
+    .hr-hot    { background:#3a1a00; color:#ffab40; border:1px solid #e65100; }
+    .hr-cold   { background:#0d1a2a; color:#81d4fa; border:1px solid #01579b; }
+    .hr-neutral{ background:#1a1d28; color:#90a4ae; border:1px solid #455a64; }
+    .wind-out  { background:#1a2a10; color:#b9f6ca; border:1px solid #1b5e20; }
+    .wind-in   { background:#1a1a2a; color:#b39ddb; border:1px solid #4527a0; }
+    .platoon-row { display:flex; justify-content:space-between; align-items:center;
+      font-size:0.72rem; color:#8890a4; padding:4px 0; border-top:1px solid #1a1d28; margin-top:4px; }
+    .streak-hot  { display:inline-block; font-size:0.6rem; font-weight:800; padding:2px 8px;
+      border-radius:4px; background:#3a1a00; color:#ff8f00; border:1px solid #e65100; }
+    .streak-cold { display:inline-block; font-size:0.6rem; font-weight:800; padding:2px 8px;
+      border-radius:4px; background:#0d1a2a; color:#81d4fa; border:1px solid #0277bd; }
+    .streak-norm { display:inline-block; font-size:0.6rem; font-weight:700; padding:2px 8px;
+      border-radius:4px; background:#1a1d28; color:#90a4ae; border:1px solid #455a64; }
+    .lineup-confirmed { display:inline-block; font-size:0.6rem; font-weight:700; padding:1px 7px;
+      border-radius:4px; background:#1a2a10; color:#69f0ae; border:1px solid #1b5e20; }
+    .lineup-projected { display:inline-block; font-size:0.6rem; font-weight:700; padding:1px 7px;
+      border-radius:4px; background:#2a2010; color:#ffcc80; border:1px solid #e65100; }
+    .conf-bar-wrap { width:100%; height:8px; background:#1a1d28; border-radius:4px; overflow:hidden; margin:4px 0; }
+    .conf-bar { height:100%; border-radius:4px; transition:width .3s; }
+    .conf-label { font-size:0.62rem; color:#8890a4; display:flex; justify-content:space-between; }
+    .platoon-bar-wrap { flex:1; margin:0 10px; height:6px; background:#1a1d28; border-radius:3px; overflow:hidden; }
+    .platoon-bar { height:100%; border-radius:3px; }
+    .form-hot      { display:inline-block; font-size:0.6rem; font-weight:700; padding:1px 7px; border-radius:4px; background:#1a2a10; color:#b9f6ca; border:1px solid #2e7d32; margin-left:4px; }
+    .form-declining{ display:inline-block; font-size:0.6rem; font-weight:700; padding:1px 7px; border-radius:4px; background:#3a1a00; color:#ffcc80; border:1px solid #e65100; margin-left:4px; }
+    .bp-depth-badge { display:inline-block; font-size:0.62rem; font-weight:700; padding:2px 8px;
+      border-radius:4px; margin:2px; }
+    .bp-depth-elite  { background:#1a2a1a; color:#69f0ae; border:1px solid #2e7d32; }
+    .bp-depth-strong { background:#1a2520; color:#80cbc4; border:1px solid #00695c; }
+    .bp-depth-average{ background:#1a1d28; color:#90a4ae; border:1px solid #455a64; }
+    .bp-depth-weak   { background:#2a2010; color:#ffcc80; border:1px solid #e65100; }
+    .bp-depth-thin   { background:#3a1a1a; color:#ef9a9a; border:1px solid #b71c1c; }
+    .series-badge { display:inline-block; font-size:0.62rem; font-weight:700; padding:1px 8px;
+      border-radius:4px; background:#1a1a2a; color:#b39ddb; border:1px solid #3a2a6a;
+      margin-bottom:4px; }
+    .il-badge { display:inline-block; font-size:0.6rem; font-weight:700; padding:1px 6px;
+      border-radius:4px; background:#3a1a1a; color:#ef9a9a; border:1px solid #5a2a2a;
+      margin-left:4px; vertical-align:middle; }
+    .txn-badge { display:inline-block; font-size:0.6rem; font-weight:700; padding:1px 6px;
+      border-radius:4px; background:#1a2a1a; color:#a5d6a7; border:1px solid #2a4a2a;
+      margin-left:4px; vertical-align:middle; }
+    .il-alert-row { font-size:0.72rem; color:#ef9a9a; padding:4px 8px 2px; }
+    .txn-row { font-size:0.72rem; color:#a5d6a7; padding:2px 8px 4px; }
     .log-bet-btn {
       display:inline-block; margin-top:10px; padding:6px 14px; font-size:0.75rem;
       font-weight:700; border-radius:8px; cursor:pointer;
       background:#14261a; color:#4caf50; border:1px solid #2a5a3a;
     }
     .log-bet-btn:hover { background:#1b3a24; }
+    /* ── Print / PDF ── */
+    @media print {
+      body { background: #fff !important; color: #000 !important; padding: 10px; }
+      .game-card { break-inside: avoid; border: 1px solid #ccc !important; background: #fff !important; margin-bottom: 10px; }
+      #refresh-bar, .sort-btn, .filter-btn, .log-bet-btn, .log-bet-modal,
+      #mode-btn, .no-print { display: none !important; }
+      .game-card { display: none; }
+      .game-card.best-bet-card, .game-card.parlay-pick-card { display: block !important; }
+      .best-bets-box, .parlay-box { border: 1px solid #ccc !important; background: #fff !important; }
+      h1::after { content: " — Best Bets"; }
+    }
+    /* ── Mobile responsive ── */
+    @media (max-width: 640px) {
+      body { padding: 12px 10px 60px; }
+      .games-grid { grid-template-columns: 1fr !important; gap: 12px; }
+      .game-card { padding: 12px 10px; }
+      .matchup-row { flex-direction: column; align-items: flex-start; gap: 8px; }
+      .team-block { flex-direction: row; align-items: center; gap: 8px; }
+      .team-logo { width: 32px; height: 32px; }
+      .pitcher-block { flex-direction: row; gap: 6px; }
+      .pitcher-headshot { width: 36px; height: 36px; }
+      .market-row { flex-direction: column; gap: 6px; }
+      .seg-row { flex-wrap: wrap; gap: 6px; }
+      .seg-cell { min-width: calc(50% - 6px); }
+      .summary-grid { grid-template-columns: repeat(2, 1fr); }
+      .parlay-header { flex-direction: column; gap: 10px; }
+      .sort-btn, .filter-btn { padding: 5px 8px; font-size: 0.7rem; }
+      .lbf-row { grid-template-columns: 1fr; }
+      .log-bet-box { padding: 18px 14px; }
+      h1 { font-size: 1.3rem; }
+      .parlay-combined .pct { font-size: 1.8rem; }
+    }
+    @media (max-width: 400px) {
+      .team-win-pct { font-size: 1.6rem; }
+      .seg-cell { min-width: 100%; }
+    }
     .log-bet-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:1000; align-items:center; justify-content:center; }
     .log-bet-modal.open { display:flex; }
     .log-bet-box { background:#161923; border:1px solid #333650; border-radius:16px; padding:24px 28px; min-width:320px; max-width:460px; width:90%; }
@@ -466,6 +546,17 @@
 </header>
 
 <!-- ── Best Bets — confidence tiers ── -->
+{% if api_remaining is not none %}
+  {% if api_remaining < 50 %}
+  <div style="background:#3a1a1a;border:1px solid #ef5350;border-radius:10px;padding:10px 16px;margin-bottom:16px;font-size:0.82rem;color:#ef9a9a;">
+    ⚠️ <strong>Odds API quota low: {{ api_remaining }} requests left.</strong> Odds are cached — no new calls will be made until the cache expires. <a href="https://the-odds-api.com" target="_blank" style="color:#ef9a9a;">Upgrade plan</a> if needed.
+  </div>
+  {% elif api_remaining < 150 %}
+  <div style="background:#2a2010;border:1px solid #ffa726;border-radius:10px;padding:10px 16px;margin-bottom:16px;font-size:0.82rem;color:#ffcc80;">
+    ⚡ <strong>Odds API: {{ api_remaining }} requests remaining.</strong> Odds cache is 60 min — you're being careful automatically.
+  </div>
+  {% endif %}
+{% endif %}
 <div class="best-bets-box">
   <div class="best-bets-title">🎯 Today's Best Bets</div>
 
@@ -545,6 +636,16 @@
     <div class="parlay-combined">
       <div class="pct">{{ combined_prob }}%</div>
       <div class="lbl">combined probability</div>
+      {%- if parlay_ev is not none %}
+      <div style="margin-top:8px;font-size:0.78rem;">
+        <span class="{% if parlay_ev > 0 %}ev-pos{% else %}ev-neg{% endif %}">
+          EV {% if parlay_ev > 0 %}+{% endif %}${{ parlay_ev }} / $100
+        </span>
+      </div>
+      <div style="font-size:0.7rem;color:#8890a4;margin-top:4px;">
+        Fair odds: {{ parlay_true_odds }} · Book pays: {{ parlay_book_odds }}
+      </div>
+      {%- endif %}
     </div>
     {% endif %}
   </div>
@@ -570,6 +671,19 @@
 </div>
 
 <!-- ── All Game Cards ── -->
+<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">
+  <span style="font-size:0.72rem;color:#8890a4;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Sort:</span>
+  <button class="sort-btn active" onclick="sortCards('top-pct')" style="background:#1a2a3a;color:#64b5f6;border:1px solid #1565c0;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:0.75rem;font-weight:700;">Win %</button>
+  <button class="sort-btn" onclick="sortCards('top-ev')" style="background:#252836;color:#8890a4;border:1px solid #333650;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:0.75rem;font-weight:700;">EV</button>
+  <button class="sort-btn" onclick="sortCards('ou')" style="background:#252836;color:#8890a4;border:1px solid #333650;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:0.75rem;font-weight:700;">O/U Total</button>
+  <span style="font-size:0.72rem;color:#8890a4;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-left:12px;">Filter:</span>
+  <button class="filter-btn active" onclick="filterCards(0)" style="background:#1a2a3a;color:#64b5f6;border:1px solid #1565c0;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:0.75rem;font-weight:700;">All</button>
+  <button class="filter-btn" onclick="filterCards(60)" style="background:#252836;color:#8890a4;border:1px solid #333650;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:0.75rem;font-weight:700;">60%+ Edge</button>
+  <button class="filter-btn" onclick="filterCards(65)" style="background:#252836;color:#8890a4;border:1px solid #333650;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:0.75rem;font-weight:700;">65%+ Edge</button>
+  <button class="filter-btn" onclick="filterCards(70)" style="background:#252836;color:#8890a4;border:1px solid #333650;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:0.75rem;font-weight:700;">70%+ Edge</button>
+  <span id="card-count" style="font-size:0.72rem;color:#8890a4;margin-left:auto;"></span>
+  <button onclick="printBestBets()" class="no-print" style="background:#1a2a10;color:#4caf50;border:1px solid #2a5a3a;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:0.75rem;font-weight:700;">🖨 Print Best Bets</button>
+</div>
 <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;">ALL GAMES TODAY <a href="/bets" style="font-size:0.78rem;font-weight:700;color:#4caf50;background:#14261a;border:1px solid #2a5a3a;border-radius:6px;padding:4px 10px;text-decoration:none;">💰 Bet Tracker</a></div>
 
 <div class="games-grid">
@@ -581,7 +695,86 @@
       {% endif %}
     {% endfor %}
 
-    <div class="game-card {% if is_parlay %}parlay-pick-card{% endif %}">
+    <div class="game-card {% if is_parlay %}parlay-pick-card{% endif %} {% if [r.away_win_pct, r.home_win_pct]|max >= 65 %}best-bet-card{% endif %}"
+         data-away-pct="{{ r.away_win_pct }}"
+         data-home-pct="{{ r.home_win_pct }}"
+         data-top-pct="{{ [r.away_win_pct, r.home_win_pct] | max }}"
+         data-away-ev="{{ r.away_ev or 0 }}"
+         data-home-ev="{{ r.home_ev or 0 }}"
+         data-top-ev="{{ ([r.away_ev or -999, r.home_ev or -999]) | max }}"
+         data-ou="{{ r.ou_line or 0 }}"
+         data-game-pk="{{ r.game_pk }}">
+
+      <!-- IL / injury alerts -->
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;flex-wrap:wrap;gap:4px;">
+        {%- if r.lineup_status == "confirmed" %}
+        <span class="lineup-confirmed">✓ Lineup Confirmed</span>
+        {%- elif r.lineup_status == "projected" %}
+        <span class="lineup-projected">⚡ Lineup Projected</span>
+        {%- endif %}
+        <span style="display:flex;gap:4px;">
+          {%- if r.away_streak and r.away_streak.label %}
+            {%- if r.away_streak.hot %}
+            <span class="streak-hot">🔥 {{ r.away_team.split()[-1] }} {{ r.away_streak.label }}</span>
+            {%- elif r.away_streak.cold %}
+            <span class="streak-cold">❄ {{ r.away_team.split()[-1] }} {{ r.away_streak.label }}</span>
+            {%- else %}
+            <span class="streak-norm">{{ r.away_team.split()[-1] }} {{ r.away_streak.label }}</span>
+            {%- endif %}
+          {%- endif %}
+          {%- if r.home_streak and r.home_streak.label %}
+            {%- if r.home_streak.hot %}
+            <span class="streak-hot">🔥 {{ r.home_team.split()[-1] }} {{ r.home_streak.label }}</span>
+            {%- elif r.home_streak.cold %}
+            <span class="streak-cold">❄ {{ r.home_team.split()[-1] }} {{ r.home_streak.label }}</span>
+            {%- else %}
+            <span class="streak-norm">{{ r.home_team.split()[-1] }} {{ r.home_streak.label }}</span>
+            {%- endif %}
+          {%- endif %}
+        </span>
+      </div>
+      {%- if r.hr_park_factor %}
+      <div style="display:flex;gap:6px;padding:3px 0;flex-wrap:wrap;">
+        {%- if r.hr_park_factor >= 1.10 %}
+        <span class="hr-badge hr-hot">HR Park {{ r.hr_park_factor }}x</span>
+        {%- elif r.hr_park_factor <= 0.92 %}
+        <span class="hr-badge hr-cold">HR Suppressor {{ r.hr_park_factor }}x</span>
+        {%- else %}
+        <span class="hr-badge hr-neutral">HR Neutral {{ r.hr_park_factor }}x</span>
+        {%- endif %}
+        {%- if r.wind_effect == "out" %}<span class="hr-badge wind-out">💨 Wind OUT {{ r.wind_label }}</span>
+        {%- elif r.wind_effect == "in" %}<span class="hr-badge wind-in">💨 Wind IN {{ r.wind_label }}</span>
+        {%- elif r.wind_label %}<span class="hr-badge hr-neutral">{{ r.wind_label }}</span>
+        {%- endif %}
+      </div>
+      {%- endif %}
+      {%- if r.series_game_num and r.series_game_num > 1 %}
+      <div style="text-align:center;padding:2px 0;">
+        <span class="series-badge">Game {{ r.series_game_num }} of Series
+          {%- if r.series_game_num >= 3 %} · Familiarity Edge{%- endif %}
+        </span>
+      </div>
+      {%- endif %}
+      {%- if r.away_il or r.home_il %}
+      <div style="display:flex;justify-content:space-between;padding:4px 0 0;flex-wrap:wrap;gap:4px;">
+        <div>
+          {%- for p in (r.away_il or []) %}<span class="il-badge">{{ p.il_type }} · {{ p.name.split()[-1] }}</span>{%- endfor %}
+        </div>
+        <div>
+          {%- for p in (r.home_il or []) %}<span class="il-badge">{{ p.il_type }} · {{ p.name.split()[-1] }}</span>{%- endfor %}
+        </div>
+      </div>
+      {%- endif %}
+      {%- if r.away_transactions or r.home_transactions %}
+      <div style="display:flex;justify-content:space-between;padding:2px 0 4px;flex-wrap:wrap;gap:4px;">
+        <div>
+          {%- for t in (r.away_transactions or [])[:2] %}<span class="txn-badge">{{ t.type[:12] }} · {{ t.player.split()[-1] }}</span>{%- endfor %}
+        </div>
+        <div>
+          {%- for t in (r.home_transactions or [])[:2] %}<span class="txn-badge">{{ t.type[:12] }} · {{ t.player.split()[-1] }}</span>{%- endfor %}
+        </div>
+      </div>
+      {%- endif %}
 
       <!-- Team names + win % -->
       <div class="matchup-row">
@@ -629,8 +822,14 @@
                onerror="this.src='https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png'">
           {%- endif %}
           <div>
-            <div class="pitcher-name">{{ r.away_pitcher_name }}</div>
-            <div style="font-size:0.7rem;color:#666">SP</div>
+            <div class="pitcher-name">{{ r.away_pitcher_name }}
+              {%- if r.away_form and r.away_form.form == "hot" %}<span class="form-hot">🔥 HOT</span>{%- endif %}
+              {%- if r.away_form and r.away_form.form == "declining" %}<span class="form-declining">⚠ DECLINING</span>{%- endif %}
+            </div>
+            <div style="font-size:0.65rem;color:#666">SP
+              {%- if r.away_form and r.away_form.note %} · <span style="color:#ffcc80;">{{ r.away_form.note }}</span>{%- endif %}
+            </div>
+            {%- if r.away_last_start %}<div style="font-size:0.6rem;color:#555870;margin-top:1px;">Last: {{ r.away_last_start }}</div>{%- endif %}
           </div>
         </div>
         <div class="umpire-badge">
@@ -647,8 +846,14 @@
         </div>
         <div class="pitcher-block home">
           <div>
-            <div class="pitcher-name">{{ r.home_pitcher_name }}</div>
-            <div style="font-size:0.7rem;color:#666">SP</div>
+            <div class="pitcher-name">{{ r.home_pitcher_name }}
+              {%- if r.home_form and r.home_form.form == "hot" %}<span class="form-hot">🔥 HOT</span>{%- endif %}
+              {%- if r.home_form and r.home_form.form == "declining" %}<span class="form-declining">⚠ DECLINING</span>{%- endif %}
+            </div>
+            <div style="font-size:0.65rem;color:#666">SP
+              {%- if r.home_form and r.home_form.note %} · <span style="color:#ffcc80;">{{ r.home_form.note }}</span>{%- endif %}
+            </div>
+            {%- if r.home_last_start %}<div style="font-size:0.6rem;color:#555870;margin-top:1px;">Last: {{ r.home_last_start }}</div>{%- endif %}
           </div>
           {%- if r.home_pitcher_id %}
           <img class="pitcher-headshot"
@@ -726,6 +931,16 @@
       <!-- Inning segments F3/F5/F7 -->
       {%- if r.f3 %}
       <div class="seg-row">
+        {%- if r.f1_over_pct is defined and r.f1_over_pct is not none %}
+        <div class="seg-cell">
+          <div class="seg-label">F1 O/U 0.5</div>
+          <div>
+            <span class="seg-away">OVER {{ r.f1_over_pct }}%</span>
+            <span style="color:#8890a4;font-size:0.7rem;"> / </span>
+            <span class="seg-home">UNDER {{ r.f1_under_pct }}%</span>
+          </div>
+        </div>
+        {%- endif %}
         {%- for label, seg in [("F3", r.f3), ("F5", r.f5), ("F7", r.f7)] %}
         <div class="seg-cell">
           <div class="seg-label">Thru {{ label[-1] }}</div>
@@ -743,6 +958,34 @@
       {%- endif %}
 
       <!-- Moneyline Vegas odds + EV + Kelly -->
+      {%- if r.away_platoon %}
+      <div class="platoon-row">
+        <span>{{ r.away_team | truncate(10, true, '') }} vs {{ r.home_hand }}HP
+          · Platoon {{ r.away_platoon }}/100</span>
+        <div class="platoon-bar-wrap">
+          {%- set edge_pct = [50 + r.platoon_edge, 5] | max | min(95) %}
+          <div class="platoon-bar" style="width:{{ edge_pct }}%;background:{% if r.platoon_edge > 5 %}#4caf50{% elif r.platoon_edge < -5 %}#ef5350{% else %}#64b5f6{% endif %};"></div>
+        </div>
+        <span>{{ r.home_team | truncate(10, true, '') }} vs {{ r.away_hand }}HP
+          · {{ r.home_platoon }}/100</span>
+      </div>
+      {%- endif %}
+
+      {%- if r.confidence_score is defined %}
+      <div style="padding:6px 0 2px;">
+        <div class="conf-label">
+          <span>Confidence</span>
+          <span style="color:{% if r.confidence_score >= 70 %}#4caf50{% elif r.confidence_score >= 40 %}#ffa726{% else %}#8890a4{% endif %};font-weight:700;">
+            {% if r.confidence_score >= 70 %}HIGH{% elif r.confidence_score >= 40 %}MODERATE{% else %}LOW / TOSS-UP{% endif %}
+            · {{ r.confidence_score }}/100
+          </span>
+        </div>
+        <div class="conf-bar-wrap">
+          <div class="conf-bar" style="width:{{ r.confidence_score }}%;background:{% if r.confidence_score >= 70 %}#4caf50{% elif r.confidence_score >= 40 %}#ffa726{% else %}#90a4ae{% endif %};"></div>
+        </div>
+      </div>
+      {%- endif %}
+
       {% if r.away_implied_pct %}
       <div class="market-row">
         <div>
@@ -751,7 +994,10 @@
             {%- if r.away_open_odds and r.away_open_odds != r.away_avg_odds %} <span style="color:#555870;font-size:.62rem;">open {{ r.away_open_odds }}</span>{%- endif %}
           </div>
           <div><span class="market-val">{{ r.away_avg_odds }}</span>
-            <span style="color:#8890a4;"> · {{ r.away_implied_pct }}% impl</span></div>
+            <span style="color:#8890a4;"> · {{ r.away_implied_pct }}% impl</span>
+            {%- if r.best_away_book and r.best_away_odds != r.away_avg_odds %}
+            <span style="color:#64b5f6;font-size:0.6rem;"> Best: {{ r.best_away_odds }} @ {{ r.best_away_book }}</span>
+            {%- endif %}</div>
           {% if r.away_edge > 0 %}
             <div class="vegas-edge-pos">+{{ r.away_edge }}% edge</div>
             {%- if r.away_ev is not none %}<div class="ev-pos">EV +${{ r.away_ev }} / $100</div>{%- endif %}
@@ -767,7 +1013,10 @@
             {%- if r.home_open_odds and r.home_open_odds != r.home_avg_odds %} <span style="color:#555870;font-size:.62rem;">open {{ r.home_open_odds }}</span>{%- endif %}
           </div>
           <div><span class="market-val">{{ r.home_avg_odds }}</span>
-            <span style="color:#8890a4;"> · {{ r.home_implied_pct }}% impl</span></div>
+            <span style="color:#8890a4;"> · {{ r.home_implied_pct }}% impl</span>
+            {%- if r.best_home_book and r.best_home_odds != r.home_avg_odds %}
+            <span style="color:#64b5f6;font-size:0.6rem;"> Best: {{ r.best_home_odds }} @ {{ r.best_home_book }}</span>
+            {%- endif %}</div>
           {% if r.home_edge > 0 %}
             <div class="vegas-edge-pos">+{{ r.home_edge }}% edge</div>
             {%- if r.home_ev is not none %}<div class="ev-pos">EV +${{ r.home_ev }} / $100</div>{%- endif %}
@@ -824,6 +1073,19 @@
           {%- else %}
             <div class="ev-neg">{{ r.home_rl_edge }}% vs line</div>
           {%- endif %}
+        </div>
+      </div>
+      {%- endif %}
+
+      {%- if r.away_cover_p15_pct %}
+      <div class="market-row" style="margin-top:6px;border-top:1px dashed #252836;padding-top:6px;">
+        <div>
+          <div class="market-label" style="color:#b39ddb;">Alt +1.5</div>
+          <div class="market-val">{{ r.away_cover_p15_pct }}% · -2.5: {{ r.away_cover_m25_pct }}%</div>
+        </div>
+        <div style="text-align:right;">
+          <div class="market-label" style="color:#b39ddb;">Alt +1.5</div>
+          <div class="market-val">{{ r.home_cover_p15_pct }}% · -2.5: {{ r.home_cover_m25_pct }}%</div>
         </div>
       </div>
       {%- endif %}
@@ -906,6 +1168,147 @@ async function submitBet() {
 <footer>
   Data: MLB Stats API + Open-Meteo · Predictions for entertainment only
 </footer>
+
+<div id="refresh-bar" style="position:fixed;bottom:0;left:0;right:0;background:#161923;border-top:1px solid #252836;
+  padding:8px 20px;display:flex;justify-content:space-between;align-items:center;font-size:0.78rem;color:#8890a4;z-index:500;">
+  <span>🔄 Auto-refresh in <strong id="refresh-countdown">10:00</strong></span>
+  <span>
+    <button onclick="location.reload()" style="background:#1a3a5a;color:#64b5f6;border:1px solid #1565c0;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:0.75rem;">Refresh Now</button>
+    &nbsp;
+    <button onclick="toggleAutoRefresh()" id="ar-toggle" style="background:#252836;color:#8890a4;border:1px solid #333650;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:0.75rem;">Pause</button>
+  </span>
+</div>
+<div style="height:40px;"></div><!-- spacer for fixed bar -->
+
+<script>
+function printBestBets() {
+  // Temporarily show only best-bet and parlay cards for print
+  window.print();
+}
+</script>
+<script>
+// Sort and filter game cards
+let _currentSort   = 'top-pct';
+let _currentFilter = 0;
+
+function sortCards(key) {
+  _currentSort = key;
+  document.querySelectorAll('.sort-btn').forEach(b => {
+    b.style.background = '#252836'; b.style.color = '#8890a4'; b.style.borderColor = '#333650';
+    b.classList.remove('active');
+  });
+  event.target.style.background = '#1a2a3a'; event.target.style.color = '#64b5f6';
+  event.target.style.borderColor = '#1565c0'; event.target.classList.add('active');
+  applySort();
+}
+
+function filterCards(minPct) {
+  _currentFilter = minPct;
+  document.querySelectorAll('.filter-btn').forEach(b => {
+    b.style.background = '#252836'; b.style.color = '#8890a4'; b.style.borderColor = '#333650';
+  });
+  event.target.style.background = '#1a2a3a'; event.target.style.color = '#64b5f6';
+  event.target.style.borderColor = '#1565c0';
+  applySort();
+}
+
+function applySort() {
+  const grid = document.querySelector('.games-grid');
+  if (!grid) return;
+  const cards = Array.from(grid.querySelectorAll('.game-card'));
+  // Filter
+  let visible = 0;
+  cards.forEach(c => {
+    const pct = parseFloat(c.dataset.topPct || 0);
+    const show = pct >= _currentFilter;
+    c.style.display = show ? '' : 'none';
+    if (show) visible++;
+  });
+  // Sort visible cards
+  const sorted = cards.filter(c => c.style.display !== 'none')
+    .sort((a, b) => parseFloat(b.dataset[_currentSort.replace(/-([a-z])/g, g => g[1].toUpperCase())] || 0)
+                  - parseFloat(a.dataset[_currentSort.replace(/-([a-z])/g, g => g[1].toUpperCase())] || 0));
+  sorted.forEach(c => grid.appendChild(c));
+  const cnt = document.getElementById('card-count');
+  if (cnt) cnt.textContent = visible + ' game' + (visible !== 1 ? 's' : '');
+}
+
+window.addEventListener('load', () => {
+  applySort();
+});
+</script>
+
+<script>
+// Dark/light mode
+const MODE_KEY = 'mlb_color_mode';
+function toggleMode() {
+  const body = document.body;
+  const btn  = document.getElementById('mode-btn');
+  if (body.classList.contains('light-mode')) {
+    body.classList.remove('light-mode');
+    btn.textContent = '☀ Light Mode';
+    localStorage.setItem(MODE_KEY, 'dark');
+  } else {
+    body.classList.add('light-mode');
+    btn.textContent = '🌙 Dark Mode';
+    localStorage.setItem(MODE_KEY, 'light');
+  }
+}
+(function() {
+  const saved = localStorage.getItem(MODE_KEY);
+  if (saved === 'light') {
+    document.body.classList.add('light-mode');
+    const btn = document.getElementById('mode-btn');
+    if (btn) btn.textContent = '🌙 Dark Mode';
+  }
+})();
+</script>
+
+<script>
+(function() {
+  const REFRESH_SECS = 600; // 10 minutes
+  let remaining = REFRESH_SECS;
+  let paused = false;
+  const el = document.getElementById('refresh-countdown');
+  const btn = document.getElementById('ar-toggle');
+
+  // Snapshot current odds for movement detection
+  const oddsSnapshot = {};
+  document.querySelectorAll('[data-away-odds]').forEach(card => {
+    const gk = card.dataset.gamePk;
+    if (gk) {
+      oddsSnapshot[gk] = {
+        away: card.dataset.awayOdds,
+        home: card.dataset.homeOdds,
+        ts: Date.now()
+      };
+    }
+  });
+
+  function toggleAutoRefresh() {
+    paused = !paused;
+    btn.textContent = paused ? 'Resume' : 'Pause';
+    btn.style.color = paused ? '#ffa726' : '#8890a4';
+  }
+  window.toggleAutoRefresh = toggleAutoRefresh;
+
+  setInterval(() => {
+    if (paused) return;
+    remaining--;
+    if (remaining <= 0) {
+      location.reload();
+      return;
+    }
+    const m = Math.floor(remaining / 60).toString().padStart(2,'0');
+    const s = (remaining % 60).toString().padStart(2,'0');
+    el.textContent = m + ':' + s;
+    // Warn when close to refresh
+    if (remaining <= 60) {
+      el.style.color = '#ffa726';
+    }
+  }, 1000);
+})();
+</script>
 
 </body>
 </html>

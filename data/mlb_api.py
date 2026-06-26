@@ -51,6 +51,28 @@ BALLPARK_COORDS = {
     "Sahlen Field":         (42.886,  -78.872),
 }
 
+# Direction wind must blow TO push balls toward CF/RF for HR boost
+# Degrees (meteorological: 0=N, 90=E) — if wind_deg is within 45deg of this, it's blowing OUT
+PARK_CF_DIRECTION = {
+    "Coors Field":              315,   # NW (blowing out toward CF)
+    "Wrigley Field":            270,   # W (famous wind blowing out)
+    "Yankee Stadium":           270,
+    "Fenway Park":              315,
+    "Citizens Bank Park":       270,
+    "Great American Ball Park": 315,
+    "Kauffman Stadium":         315,
+    "Minute Maid Park":         270,
+    "Oracle Park":              0,     # N (rare — usually blows IN from bay)
+    "T-Mobile Park":            0,
+    "Petco Park":               270,
+    "Dodger Stadium":           270,
+    "Target Field":             315,
+    "Progressive Field":        315,
+    "Globe Life Field":         0,     # indoors — wind direction irrelevant
+    "Chase Field":              0,     # retractable roof
+    "Tropicana Field":          0,     # dome
+}
+
 
 def _get(path, params=None):
     """
@@ -603,11 +625,28 @@ def get_ballpark_weather(venue_name):
         dirs   = ["N","NE","E","SE","S","SW","W","NW"]
         label  = dirs[round(wind_deg / 45) % 8]
 
+        # Wind direction HR boost: if wind blows OUT toward CF and >= 10 mph
+        cf_dir = PARK_CF_DIRECTION.get(venue_name)
+        wind_hr_boost = 1.0
+        wind_effect   = "neutral"
+        if cf_dir is not None and wind_mph >= 10:
+            diff = abs((wind_deg - cf_dir + 180) % 360 - 180)
+            if diff <= 45:
+                boost_factor = min(1.15, 1.0 + (wind_mph - 10) * 0.005)
+                wind_hr_boost = round(boost_factor, 3)
+                wind_effect   = "out"
+            elif diff >= 135:
+                suppress_factor = max(0.90, 1.0 - (wind_mph - 10) * 0.004)
+                wind_hr_boost = round(suppress_factor, 3)
+                wind_effect   = "in"
+
         return {
-            "temp_f":     round(temp_f),
-            "wind_mph":   round(wind_mph),
-            "wind_deg":   wind_deg,
-            "wind_label": f"{round(wind_mph)} mph {label}",
+            "temp_f":       round(temp_f),
+            "wind_mph":     round(wind_mph),
+            "wind_deg":     wind_deg,
+            "wind_label":   f"{round(wind_mph)} mph {label}",
+            "wind_hr_boost": wind_hr_boost,
+            "wind_effect":  wind_effect,
         }
 
     except Exception:
@@ -818,3 +857,325 @@ def get_team_bullpen_usage(team_id: int, days_back: int = 3) -> dict:
         "era_modifier":  era_mod,
         "whip_modifier": whip_mod,
     }
+
+
+def get_team_il_players(team_id: int) -> list:
+    """
+    Returns list of IL players for a team.
+    Each entry: {"id": int, "name": str, "il_type": str, "since": str}
+    Uses the 40-man roster endpoint — IL players have status.description set.
+    """
+    try:
+        data = _get(f"/teams/{team_id}/roster", params={"rosterType": "40Man"})
+        il = []
+        for p in data.get("roster", []):
+            status = p.get("status", {}).get("description", "")
+            if "IL" in status or "Injured" in status:
+                person = p.get("person", {})
+                il.append({
+                    "id":      person.get("id"),
+                    "name":    person.get("fullName", "Unknown"),
+                    "il_type": status,   # e.g. "10-Day IL", "60-Day IL"
+                })
+        return il
+    except Exception:
+        return []
+
+
+def check_lineup_il_overlap(lineup_players: list, il_players: list) -> list:
+    """
+    Given a list of lineup player dicts (with 'id') and IL player dicts (with 'id'),
+    returns IL entries for any player in the lineup who is on the IL.
+    Useful to warn if a starter slipped through a stale lineup.
+    """
+    il_ids = {p["id"] for p in il_players if p.get("id")}
+    return [p for p in il_players if p.get("id") in il_ids
+            and any(b.get("id") == p["id"] for b in lineup_players)]
+
+
+def get_recent_transactions(team_id: int, days_back: int = 3) -> list:
+    """
+    Returns recent IL placements and activations for a team.
+    Uses MLB transactions endpoint — filtered by team and date range.
+    Returns list of {"date", "player", "type"} dicts.
+    """
+    from datetime import date, timedelta
+    end   = date.today().isoformat()
+    start = (date.today() - timedelta(days=days_back)).isoformat()
+    try:
+        data = _get("/transactions", params={
+            "teamId":    team_id,
+            "startDate": start,
+            "endDate":   end,
+        })
+        txns = []
+        for t in data.get("transactions", []):
+            ttype = t.get("typeDesc", "")
+            if any(k in ttype for k in ("Placed", "Activated", "Transfer", "IL")):
+                txns.append({
+                    "date":   t.get("date", ""),
+                    "player": t.get("person", {}).get("fullName", ""),
+                    "type":   ttype,
+                })
+        return txns
+    except Exception:
+        return []
+
+
+def get_series_game_number(game_pk: int, away_team_id: int, home_team_id: int) -> int:
+    """
+    Returns the game number within the current series (1, 2, 3, or 4).
+    Looks back up to 4 days at the home team's schedule to find consecutive
+    games between the same two teams.
+    Returns 1 if this is the series opener or data is unavailable.
+    """
+    from datetime import date, timedelta
+    try:
+        today = date.today()
+        # Fetch home team schedule for last 5 days (covers a full 3-4 game series)
+        start = (today - timedelta(days=5)).isoformat()
+        end   = today.isoformat()
+        data  = _get(f"/schedule", params={
+            "teamId":    home_team_id,
+            "startDate": start,
+            "endDate":   end,
+            "sportId":   1,
+            "fields":    "dates,date,games,gamePk,teams,away,home,team,id",
+        })
+        # Collect games between these two teams in date order
+        series_games = []
+        for day in data.get("dates", []):
+            for g in day.get("games", []):
+                away_id = g.get("teams", {}).get("away", {}).get("team", {}).get("id")
+                h_id    = g.get("teams", {}).get("home", {}).get("team", {}).get("id")
+                if {away_id, h_id} == {away_team_id, home_team_id}:
+                    series_games.append((day["date"], g["gamePk"]))
+
+        series_games.sort()
+        for i, (_, pk) in enumerate(series_games, 1):
+            if pk == game_pk:
+                return i
+        return len(series_games) + 1  # today's game is next in series
+    except Exception:
+        return 1
+
+
+def get_catcher_cs_rate(team_id: int) -> float:
+    """
+    Returns the opposing catcher's caught-stealing percentage.
+    Fetches the active catcher from the team roster, then their season catching stats.
+    Falls back to league average (0.28) on any error.
+
+    League average CS% is ~28% (2023-2025 MLB).
+    A catcher above 35% is elite; below 20% is a green light for base stealers.
+    """
+    LEAGUE_AVG_CS = 0.28
+    try:
+        # Get 25-man roster and find the catcher(s)
+        data = _get(f"/teams/{team_id}/roster", params={"rosterType": "active"})
+        catchers = [
+            p["person"]["id"]
+            for p in data.get("roster", [])
+            if p.get("position", {}).get("abbreviation") == "C"
+        ]
+        if not catchers:
+            return LEAGUE_AVG_CS
+
+        # Use the first (primary) catcher
+        catcher_id = catchers[0]
+        stats = _get(f"/people/{catcher_id}/stats", params={
+            "stats": "season",
+            "group": "catching",
+            "season": __import__("datetime").date.today().year,
+        })
+
+        splits = (stats.get("stats") or [{}])[0].get("splits") or []
+        if not splits:
+            return LEAGUE_AVG_CS
+
+        s = splits[0].get("stat", {})
+        sb  = int(s.get("stolenBases",     0) or 0)   # stolen bases allowed
+        cs  = int(s.get("caughtStealing",  0) or 0)   # caught stealing by this catcher
+        attempts = sb + cs
+        if attempts < 10:
+            return LEAGUE_AVG_CS
+
+        cs_rate = cs / attempts
+        return round(min(max(cs_rate, 0.10), 0.55), 3)
+    except Exception:
+        return LEAGUE_AVG_CS
+
+
+def get_bullpen_depth_score(team_id: int, season: int = None) -> dict:
+    """
+    Score a team's bullpen depth on a 0-100 scale.
+    Counts the number of "reliable" relief arms (ERA < 3.80, WHIP < 1.30, IP >= 15).
+    Also tracks the number of "elite" arms (ERA < 3.00).
+
+    Returns:
+      {
+        "score":         int,   # 0-100
+        "grade":         str,   # "Elite" / "Strong" / "Average" / "Weak" / "Thin"
+        "reliable_arms": int,   # count of arms with ERA < 3.80
+        "elite_arms":    int,   # count of arms with ERA < 3.00
+        "avg_era":       float,
+        "avg_whip":      float,
+      }
+    """
+    if season is None:
+        from datetime import date as _d
+        season = _d.today().year
+    try:
+        roster_data = _get(f"/teams/{team_id}/roster", params={
+            "rosterType": "active", "season": season,
+        })
+        pitchers = [
+            p["person"]["id"]
+            for p in roster_data.get("roster", [])
+            if p.get("position", {}).get("code") == "1"
+        ]
+        reliable = 0
+        elite    = 0
+        total_ip = 0.0
+        era_sum  = 0.0
+        whip_sum = 0.0
+
+        for pid in pitchers[:25]:
+            try:
+                stats = get_player_season_stats(pid, group="pitching", season=season)
+                gs   = int(stats.get("gamesStarted", 0) or 0)
+                ip   = float(stats.get("inningsPitched", 0) or 0)
+                if gs >= 3 or ip < 10:
+                    continue
+                era  = float(stats.get("era",  99) or 99)
+                whip = float(stats.get("whip", 99) or 99)
+                if era <= 0 or whip <= 0:
+                    continue
+                era_sum  += era  * ip
+                whip_sum += whip * ip
+                total_ip += ip
+                if ip >= 15 and era < 3.80 and whip < 1.30:
+                    reliable += 1
+                if ip >= 15 and era < 3.00:
+                    elite += 1
+            except Exception:
+                continue
+
+        avg_era  = round(era_sum  / total_ip, 2) if total_ip else 4.20
+        avg_whip = round(whip_sum / total_ip, 2) if total_ip else 1.30
+
+        # Score: base 50, +8 per reliable arm (max 6 arms), +10 per elite arm (max 2)
+        score = 50 + min(reliable, 6) * 8 + min(elite, 2) * 10
+        # Adjust for avg ERA: sub 3.50 → +5, above 4.50 → -10
+        if avg_era < 3.50:
+            score += 5
+        elif avg_era > 4.50:
+            score -= 10
+        score = max(0, min(100, score))
+
+        if score >= 85:
+            grade = "Elite"
+        elif score >= 70:
+            grade = "Strong"
+        elif score >= 55:
+            grade = "Average"
+        elif score >= 40:
+            grade = "Weak"
+        else:
+            grade = "Thin"
+
+        return {
+            "score":         score,
+            "grade":         grade,
+            "reliable_arms": reliable,
+            "elite_arms":    elite,
+            "avg_era":       avg_era,
+            "avg_whip":      avg_whip,
+        }
+    except Exception:
+        return {"score": 50, "grade": "Average", "reliable_arms": 0,
+                "elite_arms": 0, "avg_era": 4.20, "avg_whip": 1.30}
+
+
+def get_lineup_status(game_pk: int) -> str:
+    """
+    Returns "confirmed", "projected", or "unknown" for a game's lineup.
+    MLB API gameData.status.detailedState gives us the game state.
+    If boxscore already has batting order data with batters listed as "confirmed",
+    we consider it confirmed. Otherwise projected.
+    """
+    try:
+        data = _get(f"/game/{game_pk}/feed/live")
+        state = data.get("gameData", {}).get("status", {}).get("detailedState", "")
+        # If game has started or lineup is out, it's confirmed
+        if any(s in state.lower() for s in ["in progress", "final", "game over", "pre-game"]):
+            # Check if batting orders are populated
+            away_batters = data.get("liveData", {}).get("boxscore", {}).get(
+                "teams", {}).get("away", {}).get("battingOrder", [])
+            if away_batters:
+                return "confirmed"
+        return "projected"
+    except Exception:
+        return "unknown"
+
+
+def get_team_streak(team_id: int, days_back: int = 10) -> dict:
+    """
+    Returns a team's current win/loss streak over the last N days.
+    Returns {"streak": int, "type": "W"|"L"|"", "label": str, "hot": bool, "cold": bool}
+    Positive streak = win streak, negative = loss streak.
+    hot = 5+ game win streak, cold = 5+ game loss streak.
+    """
+    from datetime import date, timedelta
+    try:
+        end   = date.today().isoformat()
+        start = (date.today() - timedelta(days=days_back)).isoformat()
+        data  = _get("/schedule", params={
+            "teamId":    team_id,
+            "startDate": start,
+            "endDate":   end,
+            "sportId":   1,
+            "fields":    "dates,date,games,gamePk,status,teams,away,home,team,id,score,isWinner",
+        })
+        results = []
+        for day in sorted(data.get("dates", []), key=lambda d: d["date"]):
+            for game in day.get("games", []):
+                state = game.get("status", {}).get("abstractGameState", "")
+                if state != "Final":
+                    continue
+                teams = game.get("teams", {})
+                away_id = teams.get("away", {}).get("team", {}).get("id")
+                home_id = teams.get("home", {}).get("team", {}).get("id")
+                if team_id not in (away_id, home_id):
+                    continue
+                side = "away" if team_id == away_id else "home"
+                won  = teams.get(side, {}).get("isWinner", False)
+                results.append("W" if won else "L")
+
+        if not results:
+            return {"streak": 0, "type": "", "label": "", "hot": False, "cold": False}
+
+        # Count current streak from most recent game backwards
+        current = results[-1]
+        streak  = 0
+        for r in reversed(results):
+            if r == current:
+                streak += 1
+            else:
+                break
+
+        if current == "W":
+            label = f"W{streak}"
+        else:
+            label = f"L{streak}"
+            streak = -streak
+
+        return {
+            "streak": streak,
+            "type":   current,
+            "label":  label,
+            "hot":    streak >= 5,
+            "cold":   streak <= -5,
+        }
+    except Exception:
+        return {"streak": 0, "type": "", "label": "", "hot": False, "cold": False}

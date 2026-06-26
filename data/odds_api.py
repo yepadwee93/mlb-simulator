@@ -17,12 +17,41 @@ ODDS_BASE    = "https://api.the-odds-api.com/v4"
 # Sportsbooks to average across (all available on free tier)
 PREFERRED_BOOKS = {"draftkings", "fanduel", "betmgm", "bovada", "williamhill_us"}
 
+# ── File-based persistent cache ──────────────────────────────────────────────
+# Survives server restarts — saves quota during development.
+import json as _json_mod
+import os as _os
+
+_CACHE_DIR = _os.path.join(_os.path.dirname(__file__), "_odds_cache")
+
+def _file_cache_get(key: str, ttl: float) -> dict | None:
+    """Return cached data if still fresh, else None."""
+    path = _os.path.join(_CACHE_DIR, f"{key}.json")
+    try:
+        with open(path) as f:
+            obj = _json_mod.load(f)
+        if time.time() - obj.get("ts", 0) < ttl:
+            return obj.get("data")
+    except Exception:
+        pass
+    return None
+
+def _file_cache_set(key: str, data):
+    """Write data + timestamp to disk cache."""
+    try:
+        _os.makedirs(_CACHE_DIR, exist_ok=True)
+        path = _os.path.join(_CACHE_DIR, f"{key}.json")
+        with open(path, "w") as f:
+            _json_mod.dump({"ts": time.time(), "data": data}, f)
+    except Exception:
+        pass
+
 # ── In-memory cache for moneyline odds ──────────────────────────────
 # Odds barely move inning to inning, so we cache for 30 minutes.
 # This cuts API usage from 1 request per simulation down to
 # ~1 request per 30-minute window regardless of how many games you run.
 _ODDS_CACHE = {"data": {}, "ts": 0.0}
-_CACHE_TTL  = 30 * 60   # 30 minutes in seconds
+_CACHE_TTL  = 60 * 60   # 60 minutes in seconds
 
 # Requests remaining — updated from response headers after every API call
 _requests_remaining = None
@@ -82,8 +111,20 @@ def get_mlb_odds() -> dict:
     if not ODDS_API_KEY:
         return {}
 
-    # Return cached data if it's still fresh
-    if time.time() - _ODDS_CACHE["ts"] < _CACHE_TTL and _ODDS_CACHE["data"]:
+    # Low-quota guard: if we have fewer than 50 requests left, extend TTL to 4 hours
+    effective_ttl = _CACHE_TTL
+    if _requests_remaining is not None and _requests_remaining < 50:
+        effective_ttl = 4 * 60 * 60  # 4 hours
+
+    # Return in-memory cache if still fresh
+    if time.time() - _ODDS_CACHE["ts"] < effective_ttl and _ODDS_CACHE["data"]:
+        return _ODDS_CACHE["data"]
+
+    # Check file cache (survives restarts — saves API quota during development)
+    file_cached = _file_cache_get("moneyline", effective_ttl)
+    if file_cached is not None:
+        _ODDS_CACHE["data"] = {frozenset(k.split("|")): v for k, v in file_cached.items()}
+        _ODDS_CACHE["ts"] = time.time()
         return _ODDS_CACHE["data"]
 
     try:
@@ -101,6 +142,9 @@ def get_mlb_odds() -> dict:
         _update_remaining(resp)
         games = resp.json()
     except Exception:
+        # Return stale cache rather than empty dict — better to show old odds than nothing
+        if _ODDS_CACHE["data"]:
+            return _ODDS_CACHE["data"]
         return {}
 
     result = {}
@@ -112,21 +156,29 @@ def get_mlb_odds() -> dict:
         # Collect odds from each bookmaker
         away_odds_list = []
         home_odds_list = []
+        best_away_odds = None
+        best_home_odds = None
+        best_away_book = ""
+        best_home_book = ""
 
         for book in game.get("bookmakers", []):
-            # Optionally filter to preferred books only
-            # (comment this out to use all available books)
-            # if book["key"] not in PREFERRED_BOOKS:
-            #     continue
-
+            book_name = book.get("title", book.get("key", ""))
             for market in book.get("markets", []):
                 if market["key"] != "h2h":
                     continue
                 for outcome in market.get("outcomes", []):
+                    price = outcome["price"]
                     if outcome["name"] == away:
-                        away_odds_list.append(outcome["price"])
+                        away_odds_list.append(price)
+                        # Best away odds = highest American odds (most favorable to bettor)
+                        if best_away_odds is None or price > best_away_odds:
+                            best_away_odds = price
+                            best_away_book = book_name
                     elif outcome["name"] == home:
-                        home_odds_list.append(outcome["price"])
+                        home_odds_list.append(price)
+                        if best_home_odds is None or price > best_home_odds:
+                            best_home_odds = price
+                            best_home_book = book_name
 
         if not away_odds_list or not home_odds_list:
             continue
@@ -154,11 +206,17 @@ def get_mlb_odds() -> dict:
             "away_avg_odds":    avg_away,
             "home_avg_odds":    avg_home,
             "books_used":       len(away_odds_list),
+            "best_away_odds":   best_away_odds or avg_away,
+            "best_away_book":   best_away_book,
+            "best_home_odds":   best_home_odds or avg_home,
+            "best_home_book":   best_home_book,
         }
 
     # Store in cache with current timestamp
     _ODDS_CACHE["data"] = result
     _ODDS_CACHE["ts"]   = time.time()
+    # Persist to file so cache survives server restarts
+    _file_cache_set("moneyline", {"|".join(sorted(k)): v for k, v in result.items()})
     return result
 
 
@@ -336,6 +394,12 @@ def get_mlb_totals() -> dict:
     if time.time() - _TOTALS_CACHE["ts"] < _CACHE_TTL and _TOTALS_CACHE["data"]:
         return _TOTALS_CACHE["data"]
 
+    file_cached_t = _file_cache_get("totals", _CACHE_TTL)
+    if file_cached_t is not None:
+        _TOTALS_CACHE["data"] = {frozenset(k.split("|")): v for k, v in file_cached_t.items()}
+        _TOTALS_CACHE["ts"] = time.time()
+        return _TOTALS_CACHE["data"]
+
     try:
         resp = requests.get(
             f"{ODDS_BASE}/sports/baseball_mlb/odds/",
@@ -401,6 +465,7 @@ def get_mlb_totals() -> dict:
 
     _TOTALS_CACHE["data"] = result
     _TOTALS_CACHE["ts"]   = time.time()
+    _file_cache_set("totals", {"|".join(sorted(k)): v for k, v in result.items()})
     return result
 
 

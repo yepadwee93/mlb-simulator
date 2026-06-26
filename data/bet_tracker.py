@@ -32,6 +32,8 @@ FIELDNAMES = [
     "result",        # "WIN" | "LOSS" | "PUSH" | ""
     "profit_loss",   # dollars won (positive) or lost (negative)
     "actual_score",  # e.g. "3-5"
+    "closing_odds",  # final Vegas closing line (American)
+    "clv",           # closing line value: odds at bet - closing odds (positive = beat the close)
 ]
 
 
@@ -75,9 +77,11 @@ def log_bet(game_pk, game_date, away_team, home_team,
         "model_edge": model_edge or "",
         "ev":         ev or "",
         "kelly":      kelly or "",
-        "result":     "",
-        "profit_loss": "",
+        "result":       "",
+        "profit_loss":  "",
         "actual_score": "",
+        "closing_odds": "",
+        "clv":          "",
     }
     rows = _read_all()
     for i, r in enumerate(rows):
@@ -218,6 +222,54 @@ def get_bet_stats():
         "by_type":       by_type,
         "recent_bets":   list(reversed(rows))[:20],
     }
+
+
+def update_closing_lines(closing_odds_map: dict):
+    """
+    Store closing odds for settled bets and compute CLV.
+    closing_odds_map: {game_pk: {"away": int, "home": int}}
+    CLV = (implied prob at bet time) - (implied prob at close)
+    Positive CLV = you got a better number than closing line = long-term profitable.
+    """
+    rows = _read_all()
+    updated = 0
+    for row in rows:
+        if row.get("closing_odds"):
+            continue
+        gk = str(row.get("game_pk", ""))
+        if gk not in closing_odds_map:
+            continue
+        bet_on   = row.get("bet_on", "")
+        away_t   = row.get("away_team", "")
+        co_dict  = closing_odds_map[gk]
+        # Match to away or home closing line
+        if bet_on == away_t:
+            close = co_dict.get("away")
+        else:
+            close = co_dict.get("home")
+        if close is None:
+            continue
+
+        def _to_prob(american):
+            american = int(american)
+            if american > 0:
+                return 100 / (american + 100)
+            else:
+                return abs(american) / (abs(american) + 100)
+
+        try:
+            open_prob  = _to_prob(row["odds"])
+            close_prob = _to_prob(close)
+            clv = round((open_prob - close_prob) * 100, 2)  # pp better than close
+            row["closing_odds"] = close
+            row["clv"]          = clv
+            updated += 1
+        except Exception:
+            continue
+
+    if updated:
+        _write_all(rows)
+    return updated
 
 
 def get_all_bets():

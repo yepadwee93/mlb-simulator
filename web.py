@@ -38,7 +38,7 @@ from data.mlb_api import (
     get_game_umpire,
     get_team_bullpen_usage,
 )
-from simulation.engine import run_simulation, predict_pitcher_ks
+from simulation.engine import run_simulation, predict_pitcher_ks, detect_pitcher_form
 
 app = Flask(__name__, template_folder="app/templates")
 
@@ -123,6 +123,24 @@ def build_game_result(game, n_sims, use_splits=True):
         # Fast mode: just use season totals (good enough for parlay overview)
         away_batter_stats = [get_player_season_stats(b["id"], group="hitting") if b.get("id") else {} for b in lineup["away_batters"]]
         home_batter_stats = [get_player_season_stats(b["id"], group="hitting") if b.get("id") else {} for b in lineup["home_batters"]]
+
+    # Platoon matchup score
+    def _platoon_score(batter_stats_list):
+        scores = []
+        for s in batter_stats_list:
+            if not s:
+                continue
+            ops = (float(s.get("obp", 0) or 0) + float(s.get("slg", 0) or 0))
+            if ops > 0:
+                scores.append(ops)
+        if not scores:
+            return 50
+        avg_ops = sum(scores) / len(scores)
+        return int(min(100, max(0, (avg_ops / 0.720) * 50)))
+
+    away_platoon_score = _platoon_score(away_batter_stats)
+    home_platoon_score = _platoon_score(home_batter_stats)
+    platoon_edge = away_platoon_score - home_platoon_score
 
     # Fetch pitcher season stats + team bullpen stats + last 10 starts in parallel
     def _fetch_pitcher_and_bullpen(pitcher_id, team_id):
@@ -252,6 +270,50 @@ def build_game_result(game, n_sims, use_splits=True):
         away_bp_fatigue = None
         home_bp_fatigue = None
 
+    # ── Injury / IL alerts ────────────────────────────────────────────
+    try:
+        away_il = get_team_il_players(game["away_id"])
+        home_il = get_team_il_players(game["home_id"])
+        away_transactions = get_recent_transactions(game["away_id"], days_back=3)
+        home_transactions = get_recent_transactions(game["home_id"], days_back=3)
+    except Exception:
+        away_il = home_il = away_transactions = home_transactions = []
+
+    # ── Series context ────────────────────────────────────────────────
+    try:
+        series_game_num = get_series_game_number(
+            game["gamePk"], game["away_id"], game["home_id"])
+    except Exception:
+        series_game_num = 1
+
+    # ── Lineup confirmation status ───────────────────────────────────
+    try:
+        lineup_status = get_lineup_status(game["gamePk"])
+    except Exception:
+        lineup_status = "unknown"
+
+    # ── Team streaks ─────────────────────────────────────────────────
+    try:
+        away_streak = get_team_streak(game["away_id"])
+        home_streak = get_team_streak(game["home_id"])
+    except Exception:
+        away_streak = home_streak = {"streak": 0, "type": "", "label": "", "hot": False, "cold": False}
+
+    # ── Catcher arm ratings ───────────────────────────────────────────
+    try:
+        away_catcher_cs = get_catcher_cs_rate(game["away_id"])
+        home_catcher_cs = get_catcher_cs_rate(game["home_id"])
+    except Exception:
+        away_catcher_cs = home_catcher_cs = 0.28
+
+    # ── Bullpen depth scores ──────────────────────────────────────────
+    try:
+        away_bp_depth = get_bullpen_depth_score(game["away_id"])
+        home_bp_depth = get_bullpen_depth_score(game["home_id"])
+    except Exception:
+        away_bp_depth = home_bp_depth = {"score": 50, "grade": "Average",
+            "reliable_arms": 0, "elite_arms": 0, "avg_era": 4.20, "avg_whip": 1.30}
+
     # Fetch umpire for K/BB tendency modifier
     try:
         umpire_name = get_game_umpire(game["gamePk"])
@@ -317,11 +379,16 @@ def build_game_result(game, n_sims, use_splits=True):
         umpire_name         = umpire_name,
         away_bp_fatigue     = away_bp_fatigue,
         home_bp_fatigue     = home_bp_fatigue,
+        series_game_number  = series_game_num,
+        away_catcher_cs     = away_catcher_cs,
+        home_catcher_cs     = home_catcher_cs,
         n                   = n_sims,
     )
 
     # ── Pitcher K prop predictions ──────────────────────────────────────
     try:
+        away_form = detect_pitcher_form(away_pitcher_log, away_pitcher_stats)
+        home_form = detect_pitcher_form(home_pitcher_log, home_pitcher_stats)
         away_k_pred = predict_pitcher_ks(
             away_pitcher_stats, home_batter_stats,
             umpire_name=umpire_name,
@@ -336,8 +403,62 @@ def build_game_result(game, n_sims, use_splits=True):
         )
     except Exception:
         away_k_pred = {}
+        away_form = {"form": "stable", "note": "", "modifier": 1.0}
+        home_form = {"form": "stable", "note": "", "modifier": 1.0}
         home_k_pred = {}
     result["away_k_pred"] = away_k_pred
+    result["away_form"]      = away_form
+    result["home_form"]      = home_form
+    result["away_platoon"]   = away_platoon_score
+    result["home_platoon"]   = home_platoon_score
+    result["platoon_edge"]   = platoon_edge
+    result["away_hand"]      = away_hand
+    result["home_hand"]      = home_hand
+    result["hr_park_factor"] = round(
+        __import__("simulation.engine", fromlist=["BALLPARK_FACTORS"]).BALLPARK_FACTORS
+        .get(game.get("venue",""), {}).get("hr", 1.0), 2)
+    result["wind_effect"]    = weather.get("wind_effect", "neutral") if weather else "neutral"
+    result["lineup_status"]  = lineup_status
+    result["wind_label"]     = weather.get("wind_label", "") if weather else ""
+
+    # ── Last start mini-recap ──────────────────────────────────────────
+    def _last_start(log):
+        if not log:
+            return None
+        g = log[-1]
+        ip = g.get("inningsPitched") or g.get("ip") or ""
+        er = g.get("earnedRuns", "") 
+        ks = g.get("strikeOuts", "")
+        opp = g.get("opponent", "") or g.get("opp", "")
+        dt = g.get("date", "")
+        parts = []
+        if ip: parts.append(f"{ip} IP")
+        if er != "": parts.append(f"{er} ER")
+        if ks != "": parts.append(f"{ks} K")
+        if opp: parts.append(f"vs {opp}")
+        from datetime import datetime as _dt, date as _d
+        if dt:
+            try:
+                d = _dt.strptime(dt[:10], "%Y-%m-%d").date()
+                days = (_d.today() - d).days
+                parts.append(f"{days}d ago")
+            except Exception:
+                pass
+        return ", ".join(parts) if parts else None
+
+    result["away_last_start"] = _last_start(away_pitcher_log)
+    result["home_last_start"] = _last_start(home_pitcher_log)
+    result["away_streak"]     = away_streak
+    result["home_streak"]     = home_streak
+    result["series_game_num"]   = series_game_num
+    result["away_catcher_cs"]   = away_catcher_cs
+    result["home_catcher_cs"]   = home_catcher_cs
+    result["away_bp_depth"]     = away_bp_depth
+    result["home_bp_depth"]     = home_bp_depth
+    result["away_il"]           = away_il
+    result["home_il"]           = home_il
+    result["away_transactions"] = away_transactions
+    result["home_transactions"] = home_transactions
     result["home_k_pred"] = home_k_pred
 
     # Attach IDs for logo/headshot URLs in templates
@@ -579,6 +700,10 @@ def simulate(game_pk):
         result["away_kelly"]       = calc_kelly(result["away_win_pct"], game_odds["away_avg_odds"])
         result["home_kelly"]       = calc_kelly(result["home_win_pct"], game_odds["home_avg_odds"])
         result["books_used"]       = game_odds["books_used"]
+        result["best_away_odds"]   = format_odds(game_odds.get("best_away_odds", game_odds["away_avg_odds"]))
+        result["best_home_odds"]   = format_odds(game_odds.get("best_home_odds", game_odds["home_avg_odds"]))
+        result["best_away_book"]   = game_odds.get("best_away_book", "")
+        result["best_home_book"]   = game_odds.get("best_home_book", "")
     else:
         result["away_implied_pct"] = None
         result["home_implied_pct"] = None
@@ -831,6 +956,26 @@ def simulate_all():
         combined_prob *= pick["win_pct"] / 100.0
     combined_prob_pct = round(combined_prob * 100, 1)
 
+    # ── Parlay EV calculator ──────────────────────────────────────────
+    parlay_ev = None
+    parlay_true_odds = None
+    parlay_book_odds = None
+    if len(parlay_picks) >= 2:
+        true_decimal = 1.0
+        for pick in parlay_picks:
+            true_decimal *= 1.0 / (pick["win_pct"] / 100.0)
+        book_decimal = 1.909 ** len(parlay_picks)
+        parlay_ev = round(combined_prob * (book_decimal - 1) * 100
+                          - (1 - combined_prob) * 100, 1)
+        if true_decimal >= 2.0:
+            parlay_true_odds = "+" + str(int((true_decimal - 1) * 100))
+        else:
+            parlay_true_odds = "-" + str(int(100 / (true_decimal - 1)))
+        if book_decimal >= 2.0:
+            parlay_book_odds = "+" + str(int((book_decimal - 1) * 100))
+        else:
+            parlay_book_odds = "-" + str(int(100 / (book_decimal - 1)))
+
     # ── Confidence-tiered best bets ───────────────────────────────────
     # Only show games where the model has enough conviction to matter.
     # 62-64% = moderate edge, 65-69% = good, 70%+ = strong lean
@@ -954,8 +1099,11 @@ def simulate_all():
     return render_template(
         "all_results.html",
         results       = results,
-        parlay_picks  = parlay_picks,
-        combined_prob = combined_prob_pct,
+        parlay_picks      = parlay_picks,
+        combined_prob     = combined_prob_pct,
+        parlay_ev         = parlay_ev,
+        parlay_true_odds  = parlay_true_odds,
+        parlay_book_odds  = parlay_book_odds,
         best_bets     = best_bets,
         date          = today,
         n_sims        = N_SIMS_ALL,

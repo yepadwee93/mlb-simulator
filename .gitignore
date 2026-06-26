@@ -3,3 +3,8 @@ __pycache__/
 *.pyc
 .env
 *.log
+
+data/_odds_cache/
+data/bets.csv
+data/my_picks.csv
+data/line_movement.json
