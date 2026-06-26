@@ -7,7 +7,7 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      background: #0f1117;
+      background: #0d1120;
       color: #e8eaf0;
       font-family: 'Segoe UI', Arial, sans-serif;
       min-height: 100vh;
@@ -16,11 +16,11 @@
     .back-link { display:inline-block; margin-bottom:28px; color:#64b5f6; text-decoration:none; font-size:0.9rem; }
     .back-link:hover { text-decoration:underline; }
     h1 { font-size:1.6rem; font-weight:800; margin-bottom:6px; }
-    .subtitle { color:#8890a4; font-size:0.88rem; margin-bottom:32px; }
+    .subtitle { color:#b0b8cc; font-size:0.88rem; margin-bottom:32px; }
 
     .card {
-      background: #1a1d27;
-      border: 1px solid #2a2d3a;
+      background: #1e2235;
+      border: 1px solid #353a52;
       border-radius: 14px;
       padding: 24px 28px;
       max-width: 900px;
@@ -29,25 +29,25 @@
 
     .section-title {
       font-size:0.72rem; text-transform:uppercase; letter-spacing:0.8px;
-      color:#8890a4; margin-bottom:16px; font-weight:600;
+      color:#b0b8cc; margin-bottom:16px; font-weight:600;
     }
 
     /* ── Stats tiles ── */
     .stat-tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:14px; }
-    .tile { background:#0f1117; border-radius:10px; padding:16px; text-align:center; }
+    .tile { background:#0d1120; border-radius:10px; padding:16px; text-align:center; }
     .tile-val { font-size:2rem; font-weight:800; line-height:1; }
-    .tile-lbl { font-size:0.72rem; color:#8890a4; margin-top:6px; text-transform:uppercase; letter-spacing:0.4px; }
+    .tile-lbl { font-size:0.72rem; color:#b0b8cc; margin-top:6px; text-transform:uppercase; letter-spacing:0.4px; }
     .green { color:#4caf50; } .yellow { color:#ffd54f; } .red { color:#ef5350; }
     .blue { color:#64b5f6; } .purple { color:#ce93d8; }
 
     /* ── Add pick form ── */
     .pick-form { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
     .pick-form select, .pick-form input[type=text] {
-      width:100%; padding:10px 12px; background:#0f1117; border:1px solid #2a2d3a;
+      width:100%; padding:10px 12px; background:#0d1120; border:1px solid #353a52;
       border-radius:8px; color:#e8eaf0; font-size:0.88rem;
     }
     .pick-form select:focus, .pick-form input:focus { outline:none; border-color:#64b5f6; }
-    .pick-form label { font-size:0.78rem; color:#8890a4; margin-bottom:5px; display:block; }
+    .pick-form label { font-size:0.78rem; color:#b0b8cc; margin-bottom:5px; display:block; }
     .full-width { grid-column: 1 / -1; }
 
     .submit-btn {
@@ -59,10 +59,10 @@
     /* ── Picks table ── */
     .picks-table { width:100%; border-collapse:collapse; font-size:0.83rem; }
     .picks-table th {
-      text-align:left; color:#555870; font-size:0.7rem; text-transform:uppercase;
-      letter-spacing:0.5px; padding:6px 0; border-bottom:1px solid #2a2d3a;
+      text-align:left; color:#9aa0b8; font-size:0.7rem; text-transform:uppercase;
+      letter-spacing:0.5px; padding:6px 0; border-bottom:1px solid #353a52;
     }
-    .picks-table td { padding:10px 0; border-bottom:1px solid #1a1d27; vertical-align:middle; }
+    .picks-table td { padding:10px 0; border-bottom:1px solid #1e2235; vertical-align:middle; }
 
     .badge {
       display:inline-block; padding:2px 8px; border-radius:5px;
@@ -70,7 +70,7 @@
     }
     .badge.correct  { background:#1b4332; color:#4caf50; }
     .badge.wrong    { background:#3b1f1f; color:#ef5350; }
-    .badge.pending  { background:#2a2d3a; color:#8890a4; }
+    .badge.pending  { background:#353a52; color:#b0b8cc; }
     .badge.sim-win  { background:#1a237e; color:#90caf9; }
     .badge.sim-diff { background:#3b1f1f; color:#ef9a9a; }
 
@@ -78,10 +78,10 @@
       padding:9px 18px; background:#2563eb; color:#fff; font-weight:700;
       border-radius:8px; border:none; cursor:pointer; font-size:0.85rem;
     }
-    .update-btn:disabled { background:#2a2d3a; color:#555870; cursor:default; }
+    .update-btn:disabled { background:#353a52; color:#9aa0b8; cursor:default; }
     .update-btn:hover:not(:disabled) { background:#1d4ed8; }
 
-    .no-picks { text-align:center; padding:40px 0; color:#555870; }
+    .no-picks { text-align:center; padding:40px 0; color:#9aa0b8; }
   </style>
 </head>
 <body>
@@ -154,10 +154,10 @@
         <label>Notes (optional — e.g. "bullpen edge", "starter is struggling")</label>
         <input type="text" id="my-notes" placeholder="Why are you picking this team?">
       </div>
-      <div class="full-width" id="sim-preview" style="display:none; padding:12px; background:#0f1117; border-radius:8px;">
-        <div style="font-size:0.75rem; color:#8890a4; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">Simulator says</div>
+      <div class="full-width" id="sim-preview" style="display:none; padding:12px; background:#0d1120; border-radius:8px;">
+        <div style="font-size:0.75rem; color:#b0b8cc; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">Simulator says</div>
         <div id="sim-preview-text" style="font-size:0.9rem;"></div>
-        <div style="font-size:0.72rem; color:#555870; margin-top:4px;">Run a simulation first on the game page to load sim data here.</div>
+        <div style="font-size:0.72rem; color:#9aa0b8; margin-top:4px;">Run a simulation first on the game page to load sim data here.</div>
       </div>
       <div class="full-width">
         <button type="button" class="submit-btn" onclick="submitPick()">🎯 Log My Pick</button>
@@ -173,7 +173,7 @@
     <div class="section-title" style="margin-bottom:0;">All Picks</div>
     <div>
       <button class="update-btn" id="update-btn" onclick="checkResults()">🔄 Check Results</button>
-      <span id="update-msg" style="font-size:0.78rem; color:#8890a4; margin-left:8px;"></span>
+      <span id="update-msg" style="font-size:0.78rem; color:#b0b8cc; margin-left:8px;"></span>
     </div>
   </div>
 
@@ -194,7 +194,7 @@
     <tbody>
       {% for r in all_picks %}
       <tr>
-        <td style="color:#8890a4; white-space:nowrap; font-size:0.78rem;">{{ r.game_date }}</td>
+        <td style="color:#b0b8cc; white-space:nowrap; font-size:0.78rem;">{{ r.game_date }}</td>
         <td style="font-size:0.8rem;">{{ r.away_team }} @ {{ r.home_team }}</td>
         <td style="font-weight:600; color:#ce93d8;">{{ r.my_pick }}</td>
         <td>
@@ -203,15 +203,15 @@
               {{ r.sim_pick }}
             </span>
           {% else %}
-            <span style="color:#555870;">—</span>
+            <span style="color:#9aa0b8;">—</span>
           {% endif %}
         </td>
-        <td style="font-size:0.78rem; color:#8890a4;">
+        <td style="font-size:0.78rem; color:#b0b8cc;">
           {% if r.sim_away_pct and r.sim_home_pct %}
             {{ r.away_team[:3] | upper }} {{ r.sim_away_pct }}% / {{ r.home_team[:3] | upper }} {{ r.sim_home_pct }}%
           {% else %}—{% endif %}
         </td>
-        <td style="font-size:0.78rem; color:#8890a4;">
+        <td style="font-size:0.78rem; color:#b0b8cc;">
           {% if r.sim_away_runs and r.sim_home_runs %}
             {{ r.sim_away_runs }}–{{ r.sim_home_runs }}
           {% else %}—{% endif %}
@@ -220,10 +220,10 @@
           {% if r.actual_away_runs != '' %}
             <strong>{{ r.actual_away_runs }}–{{ r.actual_home_runs }}</strong>
             {% if r.run_diff_error != '' %}
-              <span style="color:#555870; font-size:0.72rem; margin-left:4px;">(±{{ r.run_diff_error }} runs off)</span>
+              <span style="color:#9aa0b8; font-size:0.72rem; margin-left:4px;">(±{{ r.run_diff_error }} runs off)</span>
             {% endif %}
           {% else %}
-            <span style="color:#555870;">Pending</span>
+            <span style="color:#9aa0b8;">Pending</span>
           {% endif %}
         </td>
         <td>
@@ -238,7 +238,7 @@
       </tr>
       {% if r.my_notes %}
       <tr>
-        <td colspan="8" style="color:#555870; font-size:0.75rem; padding-top:0; padding-bottom:8px; border-bottom:1px solid #1a1d27;">
+        <td colspan="8" style="color:#9aa0b8; font-size:0.75rem; padding-top:0; padding-bottom:8px; border-bottom:1px solid #1e2235;">
           📝 {{ r.my_notes }}
         </td>
       </tr>
@@ -288,7 +288,7 @@ function onGameSelect() {
     previewText.innerHTML =
       '<strong style="color:#64b5f6;">' + simWinner + '</strong> to win — ' +
       away + ' ' + cached.away_pct + '% / ' + home + ' ' + cached.home_pct + '%' +
-      '<br><span style="color:#8890a4;">Predicted: ' + cached.away_runs + '–' + cached.home_runs + '</span>';
+      '<br><span style="color:#b0b8cc;">Predicted: ' + cached.away_runs + '–' + cached.home_runs + '</span>';
     preview.style.display = 'block';
   } else {
     preview.style.display = 'none';
@@ -359,7 +359,7 @@ function checkResults() {
         setTimeout(function() { window.location.reload(); }, 1200);
       } else {
         msg.textContent = 'No new results yet.';
-        msg.style.color = '#8890a4';
+        msg.style.color = '#b0b8cc';
         btn.disabled = false;
         btn.textContent = '🔄 Check Results';
       }

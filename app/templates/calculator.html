@@ -6,27 +6,27 @@
   <title>Bet Calculator — MLB Simulator</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #0f1117; color: #e8eaf0; font-family: 'Segoe UI', Arial, sans-serif; padding: 32px 20px; }
+    body { background: #0d1120; color: #e8eaf0; font-family: 'Segoe UI', Arial, sans-serif; padding: 32px 20px; }
     a { color: #64b5f6; text-decoration: none; } a:hover { text-decoration: underline; }
     .back { display: inline-block; margin-bottom: 24px; font-size: 0.9rem; }
     h1 { font-size: 1.6rem; font-weight: 800; margin-bottom: 6px; }
-    .subtitle { color: #8890a4; font-size: 0.9rem; margin-bottom: 28px; }
+    .subtitle { color: #b0b8cc; font-size: 0.9rem; margin-bottom: 28px; }
     nav { display: flex; gap: 16px; margin-bottom: 28px; flex-wrap: wrap; }
-    nav a { font-size: 0.82rem; color: #8890a4; padding: 5px 12px; border-radius: 6px; border: 1px solid #252836; }
-    nav a:hover { color: #e8eaf0; border-color: #555870; text-decoration: none; }
-    .card { background: #161923; border: 1px solid #252836; border-radius: 14px; padding: 24px 28px; margin-bottom: 24px; max-width: 600px; }
-    .card h2 { font-size: 1rem; font-weight: 700; margin-bottom: 18px; color: #c8cdd8; }
+    nav a { font-size: 0.82rem; color: #b0b8cc; padding: 5px 12px; border-radius: 6px; border: 1px solid #252836; }
+    nav a:hover { color: #e8eaf0; border-color: #9aa0b8; text-decoration: none; }
+    .card { background: #1a1e2e; border: 1px solid #252836; border-radius: 14px; padding: 24px 28px; margin-bottom: 24px; max-width: 600px; }
+    .card h2 { font-size: 1rem; font-weight: 700; margin-bottom: 18px; color: #d8dce8; }
     .row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
-    label { display: block; font-size: 0.68rem; color: #8890a4; text-transform: uppercase; letter-spacing: .4px; margin-bottom: 5px; }
-    input { width: 100%; background: #0f1117; border: 1px solid #333650; border-radius: 8px; color: #e8eaf0; padding: 9px 12px; font-size: 0.9rem; }
+    label { display: block; font-size: 0.68rem; color: #b0b8cc; text-transform: uppercase; letter-spacing: .4px; margin-bottom: 5px; }
+    input { width: 100%; background: #0d1120; border: 1px solid #333650; border-radius: 8px; color: #e8eaf0; padding: 9px 12px; font-size: 0.9rem; }
     input:focus { outline: none; border-color: #64b5f6; }
     .results-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-top: 18px; }
-    .res-card { background: #0f1117; border-radius: 10px; padding: 14px; text-align: center; }
-    .res-label { font-size: 0.65rem; color: #8890a4; text-transform: uppercase; letter-spacing: .4px; margin-bottom: 6px; }
+    .res-card { background: #0d1120; border-radius: 10px; padding: 14px; text-align: center; }
+    .res-label { font-size: 0.65rem; color: #b0b8cc; text-transform: uppercase; letter-spacing: .4px; margin-bottom: 6px; }
     .res-val { font-size: 1.2rem; font-weight: 800; }
     .green { color: #4caf50; } .red { color: #ef5350; } .blue { color: #64b5f6; } .gold { color: #ffa726; }
     .divider { border: none; border-top: 1px solid #252836; margin: 20px 0; }
-    .hint { font-size: 0.72rem; color: #555870; margin-top: 8px; }
+    .hint { font-size: 0.72rem; color: #9aa0b8; margin-top: 8px; }
   </style>
 </head>
 <body>
@@ -72,7 +72,7 @@
 
 <div class="card">
   <h2>Parlay Calculator</h2>
-  <p style="font-size:0.82rem;color:#8890a4;margin-bottom:16px;">Add up to 8 legs. Paste American odds for each.</p>
+  <p style="font-size:0.82rem;color:#b0b8cc;margin-bottom:16px;">Add up to 8 legs. Paste American odds for each.</p>
   <div id="legs">
     <div class="row" style="grid-template-columns:1fr 1fr auto;gap:10px;margin-bottom:10px;">
       <div><label>Leg 1 Odds</label><input class="leg-odds" type="number" value="-110" oninput="calcParlay()"></div>
@@ -147,7 +147,7 @@ function calc() {
     <div class="res-card"><div class="res-label">Flat (1 unit)</div>
       <div class="res-val">$${flatBet.toFixed(0)}</div></div>
     <div class="res-card"><div class="res-label">½ Unit</div>
-      <div class="res-val" style="color:#8890a4;">$${fractionalBet.toFixed(0)}</div></div>
+      <div class="res-val" style="color:#b0b8cc;">$${fractionalBet.toFixed(0)}</div></div>
   `;
 
   document.getElementById('ev-note').textContent = ev > 0

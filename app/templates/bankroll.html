@@ -6,31 +6,31 @@
   <title>Bankroll — MLB Simulator</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #0f1117; color: #e8eaf0; font-family: 'Segoe UI', Arial, sans-serif; padding: 32px 20px; }
+    body { background: #0d1120; color: #e8eaf0; font-family: 'Segoe UI', Arial, sans-serif; padding: 32px 20px; }
     a { color: #64b5f6; text-decoration: none; } a:hover { text-decoration: underline; }
     .back { display: inline-block; margin-bottom: 24px; font-size: 0.9rem; }
     h1 { font-size: 1.6rem; font-weight: 800; margin-bottom: 6px; }
-    .subtitle { color: #8890a4; font-size: 0.9rem; margin-bottom: 28px; }
+    .subtitle { color: #b0b8cc; font-size: 0.9rem; margin-bottom: 28px; }
     .green { color: #4caf50; } .red { color: #ef5350; } .blue { color: #64b5f6; } .gold { color: #ffa726; }
     .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 28px; }
-    .stat-card { background: #161923; border: 1px solid #252836; border-radius: 12px; padding: 14px 16px; }
-    .stat-label { font-size: 0.68rem; color: #8890a4; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
+    .stat-card { background: #1a1e2e; border: 1px solid #252836; border-radius: 12px; padding: 14px 16px; }
+    .stat-label { font-size: 0.68rem; color: #b0b8cc; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
     .stat-val { font-size: 1.4rem; font-weight: 800; }
-    .section { background: #161923; border: 1px solid #252836; border-radius: 14px; padding: 20px 24px; margin-bottom: 24px; }
-    .section-title { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: #8890a4; margin-bottom: 14px; }
+    .section { background: #1a1e2e; border: 1px solid #252836; border-radius: 14px; padding: 20px 24px; margin-bottom: 24px; }
+    .section-title { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: #b0b8cc; margin-bottom: 14px; }
     .setup-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
-    .setup-row label { font-size: 0.8rem; color: #8890a4; }
-    .setup-row input { background: #0f1117; border: 1px solid #333650; border-radius: 8px; color: #e8eaf0; padding: 8px 12px; font-size: 0.9rem; width: 120px; }
+    .setup-row label { font-size: 0.8rem; color: #b0b8cc; }
+    .setup-row input { background: #0d1120; border: 1px solid #333650; border-radius: 8px; color: #e8eaf0; padding: 8px 12px; font-size: 0.9rem; width: 120px; }
     .btn { background: #1a3a5a; color: #64b5f6; border: 1px solid #1565c0; border-radius: 8px; padding: 8px 18px; font-size: 0.85rem; font-weight: 700; cursor: pointer; }
     .btn:hover { background: #1e4a70; }
     nav { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
-    nav a { font-size: 0.82rem; color: #8890a4; padding: 5px 12px; border-radius: 6px; border: 1px solid #252836; }
-    nav a:hover { color: #e8eaf0; border-color: #555870; text-decoration: none; }
+    nav a { font-size: 0.82rem; color: #b0b8cc; padding: 5px 12px; border-radius: 6px; border: 1px solid #252836; }
+    nav a:hover { color: #e8eaf0; border-color: #9aa0b8; text-decoration: none; }
     .proj-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-top: 16px; }
-    .proj-card { background: #0f1117; border-radius: 10px; padding: 14px; text-align: center; }
-    .proj-period { font-size: 0.7rem; color: #8890a4; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+    .proj-card { background: #0d1120; border-radius: 10px; padding: 14px; text-align: center; }
+    .proj-period { font-size: 0.7rem; color: #b0b8cc; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
     .proj-val { font-size: 1.2rem; font-weight: 800; }
-    .drawdown-bar-wrap { background: #0f1117; border-radius: 4px; height: 10px; overflow: hidden; margin-top: 6px; }
+    .drawdown-bar-wrap { background: #0d1120; border-radius: 4px; height: 10px; overflow: hidden; margin-top: 6px; }
     .drawdown-bar { height: 100%; background: #ef5350; border-radius: 4px; }
   </style>
 </head>
@@ -53,7 +53,7 @@
   <div class="section-title">Setup</div>
   <div class="setup-row">
     <label>Starting Bankroll:</label>
-    <span style="color:#8890a4;">$</span>
+    <span style="color:#b0b8cc;">$</span>
     <input id="start-br" type="number" value="1000" min="1">
     <button class="btn" onclick="saveBankroll()">Save & Recalculate</button>
     <span id="br-msg" style="font-size:0.78rem;color:#4caf50;"></span>
@@ -172,7 +172,7 @@ function recalculate(startBR) {
         }, {
           label: 'Starting Bankroll',
           data: Array(balances.length).fill(startBR),
-          borderColor: '#555870',
+          borderColor: '#9aa0b8',
           borderDash: [4,4],
           pointRadius: 0,
           fill: false,
@@ -182,10 +182,10 @@ function recalculate(startBR) {
         responsive: true,
         interaction: { mode: 'index' },
         scales: {
-          y: { grid: { color: '#1a1d28' }, ticks: { color: '#8890a4', callback: v => '$' + v } },
-          x: { ticks: { color: '#8890a4', font: { size: 9 }, maxRotation: 45, maxTicksLimit: 12 }, grid: { display: false } }
+          y: { grid: { color: '#1a1d28' }, ticks: { color: '#b0b8cc', callback: v => '$' + v } },
+          x: { ticks: { color: '#b0b8cc', font: { size: 9 }, maxRotation: 45, maxTicksLimit: 12 }, grid: { display: false } }
         },
-        plugins: { legend: { labels: { color: '#8890a4' } } }
+        plugins: { legend: { labels: { color: '#b0b8cc' } } }
       }
     });
 
@@ -209,12 +209,12 @@ function recalculate(startBR) {
       return `<div class="proj-card">
         <div class="proj-period">${p.label}</div>
         <div class="proj-val ${diff >= 0 ? 'green' : 'red'}">$${proj.toFixed(0)}</div>
-        <div style="font-size:0.7rem;color:#8890a4;margin-top:3px;">${diff >= 0 ? '+' : ''}$${diff.toFixed(0)}</div>
+        <div style="font-size:0.7rem;color:#b0b8cc;margin-top:3px;">${diff >= 0 ? '+' : ''}$${diff.toFixed(0)}</div>
       </div>`;
     }).join('');
 
     if (settled.length === 0) {
-      document.getElementById('br-stats').innerHTML += `<div style="grid-column:1/-1;color:#555870;font-size:0.82rem;padding:8px 0;">Log settled bets in the Bet Tracker to see your bankroll curve.</div>`;
+      document.getElementById('br-stats').innerHTML += `<div style="grid-column:1/-1;color:#9aa0b8;font-size:0.82rem;padding:8px 0;">Log settled bets in the Bet Tracker to see your bankroll curve.</div>`;
     }
   });
 }
