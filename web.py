@@ -26,9 +26,12 @@ from data.mlb_api import (
     get_player_recent_stats,
     get_batter_split_stats,
     get_batter_sitcode_stats,
+    get_batter_risp_stats,
     get_pitcher_hand,
     get_ballpark_weather,
     get_team_bullpen_stats,
+    get_pitcher_game_log,
+    get_batter_vs_pitcher,
 )
 from simulation.engine import run_simulation
 
@@ -36,7 +39,8 @@ app = Flask(__name__, template_folder="app/templates")
 
 N_SIMS_SINGLE = 100_000   # simulations for one-game view
 N_SIMS_ALL    =  25_000   # simulations per game in simulate-all (faster)
-PARLAY_THRESHOLD = 60.0   # min win % to include in best parlay
+PARLAY_THRESHOLD  = 65.0   # min win % to include in best parlay
+BET_THRESHOLD     = 62.0   # min win % to show in best bets section
 
 
 # ── Shared helpers ────────────────────────────────────────────────
@@ -65,6 +69,23 @@ def fetch_batter_stats_with_splits(batters, pitcher_hand):
         except Exception:
             stats_list.append(get_player_season_stats(b["id"], group="hitting"))
     return stats_list
+
+
+def _get_day_night(game_time_str):
+    """
+    Returns 'd' (day) or 'n' (night) based on the game's UTC start time.
+    Day games typically start before 5:30pm ET (21:30 UTC).
+    Night games start 6pm ET or later (22:00+ UTC).
+    """
+    if not game_time_str:
+        return "n"
+    try:
+        from datetime import datetime as dt
+        utc_hour = dt.fromisoformat(game_time_str.replace("Z", "+00:00")).hour
+        # 16-21 UTC = roughly 12pm-5pm ET = day game
+        return "d" if 16 <= utc_hour < 22 else "n"
+    except Exception:
+        return "n"
 
 
 def build_game_result(game, n_sims, use_splits=True):
@@ -98,19 +119,38 @@ def build_game_result(game, n_sims, use_splits=True):
         away_batter_stats = [get_player_season_stats(b["id"], group="hitting") if b.get("id") else {} for b in lineup["away_batters"]]
         home_batter_stats = [get_player_season_stats(b["id"], group="hitting") if b.get("id") else {} for b in lineup["home_batters"]]
 
-    # Fetch pitcher season stats + team bullpen stats in parallel
+    # Fetch pitcher season stats + team bullpen stats + last 10 starts in parallel
     def _fetch_pitcher_and_bullpen(pitcher_id, team_id):
-        sp    = get_player_season_stats(pitcher_id, group="pitching") if pitcher_id else {}
-        bp    = get_team_bullpen_stats(team_id) if team_id else {"era": "4.20", "whip": "1.30"}
-        return sp, bp
+        sp  = get_player_season_stats(pitcher_id, group="pitching") if pitcher_id else {}
+        bp  = get_team_bullpen_stats(team_id) if team_id else {"era": "4.20", "whip": "1.30"}
+        log = get_pitcher_game_log(pitcher_id, num_games=10) if pitcher_id else []
+        return sp, bp, log
 
     with ThreadPoolExecutor(max_workers=2) as ex:
         away_p_future = ex.submit(_fetch_pitcher_and_bullpen,
                                   away_pitcher.get("id"), game.get("away_id"))
         home_p_future = ex.submit(_fetch_pitcher_and_bullpen,
                                   home_pitcher.get("id"), game.get("home_id"))
-        away_pitcher_stats, away_bullpen_stats = away_p_future.result()
-        home_pitcher_stats, home_bullpen_stats = home_p_future.result()
+        away_pitcher_stats, away_bullpen_stats, away_pitcher_log = away_p_future.result()
+        home_pitcher_stats, home_bullpen_stats, home_pitcher_log = home_p_future.result()
+
+    # Calculate days since each starter's last start
+    def _rest_days(game_log):
+        """Return days since the pitcher's most recent start, or None if unknown."""
+        if not game_log:
+            return None
+        last_date_str = game_log[-1].get("date", "")
+        if not last_date_str:
+            return None
+        try:
+            from datetime import datetime as dt
+            last_date = dt.strptime(last_date_str[:10], "%Y-%m-%d").date()
+            return (date.today() - last_date).days
+        except Exception:
+            return None
+
+    away_rest_days = _rest_days(away_pitcher_log)
+    home_rest_days = _rest_days(home_pitcher_log)
 
     # Fetch recent form + display splits for each batter — single-game mode only
     # In parallel we fetch: recent 20 games, vs LHP, vs RHP, vs SP, vs RP
@@ -120,11 +160,14 @@ def build_game_result(game, n_sims, use_splits=True):
     home_display_extra = []
 
     if use_splits:
-        def _fetch_all_batter_data(batter):
-            """Fetch recent form + all split types for one batter. Returns (recent, lhp, rhp, sp, rp)."""
+        day_night = _get_day_night(game.get("game_time", ""))
+
+        def _fetch_all_batter_data(batter, opp_pitcher_id=None):
+            """Fetch recent form + all split types + matchup history + day/night for one batter.
+            Returns (recent, lhp, rhp, sp, rp, risp, vs_pitcher, day_night_stat)."""
             pid = batter.get("id")
             if not pid:
-                return {}, {}, {}, {}, {}
+                return {}, {}, {}, {}, {}, {}, {}, {}
             try:
                 recent = get_player_recent_stats(pid, num_games=20)
             except Exception:
@@ -145,23 +188,40 @@ def build_game_result(game, n_sims, use_splits=True):
                 vs_rp = get_batter_sitcode_stats(pid, "vrp")
             except Exception:
                 vs_rp = {}
-            return recent, vs_lhp, vs_rhp, vs_sp, vs_rp
+            try:
+                risp = get_batter_risp_stats(pid)
+            except Exception:
+                risp = {}
+            try:
+                vs_pitcher = get_batter_vs_pitcher(pid, opp_pitcher_id) if opp_pitcher_id else {}
+            except Exception:
+                vs_pitcher = {}
+            try:
+                dn_stat = get_batter_sitcode_stats(pid, day_night)
+            except Exception:
+                dn_stat = {}
+            return recent, vs_lhp, vs_rhp, vs_sp, vs_rp, risp, vs_pitcher, dn_stat
 
-        all_batters = lineup["away_batters"] + lineup["home_batters"]
+        # Away batters face the HOME pitcher; home batters face the AWAY pitcher
         n_away = len(lineup["away_batters"])
+        home_pid = home_pitcher.get("id")
+        away_pid = away_pitcher.get("id")
 
         with ThreadPoolExecutor(max_workers=30) as ex:
-            futures = [ex.submit(_fetch_all_batter_data, b) for b in all_batters]
-            all_results_data = [f.result() for f in futures]
+            away_futures = [ex.submit(_fetch_all_batter_data, b, home_pid)
+                            for b in lineup["away_batters"]]
+            home_futures = [ex.submit(_fetch_all_batter_data, b, away_pid)
+                            for b in lineup["home_batters"]]
+            all_results_data = [f.result() for f in away_futures + home_futures]
 
         # Split results back into away and home
         away_data = all_results_data[:n_away]
         home_data = all_results_data[n_away:]
 
-        away_recent       = [d[0] for d in away_data]
-        home_recent       = [d[0] for d in home_data]
-        away_display_extra = [{"vs_lhp": d[1], "vs_rhp": d[2], "vs_sp": d[3], "vs_rp": d[4]} for d in away_data]
-        home_display_extra = [{"vs_lhp": d[1], "vs_rhp": d[2], "vs_sp": d[3], "vs_rp": d[4]} for d in home_data]
+        away_recent        = [d[0] for d in away_data]
+        home_recent        = [d[0] for d in home_data]
+        away_display_extra = [{"vs_lhp": d[1], "vs_rhp": d[2], "vs_sp": d[3], "vs_rp": d[4], "risp": d[5], "vs_pitcher": d[6], "day_night": d[7]} for d in away_data]
+        home_display_extra = [{"vs_lhp": d[1], "vs_rhp": d[2], "vs_sp": d[3], "vs_rp": d[4], "risp": d[5], "vs_pitcher": d[6], "day_night": d[7]} for d in home_data]
 
     # Fetch weather for this ballpark
     weather = get_ballpark_weather(game["venue"])
@@ -172,6 +232,18 @@ def build_game_result(game, n_sims, use_splits=True):
     away_rp_stats = [ex.get("vs_rp", {}) for ex in away_display_extra] if away_display_extra else None
     home_rp_stats = [ex.get("vs_rp", {}) for ex in home_display_extra] if home_display_extra else None
 
+    # Extract RISP stats — used in the sim whenever a runner is on 2nd or 3rd
+    away_risp_stats = [ex.get("risp", {}) for ex in away_display_extra] if away_display_extra else None
+    home_risp_stats = [ex.get("risp", {}) for ex in home_display_extra] if home_display_extra else None
+
+    # Extract matchup history stats — career stats for each batter vs the opposing starter
+    away_matchup_stats = [ex.get("vs_pitcher", {}) for ex in away_display_extra] if away_display_extra else None
+    home_matchup_stats = [ex.get("vs_pitcher", {}) for ex in home_display_extra] if home_display_extra else None
+
+    # Extract day/night splits
+    away_daynight_stats = [ex.get("day_night", {}) for ex in away_display_extra] if away_display_extra else None
+    home_daynight_stats = [ex.get("day_night", {}) for ex in home_display_extra] if home_display_extra else None
+
     # Run the simulation — all factors now wired in:
     #   - L/R pitcher splits (base stats)
     #   - Recent form blend (last 20 games)
@@ -179,21 +251,31 @@ def build_game_result(game, n_sims, use_splits=True):
     #   - Weather effects on HR (wind, temperature on top of park baseline)
     #   - SP vs RP: innings 1-5 starter, innings 6-9 bullpen
     result = run_simulation(
-        away_team        = game["away_team"],
-        home_team        = game["home_team"],
-        away_lineup      = away_batter_stats,
-        home_lineup      = home_batter_stats,
-        away_pitcher     = away_pitcher_stats,
-        home_pitcher     = home_pitcher_stats,
-        weather          = weather,
-        away_recent      = away_recent if use_splits else None,
-        home_recent      = home_recent if use_splits else None,
-        away_rp_stats    = away_rp_stats if use_splits else None,
-        home_rp_stats    = home_rp_stats if use_splits else None,
-        away_bullpen     = away_bullpen_stats,
-        home_bullpen     = home_bullpen_stats,
-        venue            = game["venue"],
-        n                = n_sims,
+        away_team         = game["away_team"],
+        home_team         = game["home_team"],
+        away_lineup       = away_batter_stats,
+        home_lineup       = home_batter_stats,
+        away_pitcher      = away_pitcher_stats,
+        home_pitcher      = home_pitcher_stats,
+        weather           = weather,
+        away_recent       = away_recent if use_splits else None,
+        home_recent       = home_recent if use_splits else None,
+        away_rp_stats     = away_rp_stats if use_splits else None,
+        home_rp_stats     = home_rp_stats if use_splits else None,
+        away_bullpen      = away_bullpen_stats,
+        home_bullpen      = home_bullpen_stats,
+        venue             = game["venue"],
+        away_pitcher_log  = away_pitcher_log,
+        home_pitcher_log  = home_pitcher_log,
+        away_rest_days    = away_rest_days,
+        home_rest_days    = home_rest_days,
+        away_risp_stats    = away_risp_stats   if use_splits else None,
+        home_risp_stats    = home_risp_stats   if use_splits else None,
+        away_matchup_stats  = away_matchup_stats  if use_splits else None,
+        home_matchup_stats  = home_matchup_stats  if use_splits else None,
+        away_daynight_stats = away_daynight_stats if use_splits else None,
+        home_daynight_stats = home_daynight_stats if use_splits else None,
+        n                 = n_sims,
     )
 
     # Build per-batter stat rows for display (season + recent + L/R + SP/RP)
@@ -204,10 +286,13 @@ def build_game_result(game, n_sims, use_splits=True):
             r    = recent_stats_list[i] if recent_stats_list and i < len(recent_stats_list) else {}
             ex   = extra_list[i] if extra_list and i < len(extra_list) else {}
 
-            vs_lhp = ex.get("vs_lhp", {})
-            vs_rhp = ex.get("vs_rhp", {})
-            vs_sp  = ex.get("vs_sp",  {})
-            vs_rp  = ex.get("vs_rp",  {})
+            vs_lhp      = ex.get("vs_lhp",      {})
+            vs_rhp      = ex.get("vs_rhp",      {})
+            vs_sp       = ex.get("vs_sp",       {})
+            vs_rp       = ex.get("vs_rp",       {})
+            risp        = ex.get("risp",        {})
+            vs_pitcher  = ex.get("vs_pitcher",  {})
+            dn_stat     = ex.get("day_night",   {})
 
             # Season: singles vs extra base hits
             hits    = s.get("hits", 0)
@@ -267,6 +352,20 @@ def build_game_result(game, n_sims, use_splits=True):
                 "recent_games": r.get("games_found", 0),
                 "recent_hr":    r.get("homeRuns", 0),
                 "recent_rbi":   r.get("rbi", 0),
+                # RISP / clutch stats
+                "risp_avg":        _fmt_avg(risp),
+                "risp_ops":        _fmt_ops(risp),
+                "risp_pa":         risp.get("plateAppearances", 0),
+                # Career matchup history vs this game's opposing starter
+                "vs_pitcher_avg":  _fmt_avg(vs_pitcher),
+                "vs_pitcher_ops":  _fmt_ops(vs_pitcher),
+                "vs_pitcher_pa":   vs_pitcher.get("plateAppearances", 0),
+                "vs_pitcher_hr":   vs_pitcher.get("homeRuns", 0),
+                # Day/night splits
+                "dn_avg":          _fmt_avg(dn_stat),
+                "dn_ops":          _fmt_ops(dn_stat),
+                "dn_pa":           dn_stat.get("plateAppearances", 0),
+                "dn_label":        "Day" if day_night == "d" else "Night",
             })
         return rows
 
@@ -300,6 +399,16 @@ def build_game_result(game, n_sims, use_splits=True):
         "home_wl":            f"{home_pitcher_stats.get('wins',0)}-{home_pitcher_stats.get('losses',0)}",
         "home_bp_era":        home_bullpen_stats.get("era",  "N/A"),
         "home_bp_whip":       home_bullpen_stats.get("whip", "N/A"),
+        # Pitcher fatigue profile (from last 10 starts game log)
+        "away_fatigue_label": result.get("away_fatigue_label", "Typical"),
+        "away_avg_ip":        result.get("away_avg_ip"),
+        "home_fatigue_label": result.get("home_fatigue_label", "Typical"),
+        "home_avg_ip":        result.get("home_avg_ip"),
+        # Pitcher rest days
+        "away_rest_days":     result.get("away_rest_days"),
+        "away_rest_type":     result.get("away_rest_type"),
+        "home_rest_days":     result.get("home_rest_days"),
+        "home_rest_type":     result.get("home_rest_type"),
         "away_batters":       away_display,
         "home_batters":       home_display,
         "weather":            weather,

@@ -410,9 +410,9 @@
 <div class="card">
   <div class="section-title">Starting Pitchers</div>
 
-  {% for pitcher_name, team_name, era, whip, wl, bp_era, bp_whip in [
-      (away_pitcher_name, away_team, away_era, away_whip, away_wl, away_bp_era, away_bp_whip),
-      (home_pitcher_name, home_team, home_era, home_whip, home_wl, home_bp_era, home_bp_whip)
+  {% for pitcher_name, team_name, era, whip, wl, bp_era, bp_whip, fatigue_label, avg_ip, rest_days, rest_type in [
+      (away_pitcher_name, away_team, away_era, away_whip, away_wl, away_bp_era, away_bp_whip, away_fatigue_label, away_avg_ip, away_rest_days, away_rest_type),
+      (home_pitcher_name, home_team, home_era, home_whip, home_wl, home_bp_era, home_bp_whip, home_fatigue_label, home_avg_ip, home_rest_days, home_rest_type)
   ] %}
   <div class="pitcher-row">
     <div>
@@ -437,8 +437,37 @@
       </div>
     </div>
   </div>
+  {% if avg_ip %}
+  <div style="padding: 4px 0 6px 0; font-size:0.77rem; color:#8890a4; border-top:1px solid #1e2130; margin-top:6px;">
+    ⏱ Fatigue (last 10 starts): avg
+    <strong style="color:#e8eaf0;">{{ avg_ip }} IP</strong> ·
+    {% if fatigue_label == 'Durable' %}
+      <span style="color:#4caf50;">{{ fatigue_label }} — minimal impact in innings 3-5</span>
+    {% elif fatigue_label == 'Moderate' %}
+      <span style="color:#ffd54f;">{{ fatigue_label }} — slight drop-off by innings 3-4</span>
+    {% elif fatigue_label == 'Tires in middle innings' %}
+      <span style="color:#ff9800;">{{ fatigue_label }} — bigger impact modeled in innings 3-5</span>
+    {% else %}
+      <span style="color:#ef5350;">{{ fatigue_label }} — significant fatigue impact modeled early</span>
+    {% endif %}
+  </div>
+  {% endif %}
+  {% if rest_days %}
+  <div style="padding: 2px 0 4px 0; font-size:0.77rem; color:#8890a4;">
+    💤 Rest:
+    {% if rest_type == 'short' %}
+      <strong style="color:#ef5350;">{{ rest_days }} days ⚠️ short rest — penalty applied</strong>
+    {% elif rest_type == 'ideal' %}
+      <strong style="color:#4caf50;">{{ rest_days }} days ✓ ideal</strong>
+    {% elif rest_type == 'rusty' %}
+      <strong style="color:#ffd54f;">{{ rest_days }} days — slight rust</strong>
+    {% else %}
+      <strong style="color:#ff9800;">{{ rest_days }} days — extended break</strong>
+    {% endif %}
+  </div>
+  {% endif %}
   {% if bp_era and bp_era != 'N/A' %}
-  <div style="padding: 6px 0 10px 0; font-size:0.78rem; color:#8890a4; border-top:1px solid #1e2130; margin-top:8px;">
+  <div style="padding: 4px 0 10px 0; font-size:0.78rem; color:#8890a4;">
     Bullpen (inn. 6-9): ERA <strong style="color:#e8eaf0;">{{ bp_era }}</strong> · WHIP <strong style="color:#e8eaf0;">{{ bp_whip }}</strong>
   </div>
   {% endif %}
@@ -588,7 +617,66 @@
       </div>
       {% endif %}
 
-      <!-- Row 5: Player prop odds — populated by JS when user clicks Load Props -->
+      <!-- Row 5: RISP / clutch stats -->
+      {% if b.risp_pa and b.risp_pa >= 20 %}
+      <div class="batter-stats-row">
+        <div style="font-size:0.68rem; color:#555870; width:100%; margin-bottom:4px; text-transform:uppercase; letter-spacing:0.5px;">
+          🏃 RISP (Runner on 2nd/3rd) — {{ b.risp_pa }} PA
+        </div>
+        <div style="display:flex; gap:12px;">
+          <div class="bstat">
+            <div class="bval" style="color:{% if b.risp_avg != '—' and b.avg != '—' %}
+              {%- set ra = b.risp_avg | replace('.','') | int -%}
+              {%- set sa = b.avg | replace('.','') | int -%}
+              {%- if ra > sa + 25 %}#4caf50{% elif ra < sa - 25 %}#ef5350{% else %}#e8eaf0{% endif %}
+            {% else %}#e8eaf0{% endif %};">{{ b.risp_avg }}</div>
+            <div class="blbl">AVG</div>
+          </div>
+          <div class="bstat"><div class="bval">{{ b.risp_ops }}</div><div class="blbl">OPS</div></div>
+          {% if b.risp_avg != '—' and b.avg != '—' %}
+            {%- set ra2 = b.risp_avg | replace('.','') | int -%}
+            {%- set sa2 = b.avg | replace('.','') | int -%}
+            {% if ra2 > sa2 + 25 %}
+              <div style="align-self:center; font-size:0.72rem; color:#4caf50; font-weight:700;">🔥 Clutch</div>
+            {% elif ra2 < sa2 - 25 %}
+              <div style="align-self:center; font-size:0.72rem; color:#ef5350; font-weight:700;">❄️ Choke</div>
+            {% endif %}
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Row 6: Career matchup history vs this game's starter -->
+      {% if b.vs_pitcher_pa and b.vs_pitcher_pa >= 20 %}
+      <div class="batter-stats-row">
+        <div style="font-size:0.68rem; color:#555870; width:100%; margin-bottom:4px; text-transform:uppercase; letter-spacing:0.5px;">
+          ⚔️ vs Today's Starter — {{ b.vs_pitcher_pa }} career PA
+        </div>
+        <div style="display:flex; gap:12px; align-items:center;">
+          <div class="bstat">
+            <div class="bval" style="color:{% if b.vs_pitcher_avg != '—' and b.avg != '—' %}
+              {%- set ma = b.vs_pitcher_avg | replace('.','') | int -%}
+              {%- set sa = b.avg | replace('.','') | int -%}
+              {%- if ma > sa + 30 %}#4caf50{% elif ma < sa - 30 %}#ef5350{% else %}#e8eaf0{% endif %}
+            {% else %}#e8eaf0{% endif %};">{{ b.vs_pitcher_avg }}</div>
+            <div class="blbl">AVG</div>
+          </div>
+          <div class="bstat"><div class="bval">{{ b.vs_pitcher_ops }}</div><div class="blbl">OPS</div></div>
+          <div class="bstat"><div class="bval">{{ b.vs_pitcher_hr }}</div><div class="blbl">HR</div></div>
+          {% if b.vs_pitcher_avg != '—' and b.avg != '—' %}
+            {%- set ma2 = b.vs_pitcher_avg | replace('.','') | int -%}
+            {%- set sa2 = b.avg | replace('.','') | int -%}
+            {% if ma2 > sa2 + 30 %}
+              <div style="font-size:0.72rem; color:#4caf50; font-weight:700;">🔥 Owns this pitcher</div>
+            {% elif ma2 < sa2 - 30 %}
+              <div style="font-size:0.72rem; color:#ef5350; font-weight:700;">❄️ Struggles vs this pitcher</div>
+            {% endif %}
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Row 7: Player prop odds — populated by JS when user clicks Load Props -->
       <div data-prop-player="{{ b.name }}" style="display:none; padding: 6px 22px 8px 22px; background:#13161f; border-top:1px solid #1e2130;">
         <div style="font-size:0.68rem; color:#555870; margin-bottom:4px; text-transform:uppercase; letter-spacing:0.5px;">📊 Prop Lines</div>
         <div class="prop-content-inner" style="display:flex; flex-wrap:wrap; gap:4px;"></div>

@@ -247,6 +247,159 @@ def apply_pitcher_modifier(probs: list, pitcher_stats: dict) -> list:
     return [p / total for p in adjusted]
 
 
+def apply_rest_modifier(pitcher_stats: dict, rest_days: int) -> dict:
+    """
+    Adjust a pitcher's ERA and WHIP based on days of rest since their last start.
+
+    Rest day effects on pitcher performance (MLB research consensus):
+      ≤ 3 days  — short rest: significantly worse, arm not recovered
+        4 days  — one day short: mild penalty
+       5-6 days — ideal window: no adjustment
+       7-9 days — slightly rusty from the extra days off
+      10+ days  — extended break (possible injury return or schedule gap): notable rust
+
+    This gets applied once in run_simulation BEFORE any fatigue or precompute,
+    so it stacks correctly with fatigue (tired + short-rest = double danger).
+
+    Returns a copy of pitcher_stats with adjusted era and whip.
+    """
+    if rest_days is None:
+        return pitcher_stats
+
+    if rest_days <= 3:
+        era_factor  = 1.18    # Short rest — very taxing on the arm
+        whip_factor = 1.11
+    elif rest_days == 4:
+        era_factor  = 1.08    # One day short of optimal
+        whip_factor = 1.05
+    elif rest_days <= 6:
+        era_factor  = 1.0     # Ideal rest — no change
+        whip_factor = 1.0
+    elif rest_days <= 9:
+        era_factor  = 1.04    # Slightly rusty
+        whip_factor = 1.02
+    else:
+        era_factor  = 1.10    # Extended break — possible injury return / rustiness
+        whip_factor = 1.06
+
+    try:
+        era  = float(pitcher_stats.get("era",  LEAGUE_AVG_ERA))
+    except (ValueError, TypeError):
+        era  = LEAGUE_AVG_ERA
+    try:
+        whip = float(pitcher_stats.get("whip", LEAGUE_AVG_WHIP))
+    except (ValueError, TypeError):
+        whip = LEAGUE_AVG_WHIP
+
+    return {
+        **pitcher_stats,                               # keep wins, losses, etc.
+        "era":  str(round(era  * era_factor,  2)),
+        "whip": str(round(whip * whip_factor, 2)),
+    }
+
+
+def build_fatigue_curve(pitcher_game_log: list) -> dict:
+    """
+    Analyze a pitcher's last 10 starts to build inning-phase fatigue multipliers.
+
+    Returns a dict with ERA/WHIP scaling factors for 3 phases:
+      phase1 (innings 1-2): always 1.0 — pitcher is always fresh early
+      phase2 (innings 3-4): moderate fatigue based on how long they typically last
+      phase3 (innings 5):   deep fatigue, last inning before bullpen takes over
+
+    Multiplier > 1.0 means pitcher is WORSE (ERA scaled up by that factor).
+
+    Real-world logic:
+      - Jacob deGrom averaging 7 IP → barely fatigues: {1.0, 1.03, 1.07}
+      - League-average starter, 5 IP avg → {1.0, 1.08, 1.18}
+      - Struggling short-starter avg 3.5 IP → {1.0, 1.18, 1.38}
+      - Pitcher who blows up in inning 4 consistently → phase2 amplified further
+    """
+    if not pitcher_game_log:
+        # Default: typical league-average fatigue
+        return {"phase1": 1.0, "phase2": 1.07, "phase3": 1.16}
+
+    n = len(pitcher_game_log)
+    if n == 0:
+        return {"phase1": 1.0, "phase2": 1.07, "phase3": 1.16}
+
+    avg_ip   = sum(g["ip"] for g in pitcher_game_log) / n
+    total_ip = sum(g["ip"] for g in pitcher_game_log)
+    total_er = sum(g["er"] for g in pitcher_game_log)
+
+    # ER per inning pitched — rough in-game ERA proxy
+    er_per_ip = total_er / total_ip if total_ip > 0 else 0.45   # 0.45 ≈ 4.05 ERA
+
+    # How often does the pitcher get knocked out before inning 3?
+    early_blowup_rate = sum(1 for g in pitcher_game_log if g["ip"] < 3.0) / n
+
+    # ── Phase 2 multiplier (innings 3-4) ──────────────────────────────────
+    # Depends on how long they typically last:
+    if avg_ip >= 6.5:
+        phase2 = 1.03   # workhorse ace — barely shows fatigue before inning 5
+    elif avg_ip >= 5.0:
+        phase2 = 1.07   # solid starter
+    elif avg_ip >= 3.5:
+        phase2 = 1.14   # often pulled in middle innings — already tiring by inning 3
+    else:
+        phase2 = 1.22   # short-starter type, frequently in trouble early
+
+    # Amplify if they get knocked out early a lot (bad sign by inning 3)
+    if early_blowup_rate >= 0.30:
+        phase2 = round(phase2 * 1.07, 3)
+
+    # ── Phase 3 multiplier (inning 5, last inning before bullpen) ─────────
+    if avg_ip >= 6.5:
+        phase3 = phase2 * 1.05    # still effective, just a tiny drop-off
+    elif avg_ip >= 5.0:
+        phase3 = phase2 * 1.11    # noticeably worse by inning 5
+    elif avg_ip >= 3.5:
+        phase3 = phase2 * 1.18    # really falling apart
+    else:
+        phase3 = phase2 * 1.25    # rarely makes it here — very dangerous inning
+
+    # Amplify or reduce based on overall run-prevention quality
+    if er_per_ip > 0.60:     # > 5.4 ERA-equivalent — struggling pitcher
+        phase2 *= 1.04
+        phase3 *= 1.07
+    elif er_per_ip < 0.25:   # < 2.25 ERA-equivalent — ace
+        phase2 *= 0.93
+        phase3 *= 0.90
+
+    return {
+        "phase1": 1.0,
+        "phase2": round(min(phase2, 1.50), 3),
+        "phase3": round(min(phase3, 1.90), 3),
+    }
+
+
+def build_fatigued_pitcher_stats(base_stats: dict, fatigue_factor: float) -> dict:
+    """
+    Scale a pitcher's ERA and WHIP up by the fatigue factor.
+
+    fatigue_factor = 1.0  → no change (fresh pitcher, innings 1-2)
+    fatigue_factor = 1.12 → ERA and WHIP 12% worse (innings 3-4)
+    fatigue_factor = 1.28 → 28% worse (inning 5 for a struggling pitcher)
+
+    We scale WHIP slightly less aggressively than ERA because walks/hits
+    don't degrade as quickly as run-prevention in late innings.
+    """
+    try:
+        era  = float(base_stats.get("era",  LEAGUE_AVG_ERA))
+    except (ValueError, TypeError):
+        era  = LEAGUE_AVG_ERA
+    try:
+        whip = float(base_stats.get("whip", LEAGUE_AVG_WHIP))
+    except (ValueError, TypeError):
+        whip = LEAGUE_AVG_WHIP
+
+    return {
+        "era":  str(round(era  * fatigue_factor, 2)),
+        # WHIP degrades at ~75% the rate of ERA
+        "whip": str(round(whip * (1 + (fatigue_factor - 1) * 0.75), 2)),
+    }
+
+
 def blend_probs(season_probs: list, recent_probs: list, recent_weight: float = 0.4) -> list:
     """
     Blend season-long probabilities with recent form probabilities.
@@ -268,7 +421,8 @@ def blend_probs(season_probs: list, recent_probs: list, recent_weight: float = 0
 
 def precompute_lineup(lineup_stats: list, pitcher_stats: dict,
                       weather: dict = None, recent_stats_list: list = None,
-                      venue: str = None) -> list:
+                      venue: str = None, matchup_stats_list: list = None,
+                      daynight_stats_list: list = None) -> list:
     """
     Pre-calculate cumulative probability arrays for every batter in a lineup.
     Doing this ONCE before the simulation loop (instead of inside it) is the
@@ -276,13 +430,11 @@ def precompute_lineup(lineup_stats: list, pitcher_stats: dict,
 
     Applies (in order):
       1. Recent form blend (season 60% + last-20-games 40%)
-      2. Pitcher modifier (ERA/WHIP)
-      3. Ballpark factor (Coors, Oracle Park, etc.)
-      4. Weather modifier (wind, temperature)
-
-    Ballpark is applied before weather so that park-specific conditions
-    (altitude, dimensions) are set first, then today's specific weather
-    fine-tunes on top of that.
+      2. Day/night split blend (25% weight if batter has 50+ PA in this game type)
+      3. Matchup history blend (30% weight if batter has 20+ career PA vs this pitcher)
+      4. Pitcher modifier (ERA/WHIP)
+      5. Ballpark factor (Coors, Oracle Park, etc.)
+      6. Weather modifier (wind, temperature)
     """
     result = []
     for i, stats in enumerate(lineup_stats):
@@ -295,6 +447,23 @@ def precompute_lineup(lineup_stats: list, pitcher_stats: dict,
             if recent and recent.get("plateAppearances", 0) >= 20:
                 recent_probs = build_batter_probs(recent)
                 probs = blend_probs(probs, recent_probs, recent_weight=0.4)
+
+        # Blend in day/night split — some batters are dramatically better in day or night games.
+        # Require 50+ PA in this game type to keep the sample meaningful.
+        if daynight_stats_list and i < len(daynight_stats_list):
+            dn = daynight_stats_list[i]
+            if dn and dn.get("plateAppearances", 0) >= 50:
+                dn_probs = build_batter_probs(dn)
+                probs = blend_probs(probs, dn_probs, recent_weight=0.25)
+
+        # Blend in matchup history if batter has 20+ career PA vs this specific pitcher.
+        # 30% weight: meaningful enough to matter, small enough not to override
+        # everything else from a 25-PA career sample.
+        if matchup_stats_list and i < len(matchup_stats_list):
+            matchup = matchup_stats_list[i]
+            if matchup and matchup.get("plateAppearances", 0) >= 20:
+                matchup_probs = build_batter_probs(matchup)
+                probs = blend_probs(probs, matchup_probs, recent_weight=0.30)
 
         # Pitcher quality modifier
         probs = apply_pitcher_modifier(probs, pitcher_stats)
@@ -373,12 +542,18 @@ def advance_runners(b1: bool, b2: bool, b3: bool, outcome: str) -> tuple:
 
 # ── STEP 4: Simulate one half-inning ────────────────────────────
 
-def simulate_half_inning(precomp_lineup: list, lineup_pos: int) -> tuple:
+def simulate_half_inning(precomp_lineup: list, lineup_pos: int,
+                         risp_precomp: list = None) -> tuple:
     """
     Simulate one half-inning (3 outs) for one team.
 
     precomp_lineup: pre-computed cumulative weight arrays (one per batter)
     lineup_pos:     which slot in the batting order is up first
+    risp_precomp:   optional — RISP (runners in scoring position) probs.
+                    When a runner is on 2nd or 3rd, we swap to these probs
+                    instead of the regular ones. Clutch batters get a boost;
+                    chokers take a hit. This is the biggest single accuracy gain
+                    because it directly captures who scores when it matters.
 
     Returns: (runs_scored, new_lineup_pos)
     The lineup_pos return value lets the next inning pick up where this one left off.
@@ -389,8 +564,13 @@ def simulate_half_inning(precomp_lineup: list, lineup_pos: int) -> tuple:
     pos = lineup_pos
 
     while outs < 3:
-        cum_weights = precomp_lineup[pos % 9]
-        outcome     = simulate_at_bat(cum_weights)
+        # Use RISP probs when runner is on 2nd or 3rd (scoring position)
+        if risp_precomp and (b2 or b3):
+            cum_weights = risp_precomp[pos % 9]
+        else:
+            cum_weights = precomp_lineup[pos % 9]
+
+        outcome = simulate_at_bat(cum_weights)
 
         if outcome in (STRIKEOUT, OUT):
             outs += 1
@@ -406,20 +586,28 @@ def simulate_half_inning(precomp_lineup: list, lineup_pos: int) -> tuple:
 # ── STEP 5: Simulate one full game ──────────────────────────────
 
 def simulate_game(
-    away_precomp_early: list,
+    away_precomp_early: list,           # innings 1-2: fresh starter
     home_precomp_early: list,
-    away_precomp_late:  list = None,
+    away_precomp_mid:   list = None,    # innings 3-5: starter showing fatigue
+    home_precomp_mid:   list = None,
+    away_precomp_late:  list = None,    # innings 6+: bullpen
     home_precomp_late:  list = None,
+    away_precomp_risp:  list = None,    # RISP probs for away batters (b2 or b3 occupied)
+    home_precomp_risp:  list = None,    # RISP probs for home batters
     innings: int = 9,
-    bullpen_start: int = 5,
+    bullpen_start: int = 5,             # 0-indexed: inning 6 in human terms
+    mid_start:     int = 2,             # 0-indexed: inning 3 in human terms
 ) -> tuple:
     """
-    Simulate one complete 9-inning game.
+    Simulate one complete 9-inning game with 3 pitching phases + RISP clutch stats:
 
-    Innings 1 through bullpen_start (default: 5) use the starting pitcher lineup probs.
-    Innings bullpen_start+1 onward switch to bullpen lineup probs (if provided).
-    This means batters who are strong vs relievers get a boost late in the game,
-    and batters who only hit starters take a hit when the bullpen comes in.
+      Phase 1 (innings 1-2):   Starter is fresh. Uses early probs.
+      Phase 2 (innings 3-5):   Starter tires. Uses mid probs (ERA/WHIP scaled up).
+      Phase 3 (innings 6-9+):  Bullpen takes over. Uses late probs.
+
+      RISP: whenever a runner reaches 2nd or 3rd, the current batter's probs
+            switch to their RISP (runners in scoring position) stats. Clutch
+            hitters get a boost; weak RISP batters get a penalty.
 
     Returns: (away_runs, home_runs)
     """
@@ -429,16 +617,22 @@ def simulate_game(
     home_pos  = 0
 
     for inning in range(innings):
-        # Switch from starter to bullpen probs after bullpen_start innings
+        # Select which precomputed lineup to use based on inning
         if inning >= bullpen_start and away_precomp_late:
+            # Innings 6+ — bullpen is pitching
             away_cur = away_precomp_late
             home_cur = home_precomp_late
+        elif inning >= mid_start and away_precomp_mid:
+            # Innings 3-5 — starter is tiring (fatigue kicks in)
+            away_cur = away_precomp_mid
+            home_cur = home_precomp_mid
         else:
+            # Innings 1-2 — starter is fresh
             away_cur = away_precomp_early
             home_cur = home_precomp_early
 
-        # Away team bats
-        runs, away_pos = simulate_half_inning(away_cur, away_pos)
+        # Away team bats (pass RISP probs — used whenever b2 or b3 is occupied)
+        runs, away_pos = simulate_half_inning(away_cur, away_pos, away_precomp_risp)
         away_runs += runs
 
         # Walk-off rule: home team wins in 9th without finishing if already ahead
@@ -446,17 +640,17 @@ def simulate_game(
             break
 
         # Home team bats
-        runs, home_pos = simulate_half_inning(home_cur, home_pos)
+        runs, home_pos = simulate_half_inning(home_cur, home_pos, home_precomp_risp)
         home_runs += runs
 
     # Extra innings if tied (up to 3 extra) — use bullpen probs
-    extra_away = away_precomp_late or away_precomp_early
-    extra_home = home_precomp_late or home_precomp_early
+    extra_away = away_precomp_late or away_precomp_mid or away_precomp_early
+    extra_home = home_precomp_late or home_precomp_mid or home_precomp_early
     extra = 0
     while away_runs == home_runs and extra < 3:
-        runs, away_pos = simulate_half_inning(extra_away, away_pos)
+        runs, away_pos = simulate_half_inning(extra_away, away_pos, away_precomp_risp)
         away_runs += runs
-        runs, home_pos = simulate_half_inning(extra_home, home_pos)
+        runs, home_pos = simulate_half_inning(extra_home, home_pos, home_precomp_risp)
         home_runs += runs
         extra += 1
 
@@ -473,21 +667,31 @@ def simulate_game(
 # ── STEP 6: Run N simulations ────────────────────────────────────
 
 def run_simulation(
-    away_team:      str,
-    home_team:      str,
-    away_lineup:    list,        # batter stat dicts (L/R split) for away team
-    home_lineup:    list,        # batter stat dicts (L/R split) for home team
-    away_pitcher:   dict,        # away starting pitcher's season stats
-    home_pitcher:   dict,        # home starting pitcher's season stats
-    weather:        dict = None, # ballpark weather
-    away_recent:    list = None, # last-20-game stats for away batters
-    home_recent:    list = None, # last-20-game stats for home batters
-    away_rp_stats:  list = None, # away batters' stats vs relief pitchers (bullpen)
-    home_rp_stats:  list = None, # home batters' stats vs relief pitchers (bullpen)
-    away_bullpen:   dict = None, # away team's actual bullpen ERA/WHIP (for innings 6-9)
-    home_bullpen:   dict = None, # home team's actual bullpen ERA/WHIP (for innings 6-9)
-    venue:          str  = None, # ballpark name for park factor adjustment
-    n:              int = 100_000,
+    away_team:         str,
+    home_team:         str,
+    away_lineup:       list,        # batter stat dicts (L/R split) for away team
+    home_lineup:       list,        # batter stat dicts (L/R split) for home team
+    away_pitcher:      dict,        # away starting pitcher's season stats
+    home_pitcher:      dict,        # home starting pitcher's season stats
+    weather:           dict = None, # ballpark weather
+    away_recent:       list = None, # last-20-game stats for away batters
+    home_recent:       list = None, # last-20-game stats for home batters
+    away_rp_stats:     list = None, # away batters' stats vs relief pitchers (bullpen)
+    home_rp_stats:     list = None, # home batters' stats vs relief pitchers (bullpen)
+    away_bullpen:      dict = None, # away team's actual bullpen ERA/WHIP (for innings 6-9)
+    home_bullpen:      dict = None, # home team's actual bullpen ERA/WHIP (for innings 6-9)
+    venue:             str  = None, # ballpark name for park factor adjustment
+    away_pitcher_log:  list = None, # away starter's last 10 game logs (ip, er per start)
+    home_pitcher_log:  list = None, # home starter's last 10 game logs
+    away_rest_days:    int  = None, # days since away starter's last start
+    home_rest_days:    int  = None, # days since home starter's last start
+    away_risp_stats:    list = None, # away batters' RISP stats (runners on 2nd/3rd)
+    home_risp_stats:    list = None, # home batters' RISP stats
+    away_matchup_stats:  list = None, # away batters' career stats vs home starter
+    home_matchup_stats:  list = None, # home batters' career stats vs away starter
+    away_daynight_stats: list = None, # away batters' day or night game splits
+    home_daynight_stats: list = None, # home batters' day or night game splits
+    n:                   int = 100_000,
 ) -> dict:
     """
     Run N Monte Carlo simulations and return aggregated results.
@@ -495,19 +699,61 @@ def run_simulation(
     Factors in:
       - L/R pitcher splits (via away_lineup / home_lineup)
       - Recent form: 60% season stats + 40% last-20-game stats
+      - Pitcher fatigue: innings 3-5 use degraded pitcher ERA/WHIP based
+        on how long this specific pitcher has lasted in recent starts
       - Weather: wind and temperature affect HR probability
       - SP vs RP: innings 1-5 use starting pitcher probs,
-                  innings 6-9 switch to bullpen probs (if rp_stats provided)
+                  innings 6-9 switch to real team bullpen probs
     """
     # League-average pitcher stats used as the "generic bullpen" modifier
-    # (we don't know which relievers will pitch, so we assume league average)
     LEAGUE_AVG_PITCHER = {"era": "4.20", "whip": "1.30"}
 
-    # ── Early game: batters vs the starting pitcher ──────────────────
-    away_precomp_early = precompute_lineup(away_lineup, home_pitcher, weather, away_recent, venue)
-    home_precomp_early = precompute_lineup(home_lineup, away_pitcher, weather, home_recent, venue)
+    # ── Apply rest day modifier to starter stats ─────────────────────
+    # Short rest = arm not recovered = worse ERA/WHIP across all innings.
+    # This is applied BEFORE fatigue so both stack (tired + short-rest = double hit).
+    away_pitcher = apply_rest_modifier(away_pitcher, away_rest_days)
+    home_pitcher = apply_rest_modifier(home_pitcher, home_rest_days)
 
-    # ── Late game: batters vs the bullpen ────────────────────────────
+    # ── Build pitcher fatigue curves from last 10 starts ─────────────
+    # away_fatigue affects home batters (they're facing the away starter)
+    # home_fatigue affects away batters (they're facing the home starter)
+    away_fatigue = build_fatigue_curve(away_pitcher_log)
+    home_fatigue = build_fatigue_curve(home_pitcher_log)
+
+    # ── Phase 1: innings 1-2 (starter is fresh) ───────────────────────
+    away_precomp_early = precompute_lineup(
+        away_lineup, home_pitcher, weather, away_recent, venue,
+        away_matchup_stats, away_daynight_stats)
+    home_precomp_early = precompute_lineup(
+        home_lineup, away_pitcher, weather, home_recent, venue,
+        home_matchup_stats, home_daynight_stats)
+
+    # ── Phase 2: innings 3-5 (starter showing fatigue) ───────────────
+    home_pitcher_mid = build_fatigued_pitcher_stats(home_pitcher, home_fatigue["phase2"])
+    away_pitcher_mid = build_fatigued_pitcher_stats(away_pitcher, away_fatigue["phase2"])
+    away_precomp_mid = precompute_lineup(
+        away_lineup, home_pitcher_mid, weather, away_recent, venue,
+        away_matchup_stats, away_daynight_stats)
+    home_precomp_mid = precompute_lineup(
+        home_lineup, away_pitcher_mid, weather, home_recent, venue,
+        home_matchup_stats, home_daynight_stats)
+
+    # ── RISP: clutch stats when runner on 2nd or 3rd ─────────────────
+    away_precomp_risp = None
+    home_precomp_risp = None
+
+    if away_risp_stats and any(s for s in away_risp_stats if s and s.get("plateAppearances", 0) >= 20):
+        away_precomp_risp = precompute_lineup(
+            away_risp_stats, home_pitcher, weather, away_recent, venue,
+            away_matchup_stats, away_daynight_stats
+        )
+    if home_risp_stats and any(s for s in home_risp_stats if s and s.get("plateAppearances", 0) >= 20):
+        home_precomp_risp = precompute_lineup(
+            home_risp_stats, away_pitcher, weather, home_recent, venue,
+            home_matchup_stats, home_daynight_stats
+        )
+
+    # ── Late game: batters vs the bullpen (innings 6+) ───────────────
     # Use real team bullpen ERA/WHIP if available, otherwise league average.
     # A team with a 3.00 bullpen ERA gets a real edge in innings 6-9.
     away_bp_pitcher = away_bullpen if away_bullpen else LEAGUE_AVG_PITCHER
@@ -534,7 +780,9 @@ def run_simulation(
     for _ in range(n):
         a, h = simulate_game(
             away_precomp_early, home_precomp_early,
+            away_precomp_mid,   home_precomp_mid,
             away_precomp_late,  home_precomp_late,
+            away_precomp_risp,  home_precomp_risp,
         )
         away_total += a
         home_total += h
@@ -563,15 +811,60 @@ def run_simulation(
     adj_away = round(adj_away / total * 100, 1)
     adj_home = round(adj_home / total * 100, 1)
 
+    # ── Summarize fatigue profile for display in the pitcher card ────────
+    def _fatigue_label(log, fatigue):
+        if not log:
+            return "Typical", None
+        avg_ip = sum(g["ip"] for g in log) / len(log)
+        p2     = fatigue["phase2"]
+        if avg_ip >= 6.5 and p2 <= 1.04:
+            label = "Durable"
+        elif avg_ip >= 5.0 and p2 <= 1.10:
+            label = "Moderate"
+        elif avg_ip >= 3.5:
+            label = "Tires in middle innings"
+        else:
+            label = "Short starts — early danger"
+        return label, round(avg_ip, 1)
+
+    away_fatigue_label, away_avg_ip = _fatigue_label(away_pitcher_log, away_fatigue)
+    home_fatigue_label, home_avg_ip = _fatigue_label(home_pitcher_log, home_fatigue)
+
+    # Rest day label for display
+    def _rest_label(days):
+        if days is None:
+            return None, None
+        if days <= 3:
+            return days, "short"
+        elif days <= 6:
+            return days, "ideal"
+        elif days <= 9:
+            return days, "rusty"
+        else:
+            return days, "extended"
+
+    away_rest_label, away_rest_type = _rest_label(away_rest_days)
+    home_rest_label, home_rest_type = _rest_label(home_rest_days)
+
     return {
-        "away_team":         away_team,
-        "home_team":         home_team,
-        "simulations":       n,
-        "away_win_pct":      adj_away,
-        "home_win_pct":      adj_home,
-        "away_win_pct_raw":  round(raw_away_pct, 1),  # pre-HFA, for display
-        "home_win_pct_raw":  round(raw_home_pct, 1),
-        "away_avg_runs":     round(away_total / n, 2),
-        "home_avg_runs":     round(home_total / n, 2),
-        "uses_bullpen_data": away_precomp_late is not None,
+        "away_team":           away_team,
+        "home_team":           home_team,
+        "simulations":         n,
+        "away_win_pct":        adj_away,
+        "home_win_pct":        adj_home,
+        "away_win_pct_raw":    round(raw_away_pct, 1),  # pre-HFA, for display
+        "home_win_pct_raw":    round(raw_home_pct, 1),
+        "away_avg_runs":       round(away_total / n, 2),
+        "home_avg_runs":       round(home_total / n, 2),
+        "uses_bullpen_data":   away_precomp_late is not None,
+        # Pitcher fatigue profile
+        "away_fatigue_label":  away_fatigue_label,
+        "away_avg_ip":         away_avg_ip,
+        "home_fatigue_label":  home_fatigue_label,
+        "home_avg_ip":         home_avg_ip,
+        # Pitcher rest days
+        "away_rest_days":      away_rest_label,
+        "away_rest_type":      away_rest_type,
+        "home_rest_days":      home_rest_label,
+        "home_rest_type":      home_rest_type,
     }

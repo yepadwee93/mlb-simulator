@@ -383,6 +383,117 @@ def get_team_bullpen_stats(team_id, season=None):
         return LEAGUE_AVG
 
 
+def get_pitcher_game_log(pitcher_id, num_games=10, season=None):
+    """
+    Returns per-start stats for a pitcher's last N starts.
+    Used to build a fatigue curve — which innings does this pitcher tend to
+    get hit hard, and when do they typically get pulled?
+
+    Returns a list of dicts, each with:
+      ip  — innings pitched as a float  (6.1 → 6.33 innings, 4.2 → 4.67 innings)
+      er  — earned runs allowed in that start
+
+    If a pitcher was a reliever in a game (gamesStarted=0) that game is skipped,
+    so short outings from bullpen appearances don't distort the fatigue profile.
+    """
+    if season is None:
+        season = date.today().year
+
+    try:
+        data = _get(f"/people/{pitcher_id}/stats", params={
+            "stats":    "gameLog",
+            "group":    "pitching",
+            "season":   season,
+            "gameType": "R",
+        })
+
+        splits = data.get("stats", [{}])[0].get("splits", [])
+        if not splits:
+            return []
+
+        # Only include starts (gamesStarted >= 1), not relief appearances
+        starts = [s for s in splits if s.get("stat", {}).get("gamesStarted", 0) >= 1]
+
+        # Take the most recent num_games starts
+        recent = starts[-num_games:]
+
+        games = []
+        for game in recent:
+            stat   = game.get("stat", {})
+            ip_str = str(stat.get("inningsPitched", "0") or "0")
+            try:
+                # MLB stores IP as "6.1" = 6 full innings + 1 out (not decimals!)
+                # .1 = 1 out = 1/3 inning, .2 = 2 outs = 2/3 inning
+                parts        = ip_str.split(".")
+                full_innings = int(parts[0])
+                partial_outs = int(parts[1]) if len(parts) > 1 and parts[1] else 0
+                ip           = full_innings + partial_outs / 3.0
+            except (ValueError, IndexError):
+                ip = 0.0
+
+            games.append({
+                "ip":   round(ip, 2),
+                "er":   int(stat.get("earnedRuns", 0) or 0),
+                "date": game.get("date", ""),   # YYYY-MM-DD of the start
+            })
+
+        return games
+
+    except Exception:
+        return []
+
+
+def get_batter_vs_pitcher(batter_id, pitcher_id):
+    """
+    Returns a batter's CAREER stats against one specific pitcher.
+
+    Uses the vsPlayer stat type — no season filter, so we get the full career
+    history. Only meaningful with 20+ career plate appearances; smaller samples
+    are too noisy to be useful.
+
+    When a batter has dominated a pitcher (e.g. .380 career AVG in 50 PA),
+    that edge should show up in the simulation — this function gives us the data.
+
+    Returns a stat dict with plateAppearances, hits, homeRuns, etc.
+    Returns {} if insufficient data or API error.
+    """
+    if not batter_id or not pitcher_id:
+        return {}
+    try:
+        data = _get(f"/people/{batter_id}/stats", params={
+            "stats":             "vsPlayer",
+            "group":             "hitting",
+            "opposingPlayerId":  pitcher_id,
+            "gameType":          "R",
+        })
+        stats_list = data.get("stats", [])
+        if not stats_list:
+            return {}
+        splits = stats_list[0].get("splits", [])
+        if not splits:
+            return {}
+        return splits[0].get("stat", {})
+    except Exception:
+        return {}
+
+
+def get_batter_risp_stats(player_id, season=None):
+    """
+    Returns a batter's stats specifically with runners in scoring position
+    (runner on 2nd or 3rd base).
+
+    sitCode "risp" = Runners In Scoring Position.
+
+    This is the single most important clutch stat — some batters hit .340
+    with RISP while others choke at .210. The difference directly translates
+    to whether runs score when the game is on the line.
+
+    When the simulation has a runner on 2nd or 3rd, we switch to these probs
+    instead of the batter's regular stats.
+    """
+    return get_batter_sitcode_stats(player_id, "risp", season=season)
+
+
 def get_pitcher_hand(pitcher_id):
     """
     Returns 'L' or 'R' — which hand the pitcher throws with.

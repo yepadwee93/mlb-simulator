@@ -1,2 +1,2 @@
 logged_at,game_date,game_pk,away_team,home_team,away_win_pct,home_win_pct,away_avg_runs,home_avg_runs,predicted_winner,n_sims,actual_away_runs,actual_home_runs,actual_winner,correct_pick,run_diff_error
-2026-06-25T19:41:39,2026-06-25,824747,New York Yankees,Boston Red Sox,83.1,16.9,4.24,1.39,New York Yankees,100000,,,,,
+2026-06-25T19:41:39,2026-06-25,824747,New York Yankees,Boston Red Sox,87.1,12.9,6.04,1.62,New York Yankees,100000,,,,,
