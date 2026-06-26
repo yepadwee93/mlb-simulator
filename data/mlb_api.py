@@ -163,9 +163,13 @@ def get_player_season_stats(player_id, group="hitting", season=None):
         "gameType": "R",            # R = Regular Season only (not playoffs)
     })
 
-    splits = data.get("stats", [{}])[0].get("splits", [])
+    stats_list = data.get("stats", [])
+    if not stats_list:
+        return {}   # no stats available (player hasn't played or just called up)
+
+    splits = stats_list[0].get("splits", [])
     if not splits:
-        return {}   # player hasn't played yet this season
+        return {}
 
     return splits[0].get("stat", {})
 
