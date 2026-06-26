@@ -1265,4 +1265,108 @@ def get_live_scores(game_date=None):
                 "game_time_utc": game.get("gameDate", ""),
             })
 
+
+def compute_injury_impact(il_players: list) -> dict:
+    """
+    Score how much a team's offense is hurt by their current IL players.
+
+    For each IL player, fetch their season hitting stats and compute an
+    offensive weight based on wRC+ proxy (OPS relative to league average).
+    Returns:
+      {
+        "score":      int,        # 0-100 (0 = no impact, 100 = devastating)
+        "grade":      str,        # "None" / "Minor" / "Moderate" / "Significant" / "Severe"
+        "color":      str,        # hex color for UI badge
+        "key_players": list[dict] # top impacted players with their stats
+      }
+    """
+    LEAGUE_AVG_OPS = 0.720
+
+    if not il_players:
+        return {"score": 0, "grade": "None", "color": "#555870", "key_players": []}
+
+    scored = []
+    for player in il_players:
+        pid = player.get("id")
+        if not pid:
+            continue
+        try:
+            stats = get_player_season_stats(pid, group="hitting")
+        except Exception:
+            stats = {}
+
+        # If no hitting stats this season, they're a pitcher or not a contributor
+        ab = int(stats.get("atBats", 0) or 0)
+        if ab < 50:
+            # Try pitching — a pitcher going to IL also matters
+            try:
+                pstats = get_player_season_stats(pid, group="pitching")
+                era = float(pstats.get("era", 5.0) or 5.0)
+                gs  = int(pstats.get("gamesStarted", 0) or 0)
+                if gs >= 3:
+                    # Starting pitcher — moderate impact regardless
+                    weight = 15
+                    scored.append({
+                        "name":    player["name"],
+                        "il_type": player.get("il_type", "IL"),
+                        "role":    "SP",
+                        "stat":    f"ERA {era:.2f}",
+                        "weight":  weight,
+                    })
+            except Exception:
+                pass
+            continue
+
+        try:
+            obp = float(stats.get("obp", "0") or 0)
+            slg = float(stats.get("slg", "0") or 0)
+            hr  = int(stats.get("homeRuns", 0) or 0)
+            rbi = int(stats.get("rbi", 0) or 0)
+        except (ValueError, TypeError):
+            continue
+
+        ops = obp + slg
+        # Weight = how much above/below league average this bat is
+        # A .900 OPS player = 25% above avg = high impact
+        ops_delta = (ops - LEAGUE_AVG_OPS) / LEAGUE_AVG_OPS
+        # Scale: 0.25 delta → weight ~20, -0.1 delta → weight ~5
+        weight = max(2, min(30, int(15 + ops_delta * 50)))
+
+        scored.append({
+            "name":    player["name"],
+            "il_type": player.get("il_type", "IL"),
+            "role":    "Bat",
+            "stat":    f".{str(stats.get('avg','000')).replace('.','')[:3]} OPS {ops:.3f}",
+            "weight":  weight,
+        })
+
+    if not scored:
+        return {"score": 0, "grade": "None", "color": "#555870", "key_players": []}
+
+    # Total impact score: sum weights, cap at 100
+    # A full lineup (~9 players × 15 avg weight = 135) would be 100
+    raw_score = sum(p["weight"] for p in scored)
+    score = min(100, int(raw_score / 1.35))
+
+    # Sort by weight descending, keep top 5 for display
+    scored.sort(key=lambda x: x["weight"], reverse=True)
+
+    if score == 0:
+        grade, color = "None", "#555870"
+    elif score < 15:
+        grade, color = "Minor", "#81c784"
+    elif score < 35:
+        grade, color = "Moderate", "#ffd54f"
+    elif score < 60:
+        grade, color = "Significant", "#ffb74d"
+    else:
+        grade, color = "Severe", "#ef5350"
+
+    return {
+        "score":       score,
+        "grade":       grade,
+        "color":       color,
+        "key_players": scored[:5],
+    }
+
     return scores

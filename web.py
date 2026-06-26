@@ -49,6 +49,7 @@ from data.mlb_api import (
     get_lineup_status,
     get_team_streak,
     get_live_scores,
+    compute_injury_impact,
 )
 from simulation.engine import run_simulation, predict_pitcher_ks, detect_pitcher_form, predict_batter_props
 
@@ -322,6 +323,13 @@ def build_game_result(game, n_sims, use_splits=True):
     except Exception:
         away_il = home_il = away_transactions = home_transactions = []
 
+    # ── Injury impact scores ─────────────────────────────────────────
+    try:
+        away_injury_impact = compute_injury_impact(away_il)
+        home_injury_impact = compute_injury_impact(home_il)
+    except Exception:
+        away_injury_impact = home_injury_impact = {"score": 0, "grade": "None", "color": "#555870", "key_players": []}
+
     # ── Series context ────────────────────────────────────────────────
     try:
         series_game_num = get_series_game_number(
@@ -498,10 +506,12 @@ def build_game_result(game, n_sims, use_splits=True):
     result["home_catcher_cs"]   = home_catcher_cs
     result["away_bp_depth"]     = away_bp_depth
     result["home_bp_depth"]     = home_bp_depth
-    result["away_il"]           = away_il
-    result["home_il"]           = home_il
-    result["away_transactions"] = away_transactions
-    result["home_transactions"] = home_transactions
+    result["away_il"]              = away_il
+    result["home_il"]              = home_il
+    result["away_transactions"]    = away_transactions
+    result["home_transactions"]    = home_transactions
+    result["away_injury_impact"]   = away_injury_impact
+    result["home_injury_impact"]   = home_injury_impact
     result["home_k_pred"] = home_k_pred
 
     # Attach IDs for logo/headshot URLs in templates
