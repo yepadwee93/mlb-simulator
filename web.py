@@ -371,8 +371,8 @@ def build_game_result(game, n_sims, use_splits=True):
     except Exception:
         umpire_name = None
 
-    # Fetch weather for this ballpark
-    weather = get_ballpark_weather(game["venue"])
+    # Fetch weather for this ballpark at game time
+    weather = get_ballpark_weather(game["venue"], game_time_utc=game.get("game_time", ""))
 
     # Extract vs-RP stats for SP→bullpen transition in the simulation
     # These are the batter's historical stats against relief pitchers specifically.

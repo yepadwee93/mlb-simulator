@@ -342,7 +342,9 @@
   <div class="sim-note">
     Based on {{ simulations | int | string | replace('000000','M') }} simulated games
     {% if weather and weather.temp_f %}
-      · {{ weather.temp_f }}°F · {{ weather.wind_label }}
+      · {{ weather.condition_icon }} {{ weather.temp_f }}°F · {{ weather.wind_label }}
+      {% if weather.precip_pct > 20 %} · 🌧 {{ weather.precip_pct }}% rain{% endif %}
+      {% if weather.is_forecast %}<span style="color:#64b5f6;font-size:0.7rem;"> (game-time forecast)</span>{% endif %}
     {% endif %}
   </div>
   <div class="sim-note" style="margin-top:4px; color:#64b5f6;">
@@ -489,6 +491,100 @@
   {% endif %}
   {% endfor %}
 </div>
+
+<!-- ── Weather Card ── -->
+{% if weather and weather.temp_f %}
+<div class="card" style="max-width:900px; padding:16px 20px;">
+  <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+
+    <!-- Condition icon + label -->
+    <div style="font-size:2rem; line-height:1;">{{ weather.condition_icon }}</div>
+    <div>
+      <div style="font-size:0.95rem; font-weight:700; color:#e8eaf0;">{{ weather.condition }}</div>
+      <div style="font-size:0.72rem; color:#9aa0b8; margin-top:2px;">
+        {% if weather.is_forecast %}Game-time forecast{% else %}Current conditions{% endif %}
+        · {{ venue }}
+      </div>
+    </div>
+
+    <div style="display:flex; gap:16px; margin-left:16px; flex-wrap:wrap;">
+
+      <!-- Temp -->
+      <div style="text-align:center;">
+        <div style="font-size:1.3rem; font-weight:800;
+          color:{% if weather.temp_f >= 85 %}#ef5350{% elif weather.temp_f <= 50 %}#64b5f6{% else %}#e8eaf0{% endif %};">
+          {{ weather.temp_f }}°F
+        </div>
+        <div style="font-size:0.65rem; color:#9aa0b8; text-transform:uppercase; letter-spacing:.4px;">Temp</div>
+      </div>
+
+      <!-- Wind -->
+      <div style="text-align:center;">
+        <div style="font-size:1.3rem; font-weight:800;
+          color:{% if weather.wind_mph >= 15 %}#ffd54f{% else %}#e8eaf0{% endif %};">
+          {{ weather.wind_mph }} mph
+        </div>
+        <div style="font-size:0.65rem; color:#9aa0b8; text-transform:uppercase; letter-spacing:.4px;">
+          Wind · {{ weather.wind_label.split(' ')[-1] }}
+        </div>
+      </div>
+
+      <!-- Rain % -->
+      <div style="text-align:center;">
+        <div style="font-size:1.3rem; font-weight:800;
+          color:{% if weather.precip_pct >= 50 %}#ef5350{% elif weather.precip_pct >= 25 %}#ffd54f{% else %}#81c784{% endif %};">
+          {{ weather.precip_pct }}%
+        </div>
+        <div style="font-size:0.65rem; color:#9aa0b8; text-transform:uppercase; letter-spacing:.4px;">Rain Chance</div>
+      </div>
+
+      <!-- HR Effect -->
+      <div style="text-align:center;">
+        {% set hr_pct = weather.hr_boost_pct %}
+        <div style="font-size:1.3rem; font-weight:800;
+          color:{% if hr_pct > 0 %}#ef5350{% elif hr_pct < 0 %}#64b5f6{% else %}#9aa0b8{% endif %};">
+          {{ '+' if hr_pct > 0 else '' }}{{ hr_pct }}%
+        </div>
+        <div style="font-size:0.65rem; color:#9aa0b8; text-transform:uppercase; letter-spacing:.4px;">HR Wind Effect</div>
+      </div>
+
+    </div>
+
+    <!-- Scoring environment tags -->
+    <div style="margin-left:auto; display:flex; flex-direction:column; gap:4px; align-items:flex-end;">
+      {% if weather.wind_effect == 'out' %}
+        <span style="background:#ef535022; color:#ef9a9a; font-size:0.7rem; font-weight:700;
+                     padding:3px 10px; border-radius:20px; border:1px solid #ef535044;">
+          💨 Wind blowing OUT — more HRs
+        </span>
+      {% elif weather.wind_effect == 'in' %}
+        <span style="background:#64b5f622; color:#90caf9; font-size:0.7rem; font-weight:700;
+                     padding:3px 10px; border-radius:20px; border:1px solid #64b5f644;">
+          💨 Wind blowing IN — fewer HRs
+        </span>
+      {% endif %}
+      {% if weather.temp_effect %}
+        <span style="background:#1a1e2e; color:#b0b8cc; font-size:0.7rem;
+                     padding:3px 10px; border-radius:20px; border:1px solid #252836;">
+          🌡 {{ weather.temp_effect | capitalize }}
+        </span>
+      {% endif %}
+      {% if weather.precip_pct >= 50 %}
+        <span style="background:#ef535022; color:#ef9a9a; font-size:0.7rem; font-weight:700;
+                     padding:3px 10px; border-radius:20px; border:1px solid #ef535044;">
+          ⛈ Rain delay risk
+        </span>
+      {% elif weather.precip_pct >= 25 %}
+        <span style="background:#ffd54f22; color:#ffd54f; font-size:0.7rem; font-weight:700;
+                     padding:3px 10px; border-radius:20px; border:1px solid #ffd54f44;">
+          🌦 Light rain possible
+        </span>
+      {% endif %}
+    </div>
+
+  </div>
+</div>
+{% endif %}
 
 <!-- ── Injury Impact Alerts ── -->
 {% set show_away_inj = away_injury_impact and away_injury_impact.score > 0 %}

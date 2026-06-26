@@ -580,50 +580,127 @@ def get_batter_sitcode_stats(player_id, sit_code, season=None):
 # 6. WEATHER FOR A BALLPARK
 # ──────────────────────────────────────────────
 
-def get_ballpark_weather(venue_name):
+def get_ballpark_weather(venue_name, game_time_utc: str = None):
     """
-    Fetches the current weather forecast for a ballpark using Open-Meteo.
+    Fetches the weather forecast for a ballpark at game time using Open-Meteo.
     Free API, no key needed.
 
+    If game_time_utc is provided (ISO string, e.g. "2025-06-15T23:10:00Z"),
+    fetches the hourly forecast for that specific hour so the sim uses
+    game-time conditions, not current conditions.
+
     Returns a dict with:
-      temp_f        — temperature in Fahrenheit
-      wind_mph      — wind speed in mph
-      wind_deg      — wind direction in degrees (0=N, 90=E, 180=S, 270=W)
-      wind_label    — human-readable wind direction (e.g. "15 mph NE")
-      condition     — short description
+      temp_f         — temperature in Fahrenheit at game time
+      wind_mph       — wind speed in mph
+      wind_deg       — wind direction in degrees (0=N, 90=E, 180=S, 270=W)
+      wind_label     — human-readable direction (e.g. "15 mph NE")
+      wind_hr_boost  — HR multiplier based on wind direction vs CF
+      wind_effect    — "out" / "in" / "neutral"
+      precip_pct     — precipitation probability 0-100 (rain chance)
+      condition      — short label ("Clear", "Partly Cloudy", "Rain", etc.)
+      condition_icon — emoji icon for condition
+      is_forecast    — True if this is game-time forecast vs current conditions
 
     If the venue isn't in our coords list, returns empty dict.
     """
+    # Open-Meteo WMO weather code → condition label + emoji
+    WMO_CONDITIONS = {
+        0:  ("Clear",          "☀️"),
+        1:  ("Mostly Clear",   "🌤"),
+        2:  ("Partly Cloudy",  "⛅"),
+        3:  ("Overcast",       "☁️"),
+        45: ("Foggy",          "🌫"),
+        48: ("Foggy",          "🌫"),
+        51: ("Drizzle",        "🌦"),
+        53: ("Drizzle",        "🌦"),
+        55: ("Drizzle",        "🌦"),
+        61: ("Light Rain",     "🌧"),
+        63: ("Rain",           "🌧"),
+        65: ("Heavy Rain",     "🌧"),
+        71: ("Snow",           "❄️"),
+        73: ("Snow",           "❄️"),
+        75: ("Heavy Snow",     "🌨"),
+        80: ("Showers",        "🌦"),
+        81: ("Showers",        "🌦"),
+        82: ("Heavy Showers",  "⛈"),
+        95: ("Thunderstorm",   "⛈"),
+        96: ("Thunderstorm",   "⛈"),
+        99: ("Thunderstorm",   "⛈"),
+    }
+
     coords = BALLPARK_COORDS.get(venue_name)
     if not coords:
         return {}
 
     lat, lon = coords
 
-    try:
-        resp = requests.get(
-            "https://api.open-meteo.com/v1/forecast",
-            params={
-                "latitude":        lat,
-                "longitude":       lon,
-                "current":         "temperature_2m,wind_speed_10m,wind_direction_10m,weather_code",
-                "temperature_unit": "fahrenheit",
-                "wind_speed_unit": "mph",
-                "timezone":        "auto",
-            },
-            timeout=5,
-        )
-        resp.raise_for_status()
-        data    = resp.json()
-        current = data.get("current", {})
+    # Parse game time to find the target hour
+    target_hour_str = None
+    is_forecast = False
+    if game_time_utc:
+        try:
+            from datetime import datetime, timezone
+            gt = datetime.fromisoformat(game_time_utc.replace("Z", "+00:00"))
+            # Round down to the hour
+            target_hour_str = gt.replace(minute=0, second=0, microsecond=0).strftime("%Y-%m-%dT%H:00")
+            is_forecast = True
+        except Exception:
+            pass
 
-        temp_f   = current.get("temperature_2m",    70)
-        wind_mph = current.get("wind_speed_10m",     0)
-        wind_deg = current.get("wind_direction_10m", 0)
+    try:
+        params = {
+            "latitude":         lat,
+            "longitude":        lon,
+            "temperature_unit": "fahrenheit",
+            "wind_speed_unit":  "mph",
+            "timezone":         "auto",
+        }
+
+        if target_hour_str:
+            # Fetch hourly data for ±2 days to cover the game time
+            from datetime import date, timedelta
+            today = date.today()
+            params["hourly"]     = "temperature_2m,wind_speed_10m,wind_direction_10m,weather_code,precipitation_probability"
+            params["start_date"] = today.isoformat()
+            params["end_date"]   = (today + timedelta(days=2)).isoformat()
+        else:
+            params["current"] = "temperature_2m,wind_speed_10m,wind_direction_10m,weather_code,precipitation_probability"
+
+        resp = requests.get("https://api.open-meteo.com/v1/forecast", params=params, timeout=5)
+        resp.raise_for_status()
+        data = resp.json()
+
+        temp_f = wind_mph = wind_deg = 70, 0, 0
+        precip_pct = 0
+        wmo_code = 0
+
+        if target_hour_str and "hourly" in data:
+            hourly = data["hourly"]
+            times  = hourly.get("time", [])
+            # Find the closest hour to game time
+            idx = next((i for i, t in enumerate(times) if t == target_hour_str), None)
+            if idx is None:
+                # Fall back to nearest
+                idx = 0
+            temp_f     = hourly["temperature_2m"][idx]       if idx < len(hourly.get("temperature_2m", [])) else 70
+            wind_mph   = hourly["wind_speed_10m"][idx]       if idx < len(hourly.get("wind_speed_10m", [])) else 0
+            wind_deg   = hourly["wind_direction_10m"][idx]   if idx < len(hourly.get("wind_direction_10m", [])) else 0
+            wmo_code   = hourly["weather_code"][idx]         if idx < len(hourly.get("weather_code", [])) else 0
+            precip_pct = hourly.get("precipitation_probability", [0]*100)[idx] if idx < len(hourly.get("precipitation_probability", [0]*100)) else 0
+        else:
+            current  = data.get("current", {})
+            temp_f   = current.get("temperature_2m",    70)
+            wind_mph = current.get("wind_speed_10m",     0)
+            wind_deg = current.get("wind_direction_10m", 0)
+            wmo_code = current.get("weather_code",       0)
+            precip_pct = current.get("precipitation_probability", 0)
+
+        # Condition label and icon
+        condition, condition_icon = WMO_CONDITIONS.get(int(wmo_code), ("Unknown", "🌡"))
 
         # Convert wind degrees to compass label
-        dirs   = ["N","NE","E","SE","S","SW","W","NW"]
-        label  = dirs[round(wind_deg / 45) % 8]
+        dirs  = ["N","NE","E","SE","S","SW","W","NW"]
+        label = dirs[round(wind_deg / 45) % 8]
 
         # Wind direction HR boost: if wind blows OUT toward CF and >= 10 mph
         cf_dir = PARK_CF_DIRECTION.get(venue_name)
@@ -632,21 +709,36 @@ def get_ballpark_weather(venue_name):
         if cf_dir is not None and wind_mph >= 10:
             diff = abs((wind_deg - cf_dir + 180) % 360 - 180)
             if diff <= 45:
-                boost_factor = min(1.15, 1.0 + (wind_mph - 10) * 0.005)
+                boost_factor  = min(1.15, 1.0 + (wind_mph - 10) * 0.005)
                 wind_hr_boost = round(boost_factor, 3)
                 wind_effect   = "out"
             elif diff >= 135:
                 suppress_factor = max(0.90, 1.0 - (wind_mph - 10) * 0.004)
-                wind_hr_boost = round(suppress_factor, 3)
-                wind_effect   = "in"
+                wind_hr_boost   = round(suppress_factor, 3)
+                wind_effect     = "in"
+
+        # Scoring environment summary
+        hr_boost_pct = round((wind_hr_boost - 1.0) * 100, 1)
+        if temp_f >= 85:
+            temp_effect = "hot air boosts HRs"
+        elif temp_f <= 50:
+            temp_effect = "cold air suppresses HRs"
+        else:
+            temp_effect = None
 
         return {
-            "temp_f":       round(temp_f),
-            "wind_mph":     round(wind_mph),
-            "wind_deg":     wind_deg,
-            "wind_label":   f"{round(wind_mph)} mph {label}",
-            "wind_hr_boost": wind_hr_boost,
-            "wind_effect":  wind_effect,
+            "temp_f":         round(temp_f),
+            "wind_mph":       round(wind_mph),
+            "wind_deg":       wind_deg,
+            "wind_label":     f"{round(wind_mph)} mph {label}",
+            "wind_hr_boost":  wind_hr_boost,
+            "wind_effect":    wind_effect,
+            "precip_pct":     int(precip_pct),
+            "condition":      condition,
+            "condition_icon": condition_icon,
+            "is_forecast":    is_forecast,
+            "hr_boost_pct":   hr_boost_pct,
+            "temp_effect":    temp_effect,
         }
 
     except Exception:
