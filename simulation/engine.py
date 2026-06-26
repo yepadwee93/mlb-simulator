@@ -166,7 +166,27 @@ def apply_pitcher_modifier(probs: list, pitcher_stats: dict) -> list:
     return [p / total for p in adjusted]
 
 
-def precompute_lineup(lineup_stats: list, pitcher_stats: dict, weather: dict = None) -> list:
+def blend_probs(season_probs: list, recent_probs: list, recent_weight: float = 0.4) -> list:
+    """
+    Blend season-long probabilities with recent form probabilities.
+
+    recent_weight=0.4 means:
+      40% of the prediction comes from last 20 games
+      60% comes from the full season
+
+    This way a player on a hot streak gets a meaningful boost,
+    but one good week doesn't completely override who they are
+    as a hitter over 150+ games.
+    """
+    season_weight = 1.0 - recent_weight
+    blended = [season_weight * s + recent_weight * r
+               for s, r in zip(season_probs, recent_probs)]
+    total = sum(blended)
+    return [p / total for p in blended]
+
+
+def precompute_lineup(lineup_stats: list, pitcher_stats: dict,
+                      weather: dict = None, recent_stats_list: list = None) -> list:
     """
     Pre-calculate cumulative probability arrays for every batter in a lineup.
     Doing this ONCE before the simulation loop (instead of inside it) is the
@@ -177,8 +197,18 @@ def precompute_lineup(lineup_stats: list, pitcher_stats: dict, weather: dict = N
     Returns a list of cumulative weight arrays, one per batter.
     """
     result = []
-    for stats in lineup_stats:
+    for i, stats in enumerate(lineup_stats):
+        # Start with season stats
         probs = build_batter_probs(stats)
+
+        # Blend in recent form if available (last 20 games)
+        if recent_stats_list and i < len(recent_stats_list):
+            recent = recent_stats_list[i]
+            # Only use recent stats if we have at least 5 games of data
+            if recent and recent.get("plateAppearances", 0) >= 20:
+                recent_probs = build_batter_probs(recent)
+                probs = blend_probs(probs, recent_probs, recent_weight=0.4)
+
         probs = apply_pitcher_modifier(probs, pitcher_stats)
         if weather:
             probs = apply_weather_modifier(probs, weather)
@@ -281,12 +311,21 @@ def simulate_half_inning(precomp_lineup: list, lineup_pos: int) -> tuple:
 # ── STEP 5: Simulate one full game ──────────────────────────────
 
 def simulate_game(
-    away_precomp: list,
-    home_precomp: list,
+    away_precomp_early: list,
+    home_precomp_early: list,
+    away_precomp_late:  list = None,
+    home_precomp_late:  list = None,
     innings: int = 9,
+    bullpen_start: int = 5,
 ) -> tuple:
     """
     Simulate one complete 9-inning game.
+
+    Innings 1 through bullpen_start (default: 5) use the starting pitcher lineup probs.
+    Innings bullpen_start+1 onward switch to bullpen lineup probs (if provided).
+    This means batters who are strong vs relievers get a boost late in the game,
+    and batters who only hit starters take a hit when the bullpen comes in.
+
     Returns: (away_runs, home_runs)
     """
     away_runs = 0
@@ -295,8 +334,16 @@ def simulate_game(
     home_pos  = 0
 
     for inning in range(innings):
+        # Switch from starter to bullpen probs after bullpen_start innings
+        if inning >= bullpen_start and away_precomp_late:
+            away_cur = away_precomp_late
+            home_cur = home_precomp_late
+        else:
+            away_cur = away_precomp_early
+            home_cur = home_precomp_early
+
         # Away team bats
-        runs, away_pos = simulate_half_inning(away_precomp, away_pos)
+        runs, away_pos = simulate_half_inning(away_cur, away_pos)
         away_runs += runs
 
         # Walk-off rule: home team wins in 9th without finishing if already ahead
@@ -304,15 +351,17 @@ def simulate_game(
             break
 
         # Home team bats
-        runs, home_pos = simulate_half_inning(home_precomp, home_pos)
+        runs, home_pos = simulate_half_inning(home_cur, home_pos)
         home_runs += runs
 
-    # Extra innings if tied (up to 3 extra)
+    # Extra innings if tied (up to 3 extra) — use bullpen probs
+    extra_away = away_precomp_late or away_precomp_early
+    extra_home = home_precomp_late or home_precomp_early
     extra = 0
     while away_runs == home_runs and extra < 3:
-        runs, away_pos = simulate_half_inning(away_precomp, away_pos)
+        runs, away_pos = simulate_half_inning(extra_away, away_pos)
         away_runs += runs
-        runs, home_pos = simulate_half_inning(home_precomp, home_pos)
+        runs, home_pos = simulate_half_inning(extra_home, home_pos)
         home_runs += runs
         extra += 1
 
@@ -329,36 +378,64 @@ def simulate_game(
 # ── STEP 6: Run N simulations ────────────────────────────────────
 
 def run_simulation(
-    away_team:    str,
-    home_team:    str,
-    away_lineup:  list,   # list of stat dicts for the 9 away batters
-    home_lineup:  list,   # list of stat dicts for the 9 home batters
-    away_pitcher: dict,   # away starting pitcher's season stats
-    home_pitcher: dict,   # home starting pitcher's season stats
-    weather:      dict = None,   # ballpark weather (from get_ballpark_weather)
-    n:            int = 100_000,
+    away_team:      str,
+    home_team:      str,
+    away_lineup:    list,        # batter stat dicts (L/R split) for away team
+    home_lineup:    list,        # batter stat dicts (L/R split) for home team
+    away_pitcher:   dict,        # away starting pitcher's season stats
+    home_pitcher:   dict,        # home starting pitcher's season stats
+    weather:        dict = None, # ballpark weather
+    away_recent:    list = None, # last-20-game stats for away batters
+    home_recent:    list = None, # last-20-game stats for home batters
+    away_rp_stats:  list = None, # away batters' stats vs relief pitchers (bullpen)
+    home_rp_stats:  list = None, # home batters' stats vs relief pitchers (bullpen)
+    n:              int = 100_000,
 ) -> dict:
     """
     Run N Monte Carlo simulations and return aggregated results.
 
-    Now accepts weather data — wind and temperature affect HR probability.
-    The key optimization: pre-compute probability arrays ONCE, then
-    reuse them across all N games. This is what makes 100,000 games fast.
+    Factors in:
+      - L/R pitcher splits (via away_lineup / home_lineup)
+      - Recent form: 60% season stats + 40% last-20-game stats
+      - Weather: wind and temperature affect HR probability
+      - SP vs RP: innings 1-5 use starting pitcher probs,
+                  innings 6-9 switch to bullpen probs (if rp_stats provided)
     """
+    # League-average pitcher stats used as the "generic bullpen" modifier
+    # (we don't know which relievers will pitch, so we assume league average)
+    LEAGUE_AVG_PITCHER = {"era": "4.20", "whip": "1.30"}
 
-    # Pre-compute batter probabilities adjusted for pitcher + weather
-    # away batters face the home pitcher, and vice versa
-    away_precomp = precompute_lineup(away_lineup, home_pitcher, weather)
-    home_precomp = precompute_lineup(home_lineup, away_pitcher, weather)
+    # ── Early game: batters vs the starting pitcher ──────────────────
+    away_precomp_early = precompute_lineup(away_lineup, home_pitcher, weather, away_recent)
+    home_precomp_early = precompute_lineup(home_lineup, away_pitcher, weather, home_recent)
 
-    # Run the simulation loop
+    # ── Late game: batters vs the bullpen ────────────────────────────
+    # If we have vs_rp stats for each batter, build a separate set of probs
+    # for innings 6+. Still blend in recent form, but now the base stats
+    # reflect how that batter historically performs against relievers.
+    away_precomp_late = None
+    home_precomp_late = None
+
+    if away_rp_stats and any(s for s in away_rp_stats if s):
+        away_precomp_late = precompute_lineup(
+            away_rp_stats, LEAGUE_AVG_PITCHER, weather, away_recent
+        )
+    if home_rp_stats and any(s for s in home_rp_stats if s):
+        home_precomp_late = precompute_lineup(
+            home_rp_stats, LEAGUE_AVG_PITCHER, weather, home_recent
+        )
+
+    # ── Run the simulation loop ───────────────────────────────────────
     away_wins  = 0
     home_wins  = 0
     away_total = 0
     home_total = 0
 
     for _ in range(n):
-        a, h = simulate_game(away_precomp, home_precomp)
+        a, h = simulate_game(
+            away_precomp_early, home_precomp_early,
+            away_precomp_late,  home_precomp_late,
+        )
         away_total += a
         home_total += h
         if a > h:
@@ -367,11 +444,12 @@ def run_simulation(
             home_wins += 1
 
     return {
-        "away_team":     away_team,
-        "home_team":     home_team,
-        "simulations":   n,
-        "away_win_pct":  round(away_wins  / n * 100, 1),
-        "home_win_pct":  round(home_wins  / n * 100, 1),
-        "away_avg_runs": round(away_total / n, 2),
-        "home_avg_runs": round(home_total / n, 2),
+        "away_team":        away_team,
+        "home_team":        home_team,
+        "simulations":      n,
+        "away_win_pct":     round(away_wins  / n * 100, 1),
+        "home_win_pct":     round(home_wins  / n * 100, 1),
+        "away_avg_runs":    round(away_total / n, 2),
+        "home_avg_runs":    round(home_total / n, 2),
+        "uses_bullpen_data": away_precomp_late is not None,
     }

@@ -247,7 +247,7 @@ def get_player_info(player_id):
 # 4. LAST-N-GAMES ("RECENT FORM") STATS
 # ──────────────────────────────────────────────
 
-def get_player_recent_stats(player_id, group="hitting", num_games=10, season=None):
+def get_player_recent_stats(player_id, group="hitting", num_games=20, season=None):
     """
     Returns a rolling average of stats over the player's last N games.
     This is how we capture "recent form" — someone who's been hot or cold lately.
@@ -325,10 +325,25 @@ def get_batter_split_stats(player_id, pitcher_hand, season=None):
 
     sitCodes: 'vl' = vs left-handed pitchers, 'vr' = vs right-handed pitchers
     """
+    sit_code = "vl" if pitcher_hand == "L" else "vr"
+    return get_batter_sitcode_stats(player_id, sit_code, season=season)
+
+
+def get_batter_sitcode_stats(player_id, sit_code, season=None):
+    """
+    Returns a batter's stats for any MLB situation code.
+
+    Common sitCodes:
+      'vl'  — vs left-handed pitchers
+      'vr'  — vs right-handed pitchers
+      'vsp' — vs starting pitchers
+      'vrp' — vs relief pitchers (bullpen)
+
+    Useful for showing whether a batter performs better early (vs SP) or
+    later in the game when the bullpen comes in (vs RP).
+    """
     if season is None:
         season = date.today().year
-
-    sit_code = "vl" if pitcher_hand == "L" else "vr"
 
     data = _get(f"/people/{player_id}/stats", params={
         "stats":    "statSplits",

@@ -16,12 +16,14 @@ load_dotenv()   # loads ODDS_API_KEY from .env file
 
 from flask import Flask, render_template, abort, request
 
-from data.odds_api import get_mlb_odds, format_odds, calc_edge
+from data.odds_api import get_mlb_odds, get_mlb_events, get_player_props, format_odds, calc_edge, get_requests_remaining
 from data.mlb_api import (
     get_today_schedule,
     get_game_lineup,
     get_player_season_stats,
+    get_player_recent_stats,
     get_batter_split_stats,
+    get_batter_sitcode_stats,
     get_pitcher_hand,
     get_ballpark_weather,
 )
@@ -97,19 +99,169 @@ def build_game_result(game, n_sims, use_splits=True):
     away_pitcher_stats = get_player_season_stats(away_pitcher["id"], group="pitching") if away_pitcher.get("id") else {}
     home_pitcher_stats = get_player_season_stats(home_pitcher["id"], group="pitching") if home_pitcher.get("id") else {}
 
+    # Fetch recent form + display splits for each batter — single-game mode only
+    # In parallel we fetch: recent 20 games, vs LHP, vs RHP, vs SP, vs RP
+    away_recent       = []
+    home_recent       = []
+    away_display_extra = []   # list of dicts with vs_lhp/vs_rhp/vs_sp/vs_rp stats
+    home_display_extra = []
+
+    if use_splits:
+        def _fetch_all_batter_data(batter):
+            """Fetch recent form + all split types for one batter. Returns (recent, lhp, rhp, sp, rp)."""
+            pid = batter.get("id")
+            if not pid:
+                return {}, {}, {}, {}, {}
+            try:
+                recent = get_player_recent_stats(pid, num_games=20)
+            except Exception:
+                recent = {}
+            try:
+                vs_lhp = get_batter_sitcode_stats(pid, "vl")
+            except Exception:
+                vs_lhp = {}
+            try:
+                vs_rhp = get_batter_sitcode_stats(pid, "vr")
+            except Exception:
+                vs_rhp = {}
+            try:
+                vs_sp = get_batter_sitcode_stats(pid, "vsp")
+            except Exception:
+                vs_sp = {}
+            try:
+                vs_rp = get_batter_sitcode_stats(pid, "vrp")
+            except Exception:
+                vs_rp = {}
+            return recent, vs_lhp, vs_rhp, vs_sp, vs_rp
+
+        all_batters = lineup["away_batters"] + lineup["home_batters"]
+        n_away = len(lineup["away_batters"])
+
+        with ThreadPoolExecutor(max_workers=30) as ex:
+            futures = [ex.submit(_fetch_all_batter_data, b) for b in all_batters]
+            all_results_data = [f.result() for f in futures]
+
+        # Split results back into away and home
+        away_data = all_results_data[:n_away]
+        home_data = all_results_data[n_away:]
+
+        away_recent       = [d[0] for d in away_data]
+        home_recent       = [d[0] for d in home_data]
+        away_display_extra = [{"vs_lhp": d[1], "vs_rhp": d[2], "vs_sp": d[3], "vs_rp": d[4]} for d in away_data]
+        home_display_extra = [{"vs_lhp": d[1], "vs_rhp": d[2], "vs_sp": d[3], "vs_rp": d[4]} for d in home_data]
+
     # Fetch weather for this ballpark
     weather = get_ballpark_weather(game["venue"])
 
-    # Run the simulation
+    # Extract vs-RP stats for SP→bullpen transition in the simulation
+    # These are the batter's historical stats against relief pitchers specifically.
+    # The sim uses them for innings 6-9 instead of the starting pitcher probs.
+    away_rp_stats = [ex.get("vs_rp", {}) for ex in away_display_extra] if away_display_extra else None
+    home_rp_stats = [ex.get("vs_rp", {}) for ex in home_display_extra] if home_display_extra else None
+
+    # Run the simulation — all factors now wired in:
+    #   - L/R pitcher splits (base stats)
+    #   - Recent form blend (last 20 games)
+    #   - Weather effects on HR
+    #   - SP vs RP: innings 1-5 starter, innings 6-9 bullpen
     result = run_simulation(
-        away_team    = game["away_team"],
-        home_team    = game["home_team"],
-        away_lineup  = away_batter_stats,
-        home_lineup  = home_batter_stats,
-        away_pitcher = away_pitcher_stats,
-        home_pitcher = home_pitcher_stats,
-        weather      = weather,
-        n            = n_sims,
+        away_team      = game["away_team"],
+        home_team      = game["home_team"],
+        away_lineup    = away_batter_stats,
+        home_lineup    = home_batter_stats,
+        away_pitcher   = away_pitcher_stats,
+        home_pitcher   = home_pitcher_stats,
+        weather        = weather,
+        away_recent    = away_recent if use_splits else None,
+        home_recent    = home_recent if use_splits else None,
+        away_rp_stats  = away_rp_stats if use_splits else None,
+        home_rp_stats  = home_rp_stats if use_splits else None,
+        n              = n_sims,
+    )
+
+    # Build per-batter stat rows for display (season + recent + L/R + SP/RP)
+    def build_batter_display(batters, season_stats_list, recent_stats_list, extra_list):
+        rows = []
+        for i, b in enumerate(batters):
+            s    = season_stats_list[i] if i < len(season_stats_list) else {}
+            r    = recent_stats_list[i] if recent_stats_list and i < len(recent_stats_list) else {}
+            ex   = extra_list[i] if extra_list and i < len(extra_list) else {}
+
+            vs_lhp = ex.get("vs_lhp", {})
+            vs_rhp = ex.get("vs_rhp", {})
+            vs_sp  = ex.get("vs_sp",  {})
+            vs_rp  = ex.get("vs_rp",  {})
+
+            # Season: singles vs extra base hits
+            hits    = s.get("hits", 0)
+            doubles = s.get("doubles", 0)
+            triples = s.get("triples", 0)
+            hr      = s.get("homeRuns", 0)
+            xbh     = doubles + triples + hr
+            singles = max(0, hits - xbh)
+
+            # Recent form: batting average over last 20 games
+            r_ab   = r.get("atBats", 0)
+            r_hits = r.get("hits", 0)
+            r_avg  = round(r_hits / r_ab, 3) if r_ab > 0 else None
+
+            def _fmt_avg(d):
+                """Format avg from a split stats dict."""
+                v = d.get("avg", "")
+                return v if v else "—"
+
+            def _fmt_ops(d):
+                v = d.get("ops", "")
+                return v if v else "—"
+
+            rows.append({
+                **b,
+                # Season stats
+                "avg":      s.get("avg", "—"),
+                "obp":      s.get("obp", "—"),
+                "slg":      s.get("slg", "—"),
+                "ops":      s.get("ops", "—"),
+                "hr":       hr,
+                "rbi":      s.get("rbi", 0),
+                "so":       s.get("strikeOuts", 0),
+                "bb":       s.get("baseOnBalls", 0),
+                "pa":       s.get("plateAppearances", 0),
+                # Hit type breakdown
+                "singles":  singles,
+                "doubles":  doubles,
+                "triples":  triples,
+                "xbh":      xbh,
+                # vs LHP / RHP
+                "vs_lhp_avg": _fmt_avg(vs_lhp),
+                "vs_lhp_ops": _fmt_ops(vs_lhp),
+                "vs_lhp_pa":  vs_lhp.get("plateAppearances", 0),
+                "vs_rhp_avg": _fmt_avg(vs_rhp),
+                "vs_rhp_ops": _fmt_ops(vs_rhp),
+                "vs_rhp_pa":  vs_rhp.get("plateAppearances", 0),
+                # vs SP / RP (early vs late game)
+                "vs_sp_avg":  _fmt_avg(vs_sp),
+                "vs_sp_ops":  _fmt_ops(vs_sp),
+                "vs_sp_pa":   vs_sp.get("plateAppearances", 0),
+                "vs_rp_avg":  _fmt_avg(vs_rp),
+                "vs_rp_ops":  _fmt_ops(vs_rp),
+                "vs_rp_pa":   vs_rp.get("plateAppearances", 0),
+                # Recent form (last 20 games)
+                "recent_avg":   f".{int(r_avg * 1000):03d}" if r_avg is not None else "—",
+                "recent_games": r.get("games_found", 0),
+                "recent_hr":    r.get("homeRuns", 0),
+                "recent_rbi":   r.get("rbi", 0),
+            })
+        return rows
+
+    away_display = build_batter_display(
+        lineup["away_batters"], away_batter_stats,
+        away_recent if use_splits else [],
+        away_display_extra if use_splits else []
+    )
+    home_display = build_batter_display(
+        lineup["home_batters"], home_batter_stats,
+        home_recent if use_splits else [],
+        home_display_extra if use_splits else []
     )
 
     # Attach extra context for display
@@ -127,9 +279,10 @@ def build_game_result(game, n_sims, use_splits=True):
         "home_era":           home_pitcher_stats.get("era",  "N/A"),
         "home_whip":          home_pitcher_stats.get("whip", "N/A"),
         "home_wl":            f"{home_pitcher_stats.get('wins',0)}-{home_pitcher_stats.get('losses',0)}",
-        "away_batters":       lineup["away_batters"],
-        "home_batters":       lineup["home_batters"],
+        "away_batters":       away_display,
+        "home_batters":       home_display,
         "weather":            weather,
+        "use_recent":         use_splits,   # flag for template to show/hide recent form column
     })
     return result
 
@@ -160,7 +313,8 @@ def index():
                            selected_date=selected_date.isoformat(),
                            prev_date=prev_date,
                            next_date=next_date,
-                           is_today=is_today)
+                           is_today=is_today,
+                           api_remaining=get_requests_remaining())
 
 
 @app.route("/simulate/<int:game_pk>")
@@ -186,8 +340,8 @@ def simulate(game_pk):
                                date=date.today().strftime("%A, %B %d %Y"),
                                error="Lineup not available yet. Try a game already in progress.")
 
-    # Fetch live betting odds and calculate our edge vs Vegas
-    all_odds = get_mlb_odds()
+    # Fetch moneyline odds (cached for 30 min — only 1 API call per 30 min window)
+    all_odds  = get_mlb_odds()
     odds_key  = frozenset([game["away_team"], game["home_team"]])
     game_odds = all_odds.get(odds_key, {})
 
@@ -208,7 +362,32 @@ def simulate(game_pk):
         result["home_edge"]        = None
         result["books_used"]       = 0
 
+    # Props are NOT auto-fetched here — user clicks "Load Props" button
+    # which calls /props/<game_pk> separately (saves 2 API calls per simulation)
+    result["props_by_player"] = {}
+
     return render_template("result.html", **result)
+
+
+@app.route("/props/<int:game_pk>")
+def load_props(game_pk):
+    """
+    On-demand player props endpoint — only called when user clicks Load Props.
+    Costs 2 API requests (events list + props for this game).
+    Returns JSON so the page loads props without a full refresh.
+    """
+    from flask import jsonify
+
+    games = get_today_schedule()
+    game  = next((g for g in games if g["gamePk"] == game_pk), None)
+    if not game:
+        return jsonify({})
+
+    odds_key   = frozenset([game["away_team"], game["home_team"]])
+    all_events = get_mlb_events()
+    event_id   = all_events.get(odds_key)
+    props      = get_player_props(event_id) if event_id else {}
+    return jsonify(props)
 
 
 @app.route("/simulate-all")

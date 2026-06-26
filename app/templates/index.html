@@ -277,6 +277,27 @@
   {% if error %}
     <p class="error-msg">⚠ {{ error }}</p>
   {% endif %}
+
+  <!-- Odds API quota tracker -->
+  {% if api_remaining is not none %}
+    <div style="margin-top:10px; font-size:0.78rem; text-align:center;">
+      {% if api_remaining > 100 %}
+        <span style="color:#4caf50;">●</span>
+      {% elif api_remaining > 30 %}
+        <span style="color:#ffd54f;">●</span>
+      {% else %}
+        <span style="color:#ef5350;">●</span>
+      {% endif %}
+      Odds API:
+      <strong style="color:{% if api_remaining > 100 %}#4caf50{% elif api_remaining > 30 %}#ffd54f{% else %}#ef5350{% endif %};">
+        {{ api_remaining }} requests left
+      </strong>
+      this month
+      {% if api_remaining <= 30 %}
+        <span style="color:#ef5350;"> — running low!</span>
+      {% endif %}
+    </div>
+  {% endif %}
 </header>
 
 <!-- Games grid -->

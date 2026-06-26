@@ -210,6 +210,66 @@
       border-radius: 4px;
     }
 
+    /* ── Per-batter expanded stats ── */
+    .batter-stats-row {
+      background: #13161f;
+      border-top: 1px solid #1e2130;
+      padding: 6px 22px 8px 22px;
+      font-size: 0.78rem;
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .bstat {
+      text-align: center;
+      min-width: 36px;
+    }
+    .bstat .bval { font-weight: 700; color: #e8eaf0; }
+    .bstat .blbl { color: #555870; font-size: 0.68rem; }
+
+    .hot-badge {
+      display: inline-block;
+      background: #1b4332;
+      color: #4caf50;
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 1px 5px;
+      border-radius: 4px;
+      margin-left: 4px;
+    }
+
+    .cold-badge {
+      display: inline-block;
+      background: #3b1f1f;
+      color: #ef5350;
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 1px 5px;
+      border-radius: 4px;
+      margin-left: 4px;
+    }
+
+    .batter-row { cursor: pointer; }
+    .batter-row:hover { background: #1e2130; }
+
+    /* ── Player prop pills ── */
+    .prop-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: #1e2130;
+      border: 1px solid #2a2d3a;
+      border-radius: 6px;
+      padding: 3px 8px;
+      font-size: 0.75rem;
+      margin: 2px 3px 2px 0;
+    }
+    .prop-label  { color: #8890a4; }
+    .prop-line   { color: #e8eaf0; font-weight: 600; }
+    .prop-odds   { color: #ffd54f; font-weight: 700; }
+    .prop-book   { color: #555870; font-size: 0.65rem; }
+
     .back-btn {
       display: block;
       width: fit-content;
@@ -321,76 +381,304 @@
 <div class="card">
   <div class="section-title">Starting Pitchers</div>
 
+  {% for pitcher_name, team_name, era, whip, wl in [
+      (away_pitcher_name, away_team, away_era, away_whip, away_wl),
+      (home_pitcher_name, home_team, home_era, home_whip, home_wl)
+  ] %}
   <div class="pitcher-row">
     <div>
-      <div class="pitcher-name">{{ away_pitcher_name }}</div>
-      <div class="pitcher-team">{{ away_team }}</div>
+      <div class="pitcher-name">{{ pitcher_name }}</div>
+      <div class="pitcher-team">{{ team_name }}</div>
+      <!-- Pitcher Ks prop — populated by JS -->
+      {% set pitcher_slug = pitcher_name | replace(' ', '_') | replace('.', '') %}
+      <div class="pitcher-prop-{{ pitcher_slug }}" style="margin-top:4px;"></div>
     </div>
     <div class="pitcher-stats">
       <div class="stat-pill">
-        <div class="val">{{ away_era }}</div>
+        <div class="val">{{ era }}</div>
         <div class="lbl">ERA</div>
       </div>
       <div class="stat-pill">
-        <div class="val">{{ away_whip }}</div>
+        <div class="val">{{ whip }}</div>
         <div class="lbl">WHIP</div>
       </div>
       <div class="stat-pill">
-        <div class="val">{{ away_wl }}</div>
+        <div class="val">{{ wl }}</div>
         <div class="lbl">W-L</div>
       </div>
     </div>
   </div>
+  {% endfor %}
+</div>
 
-  <div class="pitcher-row">
-    <div>
-      <div class="pitcher-name">{{ home_pitcher_name }}</div>
-      <div class="pitcher-team">{{ home_team }}</div>
-    </div>
-    <div class="pitcher-stats">
-      <div class="stat-pill">
-        <div class="val">{{ home_era }}</div>
-        <div class="lbl">ERA</div>
-      </div>
-      <div class="stat-pill">
-        <div class="val">{{ home_whip }}</div>
-        <div class="lbl">WHIP</div>
-      </div>
-      <div class="stat-pill">
-        <div class="val">{{ home_wl }}</div>
-        <div class="lbl">W-L</div>
-      </div>
-    </div>
-  </div>
+<!-- ── Load Props button ── -->
+<div style="max-width:900px; margin: 0 auto 16px auto; text-align:right;">
+  <button id="load-props-btn" onclick="loadProps()"
+    style="background:transparent; border:1px solid #2a2d3a; color:#8890a4;
+           padding:8px 18px; border-radius:8px; cursor:pointer; font-size:0.85rem;
+           font-weight:600; transition: all 0.2s;">
+    📊 Load Player Props
+  </button>
+  <span style="font-size:0.72rem; color:#555870; margin-left:10px;">Uses 2 API requests</span>
 </div>
 
 <!-- ── Lineups card ── -->
-<div class="card">
-  <div class="section-title">Lineups</div>
-  <div class="lineups-grid">
-    <div class="lineup-col">
-      <h3>{{ away_team }}</h3>
-      {% for b in away_batters %}
-      <div class="batter-row">
-        <span class="slot">{{ loop.index }}</span>
-        <span class="batter-name">{{ b.name }}</span>
-        <span class="pos-badge">{{ b.position }}</span>
-      </div>
-      {% endfor %}
+<div class="card" style="max-width:900px;">
+  <div class="section-title">
+    Lineups
+    <span style="float:right; font-weight:400; text-transform:none; letter-spacing:0; font-size:0.72rem; color:#555870;">
+      Click a player to see their breakdown
+      {% if use_recent %} · Recent = last 20 games{% endif %}
+    </span>
+  </div>
+
+  {% macro lineup_table(team_name, batters, opp_pitcher_name, opp_pitcher_hand) %}
+  <div style="margin-bottom: 24px;">
+    <div style="font-weight:700; font-size:0.9rem; color:#fff; margin-bottom:8px; padding-bottom:6px; border-bottom:1px solid #2a2d3a;">
+      {{ team_name }}
+      <span style="font-weight:400; font-size:0.75rem; color:#8890a4; margin-left:8px;">vs {{ opp_pitcher_name }} ({{ opp_pitcher_hand }}HP)</span>
     </div>
 
-    <div class="lineup-col">
-      <h3>{{ home_team }}</h3>
-      {% for b in home_batters %}
-      <div class="batter-row">
-        <span class="slot">{{ loop.index }}</span>
-        <span class="batter-name">{{ b.name }}</span>
-        <span class="pos-badge">{{ b.position }}</span>
-      </div>
-      {% endfor %}
+    {% for b in batters %}
+    {% set uid = team_name | replace(' ','_') ~ '_' ~ loop.index %}
+
+    <!-- Name / pos row — click to toggle stats -->
+    <div class="batter-row" onclick="toggleStats('{{ uid }}')"
+         style="display:flex; align-items:center; gap:8px; padding:6px 0; font-size:0.85rem; border-top:1px solid #1a1d27;">
+      <span class="slot">{{ loop.index }}</span>
+      <span class="batter-name">
+        {{ b.name }}
+        {% if use_recent and b.recent_games >= 5 %}
+          {% set r_avg_float = b.recent_avg | replace('.','') | int / 1000 %}
+          {% set s_avg_str = b.avg | string %}
+          {% if b.recent_avg != '—' and s_avg_str != '—' %}
+            {% set s_avg_float = s_avg_str | replace('.','') | int / 1000 %}
+            {% if r_avg_float > s_avg_float + 0.030 %}
+              <span class="hot-badge">🔥 HOT</span>
+            {% elif r_avg_float < s_avg_float - 0.030 %}
+              <span class="cold-badge">❄ COLD</span>
+            {% endif %}
+          {% endif %}
+        {% endif %}
+      </span>
+      <span class="pos-badge">{{ b.position }}</span>
+      <span style="font-size:0.75rem; color:#8890a4; margin-left:auto;">{{ b.avg }} AVG</span>
     </div>
+
+    <!-- Expandable stats row -->
+    <div id="{{ uid }}" style="display:none;">
+      <!-- Row 1: Season totals + hit breakdown -->
+      <div class="batter-stats-row">
+        <div style="font-size:0.68rem; color:#555870; width:100%; margin-bottom:4px; text-transform:uppercase; letter-spacing:0.5px;">Season</div>
+        <div class="bstat"><div class="bval">{{ b.avg }}</div><div class="blbl">AVG</div></div>
+        <div class="bstat"><div class="bval">{{ b.obp }}</div><div class="blbl">OBP</div></div>
+        <div class="bstat"><div class="bval">{{ b.slg }}</div><div class="blbl">SLG</div></div>
+        <div class="bstat"><div class="bval">{{ b.ops }}</div><div class="blbl">OPS</div></div>
+        <div class="bstat"><div class="bval">{{ b.hr }}</div><div class="blbl">HR</div></div>
+        <div class="bstat"><div class="bval">{{ b.rbi }}</div><div class="blbl">RBI</div></div>
+        <div class="bstat"><div class="bval">{{ b.bb }}</div><div class="blbl">BB</div></div>
+        <div class="bstat"><div class="bval">{{ b.so }}</div><div class="blbl">K</div></div>
+        <div style="width:1px; background:#2a2d3a; margin:0 4px;"></div>
+        <div class="bstat"><div class="bval">{{ b.singles }}</div><div class="blbl">1B</div></div>
+        <div class="bstat"><div class="bval">{{ b.doubles }}</div><div class="blbl">2B</div></div>
+        <div class="bstat"><div class="bval">{{ b.triples }}</div><div class="blbl">3B</div></div>
+        <div class="bstat"><div class="bval" style="color:#ffd54f;">{{ b.xbh }}</div><div class="blbl">XBH</div></div>
+      </div>
+
+      <!-- Row 2: vs LHP / vs RHP -->
+      {% if b.vs_lhp_pa > 0 or b.vs_rhp_pa > 0 %}
+      <div class="batter-stats-row">
+        <div style="font-size:0.68rem; color:#555870; width:100%; margin-bottom:4px; text-transform:uppercase; letter-spacing:0.5px;">vs Pitcher Hand</div>
+        <div style="display:flex; gap:24px; flex-wrap:wrap;">
+          <div>
+            <span style="font-size:0.72rem; color:#64b5f6; font-weight:600;">vs LHP</span>
+            <span style="color:#555870; font-size:0.68rem; margin-left:4px;">({{ b.vs_lhp_pa }} PA)</span>
+            <div style="display:flex; gap:12px; margin-top:4px;">
+              <div class="bstat"><div class="bval">{{ b.vs_lhp_avg }}</div><div class="blbl">AVG</div></div>
+              <div class="bstat"><div class="bval">{{ b.vs_lhp_ops }}</div><div class="blbl">OPS</div></div>
+            </div>
+          </div>
+          <div>
+            <span style="font-size:0.72rem; color:#81c784; font-weight:600;">vs RHP</span>
+            <span style="color:#555870; font-size:0.68rem; margin-left:4px;">({{ b.vs_rhp_pa }} PA)</span>
+            <div style="display:flex; gap:12px; margin-top:4px;">
+              <div class="bstat"><div class="bval">{{ b.vs_rhp_avg }}</div><div class="blbl">AVG</div></div>
+              <div class="bstat"><div class="bval">{{ b.vs_rhp_ops }}</div><div class="blbl">OPS</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Row 3: vs SP / vs RP (early vs late game) -->
+      {% if b.vs_sp_pa > 0 or b.vs_rp_pa > 0 %}
+      <div class="batter-stats-row">
+        <div style="font-size:0.68rem; color:#555870; width:100%; margin-bottom:4px; text-transform:uppercase; letter-spacing:0.5px;">Early vs Late Game</div>
+        <div style="display:flex; gap:24px; flex-wrap:wrap;">
+          <div>
+            <span style="font-size:0.72rem; color:#ffb74d; font-weight:600;">vs SP</span>
+            <span style="color:#555870; font-size:0.68rem; margin-left:4px;">({{ b.vs_sp_pa }} PA)</span>
+            <div style="display:flex; gap:12px; margin-top:4px;">
+              <div class="bstat"><div class="bval">{{ b.vs_sp_avg }}</div><div class="blbl">AVG</div></div>
+              <div class="bstat"><div class="bval">{{ b.vs_sp_ops }}</div><div class="blbl">OPS</div></div>
+            </div>
+          </div>
+          <div>
+            <span style="font-size:0.72rem; color:#ce93d8; font-weight:600;">vs RP</span>
+            <span style="color:#555870; font-size:0.68rem; margin-left:4px;">({{ b.vs_rp_pa }} PA)</span>
+            <div style="display:flex; gap:12px; margin-top:4px;">
+              <div class="bstat"><div class="bval">{{ b.vs_rp_avg }}</div><div class="blbl">AVG</div></div>
+              <div class="bstat"><div class="bval">{{ b.vs_rp_ops }}</div><div class="blbl">OPS</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Row 4: Recent form (last 20 games) -->
+      {% if use_recent and b.recent_games >= 5 %}
+      <div class="batter-stats-row">
+        <div style="font-size:0.68rem; color:#555870; width:100%; margin-bottom:4px; text-transform:uppercase; letter-spacing:0.5px;">Last {{ b.recent_games }} Games</div>
+        <div class="bstat" style="min-width:52px;">
+          <div class="bval" style="color:{% if b.recent_avg != '—' and b.avg != '—' %}
+            {%- set r = b.recent_avg | replace('.','') | int -%}
+            {%- set s = b.avg | replace('.','') | int -%}
+            {%- if r > s + 30 %}#4caf50{% elif r < s - 30 %}#ef5350{% else %}#e8eaf0{% endif %}
+          {% else %}#e8eaf0{% endif %};">
+            {{ b.recent_avg }}
+          </div>
+          <div class="blbl">AVG</div>
+        </div>
+        <div class="bstat"><div class="bval">{{ b.recent_hr }}</div><div class="blbl">HR</div></div>
+        <div class="bstat"><div class="bval">{{ b.recent_rbi }}</div><div class="blbl">RBI</div></div>
+      </div>
+      {% endif %}
+
+      <!-- Row 5: Player prop odds — populated by JS when user clicks Load Props -->
+      <div data-prop-player="{{ b.name }}" style="display:none; padding: 6px 22px 8px 22px; background:#13161f; border-top:1px solid #1e2130;">
+        <div style="font-size:0.68rem; color:#555870; margin-bottom:4px; text-transform:uppercase; letter-spacing:0.5px;">📊 Prop Lines</div>
+        <div class="prop-content-inner" style="display:flex; flex-wrap:wrap; gap:4px;"></div>
+      </div>
+    </div>
+    {% endfor %}
   </div>
+  {% endmacro %}
+
+  {{ lineup_table(away_team, away_batters, home_pitcher_name, home_pitcher_hand) }}
+  {{ lineup_table(home_team, home_batters, away_pitcher_name, away_pitcher_hand) }}
 </div>
+
+<script>
+// ── Toggle batter stat rows ───────────────────────────────────────
+function toggleStats(uid) {
+  var el = document.getElementById(uid);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+// ── Load Props on demand ──────────────────────────────────────────
+var propsLoaded = false;
+
+function loadProps() {
+  if (propsLoaded) return;
+
+  var btn = document.getElementById('load-props-btn');
+  btn.textContent = 'Loading props...';
+  btn.disabled = true;
+
+  fetch('/props/{{ game_pk }}')
+    .then(function(r) { return r.json(); })
+    .then(function(props) {
+      propsLoaded = true;
+
+      // Populate batter prop rows
+      document.querySelectorAll('[class*="prop-content-"]').forEach(function(el) {
+        var uid = el.className.replace('prop-content-', '');
+        // uid is like "New_York_Yankees_1" — extract player name from data attr
+      });
+
+      // Walk through all prop rows and fill them in by player name
+      document.querySelectorAll('[data-player]').forEach(function(container) {
+        var playerName = container.getAttribute('data-player');
+        var playerProps = props[playerName] || [];
+        if (playerProps.length === 0) return;
+
+        // Show the prop row
+        var propRow = container.closest('[id]')
+          ? document.querySelector('.prop-row[data-for="' + container.getAttribute('data-uid') + '"]')
+          : null;
+
+        var contentEl = container.querySelector('.prop-content');
+        if (!contentEl) return;
+
+        contentEl.innerHTML = playerProps.map(function(p) {
+          return '<span class="prop-pill">'
+            + '<span class="prop-label">' + p.market + '</span> '
+            + '<span class="prop-line">' + p.desc + '</span> '
+            + '<span class="prop-odds">' + p.odds + '</span> '
+            + '<span class="prop-book">' + p.book + '</span>'
+            + '</span>';
+        }).join('');
+
+        container.closest('.prop-row-wrapper').style.display = 'block';
+      });
+
+      // Pitcher K props
+      Object.keys(props).forEach(function(playerName) {
+        var slug = playerName.replace(/ /g, '_').replace(/\./g, '');
+        var el = document.querySelector('.pitcher-prop-' + slug);
+        if (!el) return;
+        var kProps = props[playerName].filter(function(p) { return p.market === 'K'; });
+        el.innerHTML = kProps.map(function(p) {
+          return '<span class="prop-pill">'
+            + '<span class="prop-label">K</span> '
+            + '<span class="prop-line">' + p.desc + '</span> '
+            + '<span class="prop-odds">' + p.odds + '</span> '
+            + '<span class="prop-book">' + p.book + '</span>'
+            + '</span>';
+        }).join('');
+      });
+
+      btn.textContent = '✓ Props Loaded';
+      btn.style.background = '#1b4332';
+      btn.style.color = '#4caf50';
+      btn.style.borderColor = '#4caf50';
+
+      // Re-populate batter prop content areas using stored name map
+      window._propNameMap && window._propNameMap.forEach(function(entry) {
+        var playerName = entry.name;
+        var contentEl  = entry.el;
+        var wrapperEl  = entry.wrapper;
+        var playerProps = props[playerName] || [];
+        if (playerProps.length === 0) return;
+
+        contentEl.innerHTML = playerProps.map(function(p) {
+          return '<span class="prop-pill">'
+            + '<span class="prop-label">' + p.market + '</span> '
+            + '<span class="prop-line">' + p.desc + '</span> '
+            + '<span class="prop-odds">' + p.odds + '</span> '
+            + '<span class="prop-book">' + p.book + '</span>'
+            + '</span>';
+        }).join('');
+
+        wrapperEl.style.display = 'flex';
+      });
+    })
+    .catch(function() {
+      btn.textContent = 'Props unavailable';
+      btn.disabled = false;
+    });
+}
+
+// Build a map of player name → DOM elements for prop content areas
+window._propNameMap = [];
+document.querySelectorAll('[data-prop-player]').forEach(function(wrapper) {
+  var name    = wrapper.getAttribute('data-prop-player');
+  var content = wrapper.querySelector('.prop-content-inner');
+  if (name && content) {
+    window._propNameMap.push({ name: name, el: content, wrapper: wrapper });
+  }
+});
+</script>
 
 <div style="text-align:center; margin-top: 8px; margin-bottom: 40px;">
   <a class="back-btn" href="/">← Simulate Another Game</a>
