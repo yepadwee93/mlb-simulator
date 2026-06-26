@@ -772,12 +772,16 @@ def simulate(game_pk):
     except ValueError:
         n_sims = N_SIMS_SINGLE
 
-    result = build_game_result(game, n_sims=n_sims)
+    try:
+        result = build_game_result(game, n_sims=n_sims)
+    except Exception:
+        result = None
+
     if result is None:
-        return render_template("index.html", games=games,
-                               date=date.today().strftime("%A, %B %d %Y"),
-                               error="Lineup not available yet. Try a game already in progress.",
-                               api_remaining=get_requests_remaining())
+        return render_template("no_lineup.html",
+                               away_team=game.get("away_team", "Away"),
+                               home_team=game.get("home_team", "Home"),
+                               game_time=game.get("game_time", ""))
 
     # Cache score_pairs for SGP correlated probability calculations
     if "score_pairs" in result:

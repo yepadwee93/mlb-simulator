@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lineup Not Available — MLB Simulator</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0d1120; color: #e8eaf0; font-family: 'Segoe UI', Arial, sans-serif; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 20px; }
+    .card { background: #1a1e2e; border: 1px solid #353a52; border-radius: 16px; padding: 40px 44px; max-width: 480px; width: 100%; text-align: center; }
+    .icon { font-size: 3.5rem; margin-bottom: 16px; }
+    h1 { font-size: 1.4rem; font-weight: 800; margin-bottom: 10px; color: #fff; }
+    .matchup { font-size: 1.1rem; font-weight: 700; color: #64b5f6; margin-bottom: 20px; }
+    p { font-size: 0.88rem; color: #b0b8cc; line-height: 1.7; margin-bottom: 10px; }
+    .time-note { font-size: 0.8rem; color: #9aa0b8; margin-bottom: 28px; }
+    .btn { display: inline-block; padding: 12px 28px; background: #2563eb; color: #fff; font-weight: 700; border-radius: 8px; text-decoration: none; font-size: 0.9rem; transition: background 0.15s; }
+    .btn:hover { background: #1d4ed8; }
+    .hint { margin-top: 20px; font-size: 0.75rem; color: #555870; }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <div class="icon">⏳</div>
+  <h1>Lineup Not In Yet</h1>
+  <div class="matchup">{{ away_team }} @ {{ home_team }}</div>
+  <p>The lineup for this game hasn't been submitted yet. Managers typically post lineups 1–2 hours before first pitch.</p>
+  {% if game_time %}
+  <div class="time-note" id="game-time-display">First pitch: <span id="gt">{{ game_time[11:16] }} UTC</span></div>
+  {% endif %}
+  <p>Check back closer to game time and try again — the simulation will be ready once both lineups are confirmed.</p>
+  <br>
+  <a href="/" class="btn">← Back to Games</a>
+  <div class="hint">You can also hit "Simulate All Games" once lineups are posted — it skips games with missing lineups automatically.</div>
+</div>
+
+<script>
+var el = document.getElementById('gt');
+var raw = '{{ game_time }}';
+if (el && raw) {
+  try {
+    var d = new Date(raw);
+    el.textContent = d.toLocaleTimeString([], {hour:'numeric', minute:'2-digit', timeZoneName:'short'});
+  } catch(e) {}
+}
+</script>
+
+</body>
+</html>
