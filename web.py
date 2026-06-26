@@ -981,7 +981,76 @@ def simulate(game_pk):
         result["away_order_opt"] = {}
         result["home_order_opt"] = {}
 
+    # ── Stadium profile ───────────────────────────────────────────────
+    result["stadium_profile"] = _build_stadium_profile(
+        game.get("venue", ""),
+        away_batter_stats,
+        home_batter_stats,
+    )
+
     return render_template("result.html", game_pk=game_pk, n_sims=n_sims, **result)
+
+
+def _build_stadium_profile(venue, away_batters, home_batters):
+    """Build a stadium split profile for the result page."""
+    from simulation.engine import BALLPARK_FACTORS, DEFAULT_PARK_FACTOR
+    park = BALLPARK_FACTORS.get(venue, DEFAULT_PARK_FACTOR)
+    hr_f  = park.get("hr",  1.0)
+    hit_f = park.get("hit", 1.0)
+    run_f = park.get("run", 1.0)
+
+    if hr_f >= 1.10:
+        park_type = "hitter-friendly"
+        park_color = "#81c784"
+    elif hr_f <= 0.90:
+        park_type = "pitcher-friendly"
+        park_color = "#ef5350"
+    else:
+        park_type = "neutral"
+        park_color = "#9aa0b8"
+
+    def batter_impact(batters):
+        impacts = []
+        for s in (batters or [])[:9]:
+            name = s.get("name", "")
+            if not name:
+                continue
+            from simulation.engine import build_batter_probs
+            try:
+                probs = build_batter_probs(s)
+            except Exception:
+                continue
+            p_hr  = probs[5]
+            p_hit = probs[2] + probs[3] + probs[4] + probs[5]
+            # Power hitter = p_hr > 4% per PA
+            is_power = p_hr > 0.04
+            # Contact hitter = p_hit > 28% per PA
+            is_contact = p_hit > 0.28
+            adj_hr  = round((hr_f  - 1.0) * 100, 0)
+            adj_hit = round((hit_f - 1.0) * 100, 0)
+            if is_power and abs(adj_hr) >= 5:
+                note = f"HR factor {'+' if adj_hr > 0 else ''}{int(adj_hr)}%"
+                flag = "power"
+            elif is_contact and abs(adj_hit) >= 3:
+                note = f"Hit factor {'+' if adj_hit > 0 else ''}{int(adj_hit)}%"
+                flag = "contact"
+            else:
+                note = None
+                flag = None
+            impacts.append({"name": name, "note": note, "flag": flag,
+                             "p_hr": round(p_hr * 100, 1), "p_hit": round(p_hit * 100, 1)})
+        return impacts
+
+    return {
+        "venue":      venue,
+        "hr_factor":  round(hr_f,  3),
+        "hit_factor": round(hit_f, 3),
+        "run_factor": round(run_f, 3),
+        "park_type":  park_type,
+        "park_color": park_color,
+        "away_impacts": batter_impact(away_batters),
+        "home_impacts": batter_impact(home_batters),
+    }
 
 
 _props_cache = {}  # game_pk → (timestamp, props dict)

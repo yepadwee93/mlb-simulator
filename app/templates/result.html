@@ -1030,6 +1030,78 @@
 </div>
 {% endif %}
 
+{# ── Stadium Batter Splits ── #}
+{% if stadium_profile and stadium_profile.venue %}
+{% set sp = stadium_profile %}
+<div class="card" style="max-width:900px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+    <h2 style="font-size:1rem;font-weight:800;">🏟️ {{ sp.venue }}</h2>
+    <span style="font-size:0.75rem;font-weight:700;padding:3px 10px;border-radius:12px;background:#1a1e2e;color:{{ sp.park_color }};border:1px solid {{ sp.park_color }};">
+      {{ sp.park_type | title }}
+    </span>
+  </div>
+
+  {# Park factor bars #}
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px;">
+    {% for label, val, color in [
+        ('HR Factor',  sp.hr_factor,  '#ef5350' if sp.hr_factor > 1 else '#81c784'),
+        ('Hit Factor', sp.hit_factor, '#64b5f6' if sp.hit_factor > 1 else '#9aa0b8'),
+        ('Run Factor', sp.run_factor, '#ffd54f' if sp.run_factor > 1 else '#9aa0b8'),
+    ] %}
+    <div style="background:#13162a;border-radius:10px;padding:10px 14px;">
+      <div style="font-size:0.67rem;color:#9aa0b8;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">{{ label }}</div>
+      <div style="font-size:1.2rem;font-weight:800;color:{{ color }};">{{ "%.2f"|format(val) }}x</div>
+      <div style="margin-top:6px;height:4px;background:#1a1e2e;border-radius:2px;overflow:hidden;">
+        {% set bar_pct = [(val - 0.75) / 0.75 * 100, 0] | max %}
+        {% set bar_pct = [bar_pct, 100] | min %}
+        <div style="width:{{ bar_pct }}%;height:100%;background:{{ color }};border-radius:2px;"></div>
+      </div>
+      <div style="font-size:0.65rem;color:#555870;margin-top:4px;">
+        {% if val > 1.0 %}+{{ "%.1f"|format((val-1)*100) }}% vs avg{% elif val < 1.0 %}-{{ "%.1f"|format((1-val)*100) }}% vs avg{% else %}league avg{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  {# Batter impacts #}
+  {% set away_flagged = sp.away_impacts | selectattr('note') | list %}
+  {% set home_flagged = sp.home_impacts | selectattr('note') | list %}
+  {% if away_flagged or home_flagged %}
+  <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#9aa0b8;margin-bottom:10px;">Batter Impact at This Park</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+    <div>
+      <div style="font-size:0.7rem;color:#b0b8cc;margin-bottom:6px;font-weight:600;">{{ away_team }}</div>
+      {% if away_flagged %}
+        {% for b in away_flagged %}
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #1a1d28;font-size:0.78rem;">
+          <span style="color:#e8eaf0;font-weight:600;">{{ b.name }}</span>
+          <span style="color:{{ '#ef5350' if sp.hr_factor < 0.95 and b.flag == 'power' else '#81c784' if sp.hr_factor > 1.05 and b.flag == 'power' else '#9aa0b8' }};font-size:0.7rem;">{{ b.note }}</span>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div style="color:#555870;font-size:0.75rem;">No notable park effects</div>
+      {% endif %}
+    </div>
+    <div>
+      <div style="font-size:0.7rem;color:#b0b8cc;margin-bottom:6px;font-weight:600;">{{ home_team }}</div>
+      {% if home_flagged %}
+        {% for b in home_flagged %}
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #1a1d28;font-size:0.78rem;">
+          <span style="color:#e8eaf0;font-weight:600;">{{ b.name }}</span>
+          <span style="color:{{ '#ef5350' if sp.hr_factor < 0.95 and b.flag == 'power' else '#81c784' if sp.hr_factor > 1.05 and b.flag == 'power' else '#9aa0b8' }};font-size:0.7rem;">{{ b.note }}</span>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div style="color:#555870;font-size:0.75rem;">No notable park effects</div>
+      {% endif %}
+    </div>
+  </div>
+  {% else %}
+  <div style="color:#555870;font-size:0.8rem;">No significant park effects on today's lineups.</div>
+  {% endif %}
+</div>
+{% endif %}
+
 {# ── Batting Order Optimizer ── #}
 {% macro order_table(team, opt) %}
 {% if opt and opt.optimized %}
