@@ -1376,8 +1376,6 @@ def run_simulation(
         "score_pairs":         {str(k): v for k, v in score_pairs.items()},
         "avg_total_runs":      round((away_total + home_total) / n, 2),
         # Inning-segment results (F3/F5/F7)
-        "f1_over_pct":         round(f1_over / n_f1 * 100, 1),
-        "f1_under_pct":        round((n_f1 - f1_over) / n_f1 * 100, 1),
         "f3":                  seg_results["f3"],
         "f5":                  seg_results["f5"],
         "f7":                  seg_results["f7"],
