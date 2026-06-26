@@ -748,10 +748,16 @@ def index():
     # Public betting % — keyed by frozenset so game cards can look up by team names
     try:
         pub_pcts_raw = get_public_betting_pcts()
-        # Convert frozenset keys to sorted-tuple so Jinja can iterate
         pub_pcts = {tuple(sorted(k)): v for k, v in pub_pcts_raw.items()}
     except Exception:
         pub_pcts = {}
+
+    # Line movement — for reverse line movement detection
+    try:
+        lm_raw = get_line_movement()
+        line_movement = {tuple(sorted(k)): v for k, v in lm_raw.items()}
+    except Exception:
+        line_movement = {}
 
     # Check if logged-in user has an email set (for the signup nudge banner)
     show_email_nudge = False
@@ -771,6 +777,7 @@ def index():
                            next_date=next_date,
                            is_today=is_today,
                            pub_pcts=pub_pcts,
+                           line_movement=line_movement,
                            api_remaining=get_requests_remaining(),
                            show_email_nudge=show_email_nudge)
 
