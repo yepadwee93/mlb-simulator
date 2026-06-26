@@ -86,6 +86,8 @@ def _user_bets_csv():
     return None  # deprecated — use user_id=_uid() instead
 
 
+_score_pairs_cache = {}   # game_pk -> score_pairs dict for SGP correlated prob
+
 N_SIMS_SINGLE = 100_000   # simulations for one-game view
 N_SIMS_ALL    =  25_000   # simulations per game in simulate-all (faster)
 PARLAY_THRESHOLD  = 65.0   # min win % to include in best parlay
@@ -777,6 +779,10 @@ def simulate(game_pk):
                                error="Lineup not available yet. Try a game already in progress.",
                                api_remaining=get_requests_remaining())
 
+    # Cache score_pairs for SGP correlated probability calculations
+    if "score_pairs" in result:
+        _score_pairs_cache[game_pk] = result["score_pairs"]
+
     # Log this prediction for accuracy tracking
     try:
         log_prediction(
@@ -910,7 +916,7 @@ def simulate(game_pk):
     result["away_batter_props"] = away_batter_props
     result["home_batter_props"] = home_batter_props
 
-    return render_template("result.html", game_pk=game_pk, **result)
+    return render_template("result.html", game_pk=game_pk, n_sims=n_sims, **result)
 
 
 @app.route("/props/<int:game_pk>")
@@ -1277,6 +1283,64 @@ def simulate_all():
         api_remaining = get_requests_remaining(),
         username      = current_user.username,
     )
+
+
+@app.route("/sgp/<int:game_pk>", methods=["POST"])
+def sgp_calc(game_pk):
+    """Compute correlated SGP probability from simulation score_pairs."""
+    import json as _json
+    data = request.get_json(silent=True) or {}
+    legs = data.get("legs", [])  # each leg: {type, line, team}
+    # type: "ml_away"|"ml_home"|"over"|"under"|"rl_away"|"rl_home"
+    # line: numeric (e.g. 8.5 for totals, -1.5 for rl)
+    # team: ignored for over/under
+
+    # Retrieve cached score_pairs from last sim of this game
+    raw_pairs = _score_pairs_cache.get(game_pk)
+    if not raw_pairs:
+        return jsonify({"error": "Run simulation first"}), 400
+
+    # keys are strings like "(3, 5)" from JSON serialization — parse back
+    pairs = {}
+    for k, v in raw_pairs.items():
+        try:
+            a, h = k.strip("()").split(", ")
+            pairs[(int(a), int(h))] = v
+        except Exception:
+            pass
+
+    total = sum(pairs.values())
+    if total == 0:
+        return jsonify({"error": "No simulation data"}), 400
+
+    def leg_hits(a, h, leg):
+        t = leg.get("type", "")
+        line = float(leg.get("line", 0))
+        if t == "ml_away":   return a > h
+        if t == "ml_home":   return h > a
+        if t == "over":      return (a + h) > line
+        if t == "under":     return (a + h) < line
+        if t == "rl_away":   return (a - h) > line   # e.g. line=-1.5 → a-h > -1.5 → away wins by 2+
+        if t == "rl_home":   return (h - a) > line
+        return False
+
+    # Count simulations where ALL legs hit
+    hits = 0
+    for (a, h), count in pairs.items():
+        if all(leg_hits(a, h, leg) for leg in legs):
+            hits += count
+
+    prob = hits / total
+    fair_odds = round((-100 / prob) if prob >= 0.5 else (100 * (1 - prob) / prob), 0)
+    fair_odds_str = f"+{int(fair_odds)}" if fair_odds > 0 else str(int(fair_odds))
+
+    return jsonify({
+        "prob": round(prob * 100, 2),
+        "fair_odds": fair_odds_str,
+        "legs": len(legs),
+        "hits": hits,
+        "total": total,
+    })
 
 
 @app.route("/parlay")

@@ -1134,6 +1134,189 @@ document.querySelectorAll('[data-prop-player]').forEach(function(wrapper) {
 })();
 </script>
 
+<!-- ── Same Game Parlay (SGP) Builder ── -->
+<div class="card" style="margin-top:28px;">
+  <div class="card-header" style="cursor:pointer;" onclick="toggleSection('sgp-body')">
+    <span>🎲 Same Game Parlay Builder</span>
+    <span style="font-size:0.75rem;color:#9aa0b8;margin-left:8px;">Correlated probabilities from your simulation</span>
+  </div>
+  <div id="sgp-body" style="padding:20px 24px;">
+
+    <p style="font-size:0.82rem;color:#b0b8cc;margin-bottom:16px;">
+      Add legs from <b>{{ away_team }}</b> vs <b>{{ home_team }}</b>. Probabilities are computed from the actual score distribution in your {{ "{:,}".format(n_sims) }} simulations — fully correlated (e.g. if one team wins big, the over is more likely too).
+    </p>
+
+    <!-- Leg builder -->
+    <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:18px;">
+
+      <!-- ML legs -->
+      <button class="sgp-leg-btn" data-type="ml_away" data-line="0" data-label="ML: {{ away_team }}"
+              onclick="sgpToggle(this)" style="background:#1e2235;border:1px solid #353a52;color:#e8eaf0;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.82rem;">
+        ML: {{ away_team }}
+      </button>
+      <button class="sgp-leg-btn" data-type="ml_home" data-line="0" data-label="ML: {{ home_team }}"
+              onclick="sgpToggle(this)" style="background:#1e2235;border:1px solid #353a52;color:#e8eaf0;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.82rem;">
+        ML: {{ home_team }}
+      </button>
+
+      <!-- Run line -->
+      <button class="sgp-leg-btn" data-type="rl_away" data-line="-1.5" data-label="{{ away_team }} -1.5"
+              onclick="sgpToggle(this)" style="background:#1e2235;border:1px solid #353a52;color:#e8eaf0;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.82rem;">
+        {{ away_team }} -1.5
+      </button>
+      <button class="sgp-leg-btn" data-type="rl_home" data-line="-1.5" data-label="{{ home_team }} -1.5"
+              onclick="sgpToggle(this)" style="background:#1e2235;border:1px solid #353a52;color:#e8eaf0;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.82rem;">
+        {{ home_team }} -1.5
+      </button>
+
+      <!-- Totals — auto-populate from avg_total_runs if available -->
+      {% set ou_line = ((away_avg_runs + home_avg_runs) | round(0) | int) %}
+      <button class="sgp-leg-btn" data-type="over" data-line="{{ ou_line - 0.5 }}" data-label="Over {{ ou_line - 0.5 }}"
+              onclick="sgpToggle(this)" style="background:#1e2235;border:1px solid #353a52;color:#e8eaf0;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.82rem;">
+        Over {{ ou_line - 0.5 }}
+      </button>
+      <button class="sgp-leg-btn" data-type="under" data-line="{{ ou_line - 0.5 }}" data-label="Under {{ ou_line - 0.5 }}"
+              onclick="sgpToggle(this)" style="background:#1e2235;border:1px solid #353a52;color:#e8eaf0;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.82rem;">
+        Under {{ ou_line - 0.5 }}
+      </button>
+
+      <!-- Custom total line input -->
+      <div style="display:flex;align-items:center;gap:6px;">
+        <input id="sgp-custom-line" type="number" step="0.5" min="1" max="25" value="{{ ou_line - 0.5 }}"
+               style="width:70px;background:#0d1120;border:1px solid #333650;color:#e8eaf0;padding:6px 10px;border-radius:7px;font-size:0.82rem;">
+        <button onclick="sgpAddCustomOver()" style="background:#1e2235;border:1px solid #353a52;color:#64b5f6;padding:7px 12px;border-radius:7px;cursor:pointer;font-size:0.8rem;">+ Over</button>
+        <button onclick="sgpAddCustomUnder()" style="background:#1e2235;border:1px solid #353a52;color:#81c784;padding:7px 12px;border-radius:7px;cursor:pointer;font-size:0.8rem;">+ Under</button>
+      </div>
+    </div>
+
+    <!-- Active legs display -->
+    <div id="sgp-legs-list" style="min-height:36px;margin-bottom:14px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+      <span style="color:#555870;font-size:0.8rem;font-style:italic;" id="sgp-empty-msg">No legs selected — click buttons above</span>
+    </div>
+
+    <!-- Result -->
+    <div id="sgp-result" style="display:none;background:#0d1120;border-radius:10px;padding:16px 20px;border:1px solid #252836;">
+      <div style="display:flex;flex-wrap:wrap;gap:24px;align-items:center;">
+        <div>
+          <div style="font-size:0.72rem;color:#9aa0b8;text-transform:uppercase;letter-spacing:.4px;">True Probability</div>
+          <div id="sgp-prob" style="font-size:1.8rem;font-weight:800;color:#64b5f6;"></div>
+        </div>
+        <div>
+          <div style="font-size:0.72rem;color:#9aa0b8;text-transform:uppercase;letter-spacing:.4px;">Fair Odds</div>
+          <div id="sgp-odds" style="font-size:1.8rem;font-weight:800;color:#ffd54f;"></div>
+        </div>
+        <div>
+          <div style="font-size:0.72rem;color:#9aa0b8;text-transform:uppercase;letter-spacing:.4px;">Legs</div>
+          <div id="sgp-legs-count" style="font-size:1.8rem;font-weight:800;color:#b0b8cc;"></div>
+        </div>
+      </div>
+      <div style="margin-top:10px;font-size:0.75rem;color:#555870;">
+        Correlated probability — accounts for the natural relationship between legs (e.g. team wins → higher scoring game is slightly more likely).
+      </div>
+    </div>
+
+    <div id="sgp-error" style="display:none;color:#ef5350;font-size:0.82rem;margin-top:8px;"></div>
+  </div>
+</div>
+
+<script>
+(function() {
+  var sgpLegs = {};  // label -> {type, line}
+
+  window.sgpToggle = function(btn) {
+    var label = btn.dataset.label;
+    if (sgpLegs[label]) {
+      delete sgpLegs[label];
+      btn.style.borderColor = '#353a52';
+      btn.style.color = '#e8eaf0';
+      btn.style.background = '#1e2235';
+    } else {
+      sgpLegs[label] = {type: btn.dataset.type, line: parseFloat(btn.dataset.line)};
+      btn.style.borderColor = '#64b5f6';
+      btn.style.color = '#64b5f6';
+      btn.style.background = '#0d2040';
+    }
+    sgpRefresh();
+  };
+
+  window.sgpAddCustomOver = function() {
+    var line = parseFloat(document.getElementById('sgp-custom-line').value);
+    var label = 'Over ' + line;
+    sgpLegs[label] = {type: 'over', line: line};
+    sgpRefresh();
+  };
+
+  window.sgpAddCustomUnder = function() {
+    var line = parseFloat(document.getElementById('sgp-custom-line').value);
+    var label = 'Under ' + line;
+    sgpLegs[label] = {type: 'under', line: line};
+    sgpRefresh();
+  };
+
+  function sgpRefresh() {
+    var list = document.getElementById('sgp-legs-list');
+    var emptyMsg = document.getElementById('sgp-empty-msg');
+    var keys = Object.keys(sgpLegs);
+
+    // Render pills
+    list.innerHTML = '';
+    if (keys.length === 0) {
+      list.appendChild(emptyMsg);
+      document.getElementById('sgp-result').style.display = 'none';
+      return;
+    }
+    keys.forEach(function(label) {
+      var pill = document.createElement('span');
+      pill.style.cssText = 'background:#1e2a40;border:1px solid #64b5f6;color:#64b5f6;padding:5px 12px;border-radius:20px;font-size:0.78rem;cursor:pointer;';
+      pill.textContent = label + ' ✕';
+      pill.onclick = function() {
+        delete sgpLegs[label];
+        // deselect matching preset btn
+        document.querySelectorAll('.sgp-leg-btn').forEach(function(b) {
+          if (b.dataset.label === label) {
+            b.style.borderColor = '#353a52';
+            b.style.color = '#e8eaf0';
+            b.style.background = '#1e2235';
+          }
+        });
+        sgpRefresh();
+      };
+      list.appendChild(pill);
+    });
+
+    // Call API
+    var gamePk = {{ game_pk }};
+    var legs = keys.map(function(k) {
+      return {type: sgpLegs[k].type, line: sgpLegs[k].line};
+    });
+
+    fetch('/sgp/' + gamePk, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({legs: legs})
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.error) {
+        document.getElementById('sgp-error').textContent = d.error;
+        document.getElementById('sgp-error').style.display = 'block';
+        document.getElementById('sgp-result').style.display = 'none';
+        return;
+      }
+      document.getElementById('sgp-error').style.display = 'none';
+      document.getElementById('sgp-prob').textContent = d.prob.toFixed(1) + '%';
+      document.getElementById('sgp-odds').textContent = d.fair_odds;
+      document.getElementById('sgp-legs-count').textContent = d.legs;
+      document.getElementById('sgp-result').style.display = 'block';
+    })
+    .catch(function() {
+      document.getElementById('sgp-error').textContent = 'Error calculating — try again';
+      document.getElementById('sgp-error').style.display = 'block';
+    });
+  }
+})();
+</script>
+
 <div style="text-align:center; margin-top: 8px; margin-bottom: 40px;">
   <a class="back-btn" href="/">← Simulate Another Game</a>
 </div>

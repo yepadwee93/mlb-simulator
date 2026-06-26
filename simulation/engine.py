@@ -1203,6 +1203,7 @@ def run_simulation(
     away_cover_m25 = 0  # wins by 3+ (alt: -2.5)
     home_cover_m25 = 0
     total_runs_hist = Counter()  # {total_runs: count} for O/U model
+    score_pairs     = Counter()  # {(away_runs, home_runs): count} for SGP correlated probs
 
     def _sim(**kw):
         return simulate_game(
@@ -1219,6 +1220,7 @@ def run_simulation(
         away_total += a
         home_total += h
         total_runs_hist[a + h] += 1
+        score_pairs[(a, h)] += 1
         if a > h:
             away_wins += 1
             if a - h >= 2:
@@ -1371,6 +1373,7 @@ def run_simulation(
         "home_cover_m25_pct":  round(home_cover_m25 / n * 100, 1),
         # Over/Under: full distribution so web layer can calc P(total > any line)
         "total_runs_hist":     dict(total_runs_hist),
+        "score_pairs":         {str(k): v for k, v in score_pairs.items()},
         "avg_total_runs":      round((away_total + home_total) / n, 2),
         # Inning-segment results (F3/F5/F7)
         "f1_over_pct":         round(f1_over / n_f1 * 100, 1),
