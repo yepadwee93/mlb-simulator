@@ -963,14 +963,22 @@ def simulate(game_pk):
     return render_template("result.html", game_pk=game_pk, n_sims=n_sims, **result)
 
 
+_props_cache = {}  # game_pk → (timestamp, props dict)
+_PROPS_TTL   = 1800  # 30 min
+
 @app.route("/props/<int:game_pk>")
 def load_props(game_pk):
     """
-    On-demand player props endpoint — only called when user clicks Load Props.
-    Costs 2 API requests (events list + props for this game).
-    Returns JSON so the page loads props without a full refresh.
+    On-demand player props — only called when user clicks Load Props.
+    Cached 30 min per game so repeated clicks don't cost extra credits.
+    Returns {} immediately if no event ID found (free — no API call made).
     """
-    from flask import jsonify
+    import time as _time
+
+    now = _time.time()
+    cached = _props_cache.get(game_pk)
+    if cached and (now - cached[0]) < _PROPS_TTL:
+        return jsonify(cached[1])
 
     games = get_today_schedule()
     game  = next((g for g in games if g["gamePk"] == game_pk), None)
@@ -980,7 +988,11 @@ def load_props(game_pk):
     odds_key   = frozenset([game["away_team"], game["home_team"]])
     all_events = get_mlb_events()
     event_id   = all_events.get(odds_key)
-    props      = get_player_props(event_id) if event_id else {}
+    if not event_id:
+        return jsonify({})  # no event found — don't spend credits
+
+    props = get_player_props(event_id)
+    _props_cache[game_pk] = (now, props)
     return jsonify(props)
 
 
