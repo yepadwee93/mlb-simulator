@@ -428,9 +428,9 @@
 <div class="card">
   <div class="section-title">Starting Pitchers</div>
 
-  {% for pitcher_name, team_name, era, whip, wl, bp_era, bp_whip, fatigue_label, avg_ip, rest_days, rest_type in [
-      (away_pitcher_name, away_team, away_era, away_whip, away_wl, away_bp_era, away_bp_whip, away_fatigue_label, away_avg_ip, away_rest_days, away_rest_type),
-      (home_pitcher_name, home_team, home_era, home_whip, home_wl, home_bp_era, home_bp_whip, home_fatigue_label, home_avg_ip, home_rest_days, home_rest_type)
+  {% for pitcher_name, team_name, era, whip, wl, bp_era, bp_whip, fatigue_label, avg_ip, rest_days, rest_type, avg_pitches, last_pitches, pitch_carryover in [
+      (away_pitcher_name, away_team, away_era, away_whip, away_wl, away_bp_era, away_bp_whip, away_fatigue_label, away_avg_ip, away_rest_days, away_rest_type, away_avg_pitches, away_last_pitches, away_pitch_carryover),
+      (home_pitcher_name, home_team, home_era, home_whip, home_wl, home_bp_era, home_bp_whip, home_fatigue_label, home_avg_ip, home_rest_days, home_rest_type, home_avg_pitches, home_last_pitches, home_pitch_carryover)
   ] %}
   <div class="pitcher-row">
     <div>
@@ -458,7 +458,8 @@
   {% if avg_ip %}
   <div style="padding: 4px 0 6px 0; font-size:0.77rem; color:#b0b8cc; border-top:1px solid #1e2130; margin-top:6px;">
     ⏱ Fatigue (last 10 starts): avg
-    <strong style="color:#e8eaf0;">{{ avg_ip }} IP</strong> ·
+    <strong style="color:#e8eaf0;">{{ avg_ip }} IP</strong>
+    {% if avg_pitches %} · <strong style="color:#e8eaf0;">{{ avg_pitches }}</strong> pitches/start{% endif %} ·
     {% if fatigue_label == 'Durable' %}
       <span style="color:#4caf50;">{{ fatigue_label }} — minimal impact in innings 3-5</span>
     {% elif fatigue_label == 'Moderate' %}
@@ -467,6 +468,12 @@
       <span style="color:#ff9800;">{{ fatigue_label }} — bigger impact modeled in innings 3-5</span>
     {% else %}
       <span style="color:#ef5350;">{{ fatigue_label }} — significant fatigue impact modeled early</span>
+    {% endif %}
+    {% if last_pitches %}
+      <span style="color:#9aa0b8;"> · Last start: {{ last_pitches }} pitches</span>
+      {% if pitch_carryover %}
+        <span style="color:#ef9a9a; font-weight:600;"> ⚠️ high pitch count carry-over</span>
+      {% endif %}
     {% endif %}
   </div>
   {% endif %}

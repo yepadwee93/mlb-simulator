@@ -331,74 +331,100 @@ def build_fatigue_curve(pitcher_game_log: list) -> dict:
     """
     Analyze a pitcher's last 10 starts to build inning-phase fatigue multipliers.
 
+    Now uses pitch count data (if available) to refine the curve:
+      - High-pitch-count pitcher (105+ avg) → tires later
+      - Low-pitch-count pitcher (80-90 avg) → short-arm type, tires early
+      - If last start had 115+ pitches → carry-over fatigue this start
+
     Returns a dict with ERA/WHIP scaling factors for 3 phases:
       phase1 (innings 1-2): always 1.0 — pitcher is always fresh early
       phase2 (innings 3-4): moderate fatigue based on how long they typically last
       phase3 (innings 5):   deep fatigue, last inning before bullpen takes over
 
     Multiplier > 1.0 means pitcher is WORSE (ERA scaled up by that factor).
-
-    Real-world logic:
-      - Jacob deGrom averaging 7 IP → barely fatigues: {1.0, 1.03, 1.07}
-      - League-average starter, 5 IP avg → {1.0, 1.08, 1.18}
-      - Struggling short-starter avg 3.5 IP → {1.0, 1.18, 1.38}
-      - Pitcher who blows up in inning 4 consistently → phase2 amplified further
     """
     if not pitcher_game_log:
-        # Default: typical league-average fatigue
-        return {"phase1": 1.0, "phase2": 1.07, "phase3": 1.16}
+        return {"phase1": 1.0, "phase2": 1.07, "phase3": 1.16,
+                "avg_pitches": None, "last_pitches": None, "pitch_carryover": False}
 
     n = len(pitcher_game_log)
     if n == 0:
-        return {"phase1": 1.0, "phase2": 1.07, "phase3": 1.16}
+        return {"phase1": 1.0, "phase2": 1.07, "phase3": 1.16,
+                "avg_pitches": None, "last_pitches": None, "pitch_carryover": False}
 
     avg_ip   = sum(g["ip"] for g in pitcher_game_log) / n
     total_ip = sum(g["ip"] for g in pitcher_game_log)
     total_er = sum(g["er"] for g in pitcher_game_log)
 
+    # ── Pitch count analysis ──────────────────────────────────────────────
+    pitch_counts = [g.get("pitches", 0) for g in pitcher_game_log if g.get("pitches", 0) > 0]
+    avg_pitches  = round(sum(pitch_counts) / len(pitch_counts), 1) if pitch_counts else None
+    last_pitches = pitcher_game_log[-1].get("pitches", 0) if pitcher_game_log else 0
+
+    # Carry-over fatigue: if last start was 115+ pitches, arm not fully recovered
+    pitch_carryover = bool(last_pitches and last_pitches >= 115)
+
     # ER per inning pitched — rough in-game ERA proxy
-    er_per_ip = total_er / total_ip if total_ip > 0 else 0.45   # 0.45 ≈ 4.05 ERA
+    er_per_ip = total_er / total_ip if total_ip > 0 else 0.45
 
     # How often does the pitcher get knocked out before inning 3?
     early_blowup_rate = sum(1 for g in pitcher_game_log if g["ip"] < 3.0) / n
 
     # ── Phase 2 multiplier (innings 3-4) ──────────────────────────────────
-    # Depends on how long they typically last:
-    if avg_ip >= 6.5:
-        phase2 = 1.03   # workhorse ace — barely shows fatigue before inning 5
-    elif avg_ip >= 5.0:
-        phase2 = 1.07   # solid starter
-    elif avg_ip >= 3.5:
-        phase2 = 1.14   # often pulled in middle innings — already tiring by inning 3
+    # Use pitch count to refine the IP-based estimate when available
+    if avg_pitches is not None:
+        if avg_pitches >= 105:
+            phase2 = 1.03   # high-volume arm — tires slowly
+        elif avg_pitches >= 95:
+            phase2 = 1.07   # normal workload
+        elif avg_pitches >= 85:
+            phase2 = 1.12   # kept on a short leash — tires faster
+        else:
+            phase2 = 1.20   # short-arm type, frequently managed out early
     else:
-        phase2 = 1.22   # short-starter type, frequently in trouble early
+        # Fall back to IP-based estimate
+        if avg_ip >= 6.5:
+            phase2 = 1.03
+        elif avg_ip >= 5.0:
+            phase2 = 1.07
+        elif avg_ip >= 3.5:
+            phase2 = 1.14
+        else:
+            phase2 = 1.22
 
-    # Amplify if they get knocked out early a lot (bad sign by inning 3)
+    # Amplify if they get knocked out early a lot
     if early_blowup_rate >= 0.30:
         phase2 = round(phase2 * 1.07, 3)
 
-    # ── Phase 3 multiplier (inning 5, last inning before bullpen) ─────────
-    if avg_ip >= 6.5:
-        phase3 = phase2 * 1.05    # still effective, just a tiny drop-off
-    elif avg_ip >= 5.0:
-        phase3 = phase2 * 1.11    # noticeably worse by inning 5
-    elif avg_ip >= 3.5:
-        phase3 = phase2 * 1.18    # really falling apart
-    else:
-        phase3 = phase2 * 1.25    # rarely makes it here — very dangerous inning
+    # Carry-over penalty: arm slightly fatigued from big outing last start
+    if pitch_carryover:
+        phase2 = round(phase2 * 1.04, 3)
 
-    # Amplify or reduce based on overall run-prevention quality
-    if er_per_ip > 0.60:     # > 5.4 ERA-equivalent — struggling pitcher
+    # ── Phase 3 multiplier (inning 5+) ────────────────────────────────────
+    if avg_ip >= 6.5 or (avg_pitches and avg_pitches >= 105):
+        phase3 = phase2 * 1.05
+    elif avg_ip >= 5.0 or (avg_pitches and avg_pitches >= 95):
+        phase3 = phase2 * 1.11
+    elif avg_ip >= 3.5 or (avg_pitches and avg_pitches >= 85):
+        phase3 = phase2 * 1.18
+    else:
+        phase3 = phase2 * 1.25
+
+    # Quality modifier
+    if er_per_ip > 0.60:
         phase2 *= 1.04
         phase3 *= 1.07
-    elif er_per_ip < 0.25:   # < 2.25 ERA-equivalent — ace
+    elif er_per_ip < 0.25:
         phase2 *= 0.93
         phase3 *= 0.90
 
     return {
-        "phase1": 1.0,
-        "phase2": round(min(phase2, 1.50), 3),
-        "phase3": round(min(phase3, 1.90), 3),
+        "phase1":         1.0,
+        "phase2":         round(min(phase2, 1.50), 3),
+        "phase3":         round(min(phase3, 1.90), 3),
+        "avg_pitches":    avg_pitches,
+        "last_pitches":   last_pitches if last_pitches else None,
+        "pitch_carryover": pitch_carryover,
     }
 
 
@@ -1321,10 +1347,16 @@ def run_simulation(
         "home_avg_runs":       round(home_total / n, 2),
         "uses_bullpen_data":   away_precomp_late is not None,
         # Pitcher fatigue profile
-        "away_fatigue_label":  away_fatigue_label,
-        "away_avg_ip":         away_avg_ip,
-        "home_fatigue_label":  home_fatigue_label,
-        "home_avg_ip":         home_avg_ip,
+        "away_fatigue_label":      away_fatigue_label,
+        "away_avg_ip":             away_avg_ip,
+        "away_avg_pitches":        away_fatigue.get("avg_pitches"),
+        "away_last_pitches":       away_fatigue.get("last_pitches"),
+        "away_pitch_carryover":    away_fatigue.get("pitch_carryover", False),
+        "home_fatigue_label":      home_fatigue_label,
+        "home_avg_ip":             home_avg_ip,
+        "home_avg_pitches":        home_fatigue.get("avg_pitches"),
+        "home_last_pitches":       home_fatigue.get("last_pitches"),
+        "home_pitch_carryover":    home_fatigue.get("pitch_carryover", False),
         # Pitcher rest days
         "away_rest_days":      away_rest_label,
         "away_rest_type":      away_rest_type,

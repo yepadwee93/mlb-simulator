@@ -454,9 +454,13 @@ def get_pitcher_game_log(pitcher_id, num_games=10, season=None):
                 ip = 0.0
 
             games.append({
-                "ip":   round(ip, 2),
-                "er":   int(stat.get("earnedRuns", 0) or 0),
-                "date": game.get("date", ""),   # YYYY-MM-DD of the start
+                "ip":          round(ip, 2),
+                "er":          int(stat.get("earnedRuns",     0) or 0),
+                "pitches":     int(stat.get("numberOfPitches", 0) or 0),
+                "strikes":     int(stat.get("strikes",         0) or 0),
+                "ks":          int(stat.get("strikeOuts",      0) or 0),
+                "bb":          int(stat.get("baseOnBalls",     0) or 0),
+                "date":        game.get("date", ""),
             })
 
         return games
