@@ -746,6 +746,41 @@ def index():
     games = get_today_schedule(game_date=selected_date.isoformat())
     label = selected_date.strftime("%A, %B %d %Y")
 
+    # Multi-day strip: today + next 6 days (fetched lightweight — just game count)
+    from datetime import timedelta as _td
+    today = date.today()
+    multi_day = []
+    for offset in range(7):
+        d = today + _td(days=offset)
+        try:
+            day_games = get_today_schedule(game_date=d.isoformat())
+            count = len(day_games)
+        except Exception:
+            count = 0
+        multi_day.append({
+            "date":     d.isoformat(),
+            "label":    d.strftime("%a"),
+            "day_num":  d.day,
+            "count":    count,
+            "is_today": d == today,
+            "selected": d == selected_date,
+        })
+    # Also include yesterday so you can go back
+    yesterday = today - _td(days=1)
+    try:
+        y_games = get_today_schedule(game_date=yesterday.isoformat())
+        y_count = len(y_games)
+    except Exception:
+        y_count = 0
+    multi_day.insert(0, {
+        "date":     yesterday.isoformat(),
+        "label":    yesterday.strftime("%a"),
+        "day_num":  yesterday.day,
+        "count":    y_count,
+        "is_today": False,
+        "selected": yesterday == selected_date,
+    })
+
     # Public betting % — keyed by frozenset so game cards can look up by team names
     try:
         pub_pcts_raw = get_public_betting_pcts()
@@ -779,6 +814,7 @@ def index():
                            is_today=is_today,
                            pub_pcts=pub_pcts,
                            line_movement=line_movement,
+                           multi_day=multi_day,
                            game_notes=get_game_notes(current_user.id) if current_user.is_authenticated else {},
                            api_remaining=get_requests_remaining(),
                            show_email_nudge=show_email_nudge)
