@@ -80,6 +80,19 @@ PARK_CF_DIRECTION = {
 }
 
 
+def _get_nocache(path, params=None):
+    """Same as _get but always fetches fresh — use for final score checks."""
+    url = f"{BASE_URL}{path}"
+    response = requests.get(url, params=params, timeout=10)
+    response.raise_for_status()
+    data = response.json()
+    # Also update the cache so subsequent cached calls get fresh data
+    import hashlib, json as _json
+    key = path + (("?" + _json.dumps(params, sort_keys=True)) if params else "")
+    _API_CACHE[key] = (time.time(), data)
+    return data
+
+
 def _get(path, params=None):
     """
     Internal helper: GET with in-memory TTL cache (10 min).
