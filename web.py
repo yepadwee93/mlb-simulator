@@ -1615,16 +1615,23 @@ def my_picks():
     from flask import request as freq
     if freq.method == "POST":
         data = freq.get_json() or {}
-        add_pick(
-            game_pk   = data.get("game_pk"),
-            game_date = data.get("game_date", date.today().isoformat()),
-            away_team = data.get("away_team", ""),
-            home_team = data.get("home_team", ""),
-            pick      = data.get("pick", ""),
-            sim_pct   = data.get("sim_pct"),
-            user_id   = _uid(),
-        )
-        return jsonify({"status": "ok"})
+        try:
+            add_pick(
+                game_pk      = data.get("game_pk"),
+                game_date    = data.get("game_date", date.today().isoformat()),
+                away_team    = data.get("away_team", ""),
+                home_team    = data.get("home_team", ""),
+                my_pick      = data.get("my_pick") or data.get("pick", ""),
+                my_notes     = data.get("my_notes", ""),
+                sim_away_pct = data.get("sim_away_pct"),
+                sim_home_pct = data.get("sim_home_pct"),
+                sim_away_runs= data.get("sim_away_runs"),
+                sim_home_runs= data.get("sim_home_runs"),
+                user_id      = _uid(),
+            )
+            return jsonify({"status": "ok"})
+        except Exception as e:
+            return jsonify({"status": "error", "error": str(e)}), 500
     update_pick_results(user_id=_uid())
     games = get_today_schedule()
     stats = get_pick_stats(user_id=_uid())

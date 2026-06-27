@@ -208,7 +208,9 @@ def get_game_lineup(game_pk):
         batters.sort(key=lambda b: b["batting_order"])
         result[f"{side}_batters"] = batters
 
-        # Starter: prefer gamesStarted flag; fall back to first in pitchers list
+        # Starter: prefer gamesStarted flag; fall back to first pitcher in list
+        # Note: gamesStarted=1 may not be set during live games, so always
+        # fall back to the first pitcher listed (they entered first = starter)
         if starters:
             result[f"{side}_pitcher"] = starters[0]
         else:
@@ -216,10 +218,11 @@ def get_game_lineup(game_pk):
             if pitchers:
                 p_data = players.get(f"ID{pitchers[0]}", {})
                 person = p_data.get("person", {})
-                result[f"{side}_pitcher"] = {
-                    "id":   person.get("id"),
-                    "name": person.get("fullName"),
-                }
+                if person.get("id"):
+                    result[f"{side}_pitcher"] = {
+                        "id":   person.get("id"),
+                        "name": person.get("fullName"),
+                    }
 
     return result
 
