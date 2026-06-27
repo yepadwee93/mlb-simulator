@@ -1642,9 +1642,26 @@ def my_picks():
 @app.route("/my-picks/update", methods=["POST"])
 @login_required
 def update_my_picks():
-    updated = update_pick_results(user_id=_uid())
-    stats   = get_pick_stats(user_id=_uid())
-    return jsonify({"updated": updated, "my_pct": stats["my_pct"], "sim_pct": stats["sim_pct"]})
+    uid = _uid()
+    debug_info = []
+    try:
+        from data.mlb_api import _get_nocache
+        from data.db import supa
+        rows = supa().table("picks").select("*").eq("user_id", int(uid)).is_("actual_winner", "null").execute().data or []
+        for row in rows:
+            gk = row.get("game_pk")
+            try:
+                live  = _get_nocache(f"/game/{gk}/feed/live")
+                state = live.get("gameData", {}).get("status", {}).get("abstractGameState", "unknown")
+                debug_info.append({"game_pk": gk, "state": state})
+            except Exception as e:
+                debug_info.append({"game_pk": gk, "error": str(e)})
+    except Exception as e:
+        debug_info.append({"error": str(e)})
+
+    updated = update_pick_results(user_id=uid)
+    stats   = get_pick_stats(user_id=uid)
+    return jsonify({"updated": updated, "my_pct": stats["my_pct"], "sim_pct": stats["sim_pct"], "debug": debug_info})
 
 
 @app.route("/odds-history")
