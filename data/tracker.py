@@ -7,7 +7,7 @@ Storage: Supabase `predictions` table (shared across all users).
 
 from datetime import datetime
 from data.db import supa
-from data.mlb_api import _get
+from data.mlb_api import _get, _get_nocache
 
 
 def log_prediction(game_pk, game_date, away_team, home_team,
@@ -60,7 +60,7 @@ def update_results():
         if not game_pk:
             continue
         try:
-            live  = _get(f"/game/{game_pk}/feed/live")
+            live  = _get_nocache(f"/game/{game_pk}/feed/live")
             state = live.get("gameData", {}).get("status", {}).get("abstractGameState", "")
             if state != "Final":
                 continue
