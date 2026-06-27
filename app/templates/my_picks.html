@@ -313,9 +313,9 @@
           {% else %}—{% endif %}
         </td>
         <td style="font-size:0.85rem;">
-          {% if r.actual_away_runs != '' %}
+          {% if r.actual_away_runs is not none %}
             <strong>{{ r.actual_away_runs }}–{{ r.actual_home_runs }}</strong>
-            {% if r.run_diff_error != '' %}
+            {% if r.run_diff_error is not none %}
               <span style="color:#9aa0b8; font-size:0.72rem; margin-left:4px;">(±{{ r.run_diff_error }} runs off)</span>
             {% endif %}
           {% else %}
@@ -323,9 +323,9 @@
           {% endif %}
         </td>
         <td>
-          {% if r.my_pick_correct == '1' %}
+          {% if r.my_pick_correct == 1 or r.my_pick_correct == '1' %}
             <span class="badge correct">✓ Won</span>
-          {% elif r.my_pick_correct == '0' %}
+          {% elif r.my_pick_correct == 0 or r.my_pick_correct == '0' %}
             <span class="badge wrong">✗ Lost</span>
           {% else %}
             <span class="badge pending">Pending</span>
