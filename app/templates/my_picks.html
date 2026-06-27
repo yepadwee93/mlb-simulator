@@ -428,13 +428,18 @@ function submitPick() {
     })
   })
   .then(function(r) { return r.json(); })
-  .then(function() {
-    msg.textContent = '✓ Pick logged!';
-    msg.style.color = '#4caf50';
-    setTimeout(function() { window.location.reload(); }, 800);
+  .then(function(res) {
+    if (res.status === 'ok') {
+      msg.textContent = '✓ Pick logged!';
+      msg.style.color = '#4caf50';
+      setTimeout(function() { window.location.reload(); }, 800);
+    } else {
+      msg.textContent = 'Error: ' + (res.error || 'Could not save pick.');
+      msg.style.color = '#ef5350';
+    }
   })
-  .catch(function() {
-    msg.textContent = 'Error saving pick.';
+  .catch(function(e) {
+    msg.textContent = 'Network error saving pick — try again.';
     msg.style.color = '#ef5350';
   });
 }
