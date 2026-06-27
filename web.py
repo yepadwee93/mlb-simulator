@@ -1004,6 +1004,8 @@ def simulate(game_pk):
 
     result["away_batter_props"] = away_batter_props
     result["home_batter_props"] = home_batter_props
+    result["away_lineup_stats"] = away_batter_stats
+    result["home_lineup_stats"] = home_batter_stats
 
     # ── Batting order optimizer ───────────────────────────────────────
     try:
@@ -1030,8 +1032,8 @@ def simulate(game_pk):
     # ── Stadium profile ───────────────────────────────────────────────
     result["stadium_profile"] = _build_stadium_profile(
         game.get("venue", ""),
-        away_batter_stats,
-        home_batter_stats,
+        result.get("away_lineup_stats", []),
+        result.get("home_lineup_stats", []),
     )
 
     return render_template("result.html", game_pk=game_pk, n_sims=n_sims, **result)
