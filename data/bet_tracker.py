@@ -81,7 +81,11 @@ def settle_bets(user_id=None, csv_path=None):
         if not game_pk:
             continue
         try:
-            live = _get(f"/game/{game_pk}/feed/live")
+            import requests as _req
+
+            live = _req.get(
+                f"https://statsapi.mlb.com/api/v1.1/game/{game_pk}/feed/live", timeout=10
+            ).json()
             state = live.get("gameData", {}).get("status", {}).get("abstractGameState", "")
             if state != "Final":
                 continue
@@ -89,18 +93,59 @@ def settle_bets(user_id=None, csv_path=None):
             ls = live["liveData"]["linescore"]["teams"]
             away = ls["away"].get("runs", 0)
             home = ls["home"].get("runs", 0)
+            total = away + home
+            margin = away - home  # positive = away won by that many
 
-            actual_winner = bet["away_team"] if away > home else bet["home_team"]
-            bet_won = bet["bet_on"] == actual_winner
+            bet_type = (bet.get("bet_type") or "ml").lower()
+            bet_on = bet.get("bet_on", "")
+            away_team = bet.get("away_team", "")
 
-            odds = bet.get("odds") or -110
-            amount = float(bet.get("amount") or 100)
-            if bet_won:
-                payout = (amount * odds / 100) if odds > 0 else (amount * 100 / abs(odds))
-                result = "win"
+            # Determine result based on bet type
+            if bet_type in ("rl", "run line", "runline"):
+                # Run line: away -1.5 means away must win by 2+
+                # bet_on is the team name; parse the line from bet_on field if present
+                # Convention: away team is always -1.5 (must win by 2), home is +1.5
+                is_away_side = bet_on == away_team or bet_on.endswith("-1.5")
+                if is_away_side:
+                    bet_won = margin >= 2  # away covers -1.5
+                else:
+                    bet_won = margin <= 1  # home covers +1.5 (wins outright OR loses by 1)
+            elif bet_type in ("ou", "o/u", "over", "under", "total"):
+                # O/U: bet_on contains "OVER X.X" or "UNDER X.X"
+                bet_on_upper = bet_on.upper()
+                if "OVER" in bet_on_upper or bet_on_upper.startswith("O "):
+                    try:
+                        line = float(bet_on_upper.replace("OVER", "").replace("O ", "").strip())
+                    except ValueError:
+                        line = 8.5
+                    bet_won = total > line
+                elif "UNDER" in bet_on_upper or bet_on_upper.startswith("U "):
+                    try:
+                        line = float(bet_on_upper.replace("UNDER", "").replace("U ", "").strip())
+                    except ValueError:
+                        line = 8.5
+                    bet_won = total < line
+                else:
+                    continue  # can't parse, skip
             else:
-                payout = -amount
-                result = "loss"
+                # Moneyline: bet_on is the team name that must win outright
+                actual_winner = away_team if away > home else bet["home_team"]
+                bet_won = bet_on == actual_winner
+
+            if away == home:
+                result = "push"
+                payout = 0.0
+            else:
+                odds = bet.get("odds") or -110
+                amount = float(bet.get("amount") or 100)
+                if bet_won:
+                    payout = (
+                        (amount * odds / 100) if int(odds) > 0 else (amount * 100 / abs(int(odds)))
+                    )
+                    result = "win"
+                else:
+                    payout = -amount
+                    result = "loss"
 
             supa().table("bets").update(
                 {
