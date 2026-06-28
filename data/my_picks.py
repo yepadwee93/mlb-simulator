@@ -81,6 +81,7 @@ def update_pick_results(user_id=None):
         try:
             live  = _get_nocache(f"/game/{game_pk}/feed/live")
             state = live.get("gameData", {}).get("status", {}).get("abstractGameState", "")
+            print(f"[picks] game_pk={game_pk} state={state}")
             if state != "Final":
                 continue
 
@@ -106,7 +107,8 @@ def update_pick_results(user_id=None):
             supa().table("picks").update(update).eq("id", row["id"]).execute()
             updated += 1
 
-        except Exception:
+        except Exception as e:
+            print(f"[picks] game_pk={game_pk} error: {e}")
             continue
 
     return updated
