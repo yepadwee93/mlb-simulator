@@ -3,6 +3,7 @@
 <head>
 <script>!function(){var t=localStorage.getItem("mlb_theme")||"dark",m={dark:{"--bg":"#0d1120","--bg2":"#1a1e2e","--bg3":"#252836","--border":"#252836","--text":"#e8eaf0","--text2":"#b0b8cc","--text3":"#9aa0b8","--accent":"#64b5f6","--card-bg":"#1a1e2e"},medium:{"--bg":"#1a1528","--bg2":"#241d38","--bg3":"#302848","--border":"#3a2f5a","--text":"#ede8f5","--text2":"#c0b8d8","--text3":"#a098c0","--accent":"#b39ddb","--card-bg":"#241d38"},light:{"--bg":"#f0f2f8","--bg2":"#ffffff","--bg3":"#e8eaf6","--border":"#d0d4e8","--text":"#1a1a2e","--text2":"#444466","--text3":"#6666aa","--accent":"#3949ab","--card-bg":"#ffffff"}}[t]||{};Object.entries(m).forEach(function(e){document.documentElement.style.setProperty(e[0],e[1])});document.addEventListener("DOMContentLoaded",function(){document.body.style.background=m["--bg"];document.body.style.color=m["--text"]})}();</script>
   <meta charset="UTF-8">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MLB Simulator</title>
   <style>
@@ -567,7 +568,7 @@ function editNote(gk, away, home) {
 function saveNote(gk, away, home, gameDate) {
   var note = document.getElementById('note-ta-' + gk).value.trim();
   if (!note) return;
-  fetch('/api/notes/' + gk, {
+  csrfFetch('/api/notes/' + gk, {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({note: note, away_team: away, home_team: home, game_date: gameDate})
@@ -584,12 +585,27 @@ function saveNote(gk, away, home, gameDate) {
         div.className = 'note-display';
         div.id = 'note-display-' + gk;
         div.style.cssText = 'background:#1a1e2e;border:1px solid #353a52;border-radius:8px;padding:8px 10px;font-size:0.78rem;color:#e8eaf0;';
-        div.innerHTML = '<span style="color:#ffd54f;font-weight:700;font-size:0.65rem;display:block;margin-bottom:3px;">📝 MY NOTE</span>'
-          + '<span id="note-text-' + gk + '">' + note + '</span>'
-          + '<div style="display:flex;gap:8px;margin-top:6px;">'
-          + '<button onclick="editNote(\'' + gk + '\',\'' + away.replace(/'/g,"\\'") + '\',\'' + home.replace(/'/g,"\\'") + '\')" style="font-size:0.68rem;background:none;border:1px solid #555870;color:#9aa0b8;padding:2px 8px;border-radius:4px;cursor:pointer;">Edit</button>'
-          + '<button onclick="deleteNote(\'' + gk + '\')" style="font-size:0.68rem;background:none;border:1px solid #5a2a2a;color:#ef9a9a;padding:2px 8px;border-radius:4px;cursor:pointer;">Delete</button>'
-          + '</div>';
+        var noteLabel = document.createElement('span');
+        noteLabel.style.cssText = 'color:#ffd54f;font-weight:700;font-size:0.65rem;display:block;margin-bottom:3px;';
+        noteLabel.textContent = '📝 MY NOTE';
+        var noteSpan = document.createElement('span');
+        noteSpan.id = 'note-text-' + gk;
+        noteSpan.textContent = note;
+        var btnRow = document.createElement('div');
+        btnRow.style.cssText = 'display:flex;gap:8px;margin-top:6px;';
+        var editBtn = document.createElement('button');
+        editBtn.style.cssText = 'font-size:0.68rem;background:none;border:1px solid #555870;color:#9aa0b8;padding:2px 8px;border-radius:4px;cursor:pointer;';
+        editBtn.textContent = 'Edit';
+        editBtn.onclick = function(){ editNote(gk, away, home); };
+        var delBtn = document.createElement('button');
+        delBtn.style.cssText = 'font-size:0.68rem;background:none;border:1px solid #5a2a2a;color:#ef9a9a;padding:2px 8px;border-radius:4px;cursor:pointer;';
+        delBtn.textContent = 'Delete';
+        delBtn.onclick = function(){ deleteNote(gk); };
+        btnRow.appendChild(editBtn);
+        btnRow.appendChild(delBtn);
+        div.appendChild(noteLabel);
+        div.appendChild(noteSpan);
+        div.appendChild(btnRow);
         section.insertBefore(div, document.getElementById('note-form-' + gk));
       }
       document.getElementById('note-form-' + gk).style.display = 'none';
@@ -599,7 +615,7 @@ function saveNote(gk, away, home, gameDate) {
 }
 function deleteNote(gk) {
   if (!confirm('Delete this note?')) return;
-  fetch('/api/notes/' + gk, {method: 'DELETE'})
+  csrfFetch('/api/notes/' + gk, {method: 'DELETE'})
     .then(function(r) { return r.json(); }).then(function(res) {
       if (res.ok) {
         var display = document.getElementById('note-display-' + gk);
@@ -624,4 +640,7 @@ function deleteNote(gk) {
 
 </body>
 </html>
+
+
+
 

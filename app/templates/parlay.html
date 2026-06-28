@@ -3,6 +3,7 @@
 <head>
 <script>!function(){var t=localStorage.getItem("mlb_theme")||"dark",m={dark:{"--bg":"#0d1120","--bg2":"#1a1e2e","--bg3":"#252836","--border":"#252836","--text":"#e8eaf0","--text2":"#b0b8cc","--text3":"#9aa0b8","--accent":"#64b5f6","--card-bg":"#1a1e2e"},medium:{"--bg":"#1a1528","--bg2":"#241d38","--bg3":"#302848","--border":"#3a2f5a","--text":"#ede8f5","--text2":"#c0b8d8","--text3":"#a098c0","--accent":"#b39ddb","--card-bg":"#241d38"},light:{"--bg":"#f0f2f8","--bg2":"#ffffff","--bg3":"#e8eaf6","--border":"#d0d4e8","--text":"#1a1a2e","--text2":"#444466","--text3":"#6666aa","--accent":"#3949ab","--card-bg":"#ffffff"}}[t]||{};Object.entries(m).forEach(function(e){document.documentElement.style.setProperty(e[0],e[1])});document.addEventListener("DOMContentLoaded",function(){document.body.style.background=m["--bg"];document.body.style.color=m["--text"]})}();</script>
   <meta charset="UTF-8">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Parlay Builder — MLB Simulator</title>
   <style>
@@ -183,22 +184,22 @@
       } else if (isFinal) {
         timeStr = 'Final';
       }
-      var scoreAway = (isLive||isFinal) ? '<b style="color:#fff;">'+g.away_score+'</b>' : '';
-      var scoreHome = (isLive||isFinal) ? '<b style="color:#fff;">'+g.home_score+'</b>' : '';
+      var scoreAway = (isLive||isFinal) ? '<b style="color:#fff;">'+esc(g.away_score)+'</b>' : '';
+      var scoreHome = (isLive||isFinal) ? '<b style="color:#fff;">'+esc(g.home_score)+'</b>' : '';
       var dot = '<span style="width:6px;height:6px;border-radius:50%;background:'+statusColor(g.status)+';display:inline-block;margin-right:5px;vertical-align:middle;'+(isLive?'animation:pulse 1.2s infinite;':'')+'" ></span>';
       var link = g.gamePk ? '/simulate/'+g.gamePk+'?sims=100000' : '#';
       html += '<a href="'+link+'" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:5px 14px;border-left:1px solid #1e2235;text-decoration:none;flex-shrink:0;min-width:110px;">'
         + '<div style="display:flex;align-items:center;gap:6px;font-size:0.72rem;white-space:nowrap;">'
-        + '<span style="color:#b0b8cc;">'+abbr(g.away)+' '+scoreAway+'</span>'
+        + '<span style="color:#b0b8cc;">'+esc(abbr(g.away))+' '+scoreAway+'</span>'
         + '<span style="color:#555870;font-size:0.65rem;">@</span>'
-        + '<span style="color:#b0b8cc;">'+scoreHome+' '+abbr(g.home)+'</span>'
+        + '<span style="color:#b0b8cc;">'+scoreHome+' '+esc(abbr(g.home))+'</span>'
         + '</div>'
         + '<div style="font-size:0.63rem;margin-top:2px;">'+dot+'<span style="color:'+statusColor(g.status)+';">'+timeStr+'</span></div>'
         + '</a>';
     });
     inner.innerHTML = html;
   }
-  fetch('/api/scores').then(function(r){return r.json();}).then(renderScoreboard).catch(function(){
+  csrfFetch('/api/scores').then(function(r){return r.json();}).then(renderScoreboard).catch(function(){
     document.getElementById('scoreboard-bar').style.display='none';
   });
 })();
@@ -523,4 +524,8 @@ renderSlip();
 </script>
 </body>
 </html>
+
+
+
+
 
