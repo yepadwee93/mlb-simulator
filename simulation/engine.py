@@ -300,6 +300,24 @@ def build_batter_probs(stats: dict) -> list:
 
     p_out = max(0.0, 1.0 - p_walk - p_k - p_1b - p_2b - p_3b - p_hr)
 
+    # ── Batted ball profile adjustment ───────────────────────────────────────
+    # Ground ball hitters: more singles (weak grounders fall in), fewer HRs,
+    #   but more GIDP exposure. FB hitters: more HRs, fewer singles.
+    # We use groundOuts/flyOuts from the MLB API (already in season stats).
+    # League average GB% ≈ 44%. Each 5pp above/below avg shifts outcomes slightly.
+    go = int(stats.get("groundOuts", 0) or 0)
+    fo = int(stats.get("flyOuts", 0) or 0)
+    if go + fo >= 50:  # need enough sample to trust the profile
+        gb_pct = go / (go + fo) * 100
+        gb_delta = (gb_pct - 44.0) / 5.0  # units of 5pp above/below league avg
+        # Ground ball bias: boosts singles slightly, suppresses HRs
+        # Fly ball bias: boosts HRs, suppresses singles
+        gb_1b_boost = gb_delta * 0.005  # +0.5% singles per 5pp GB above avg
+        gb_hr_suppress = gb_delta * 0.003  # -0.3% HR per 5pp GB above avg
+        p_1b = max(0.0, p_1b + gb_1b_boost)
+        p_hr = max(0.0, p_hr - gb_hr_suppress)
+        p_out = max(0.0, 1.0 - p_walk - p_k - p_1b - p_2b - p_3b - p_hr)
+
     # Return in OUTCOME_ORDER: WALK, K, 1B, 2B, 3B, HR, OUT
     return [p_walk, p_k, p_1b, p_2b, p_3b, p_hr, p_out]
 
@@ -966,10 +984,19 @@ def compute_batter_rates(lineup_stats: list) -> list:
         k = int(stats.get("strikeOuts", 0) or 0)
         pa = int(stats.get("plateAppearances", 0) or 0)
 
+        go = int(stats.get("groundOuts", 0) or 0)
+        fo = int(stats.get("flyOuts", 0) or 0)
+
         if ab >= 100:
-            # GIDP rate: GDP / (non-K outs) — these are the outs where a DP is even possible
+            # GIDP rate: GDP / (non-K outs), scaled by GB% profile.
+            # High-GB% batters hit into more DPs (more balls on the ground).
+            # Each 5pp of GB% above 44% adds ~5% to the raw GIDP rate.
             non_k_outs = max(ab - hits - k, 1)
             gdp_rate = gdp / non_k_outs
+            if go + fo >= 50:
+                gb_pct = go / (go + fo) * 100
+                gb_scale = 1.0 + (gb_pct - 44.0) / 5.0 * 0.05
+                gdp_rate = gdp_rate * max(0.5, min(1.5, gb_scale))
 
             # Sac fly rate: SF / (estimated PA with runner on 3rd, <2 out)
             # ~20% of PA come with runner on 3rd and <2 out (rough MLB estimate)
@@ -1395,13 +1422,24 @@ def simulate_half_inning(
             runner_idx = (pos - 1) % 9  # runner on 1st was the prior batter
             r = batter_rates[runner_idx]
             if random.random() < r["sb_rate"]:
-                if random.random() < r["sb_success"]:
-                    b2, b1 = True, False  # successful steal of 2nd
-                else:
-                    b1 = False  # caught stealing — runner is out
-                    outs += 1
-                    if outs >= 3:
-                        break
+                # RE24 break-even check: only steal if success probability
+                # exceeds the break-even point for this base-out state.
+                # Break-even = RE(caught) loss / (RE(success) gain + RE(caught) loss)
+                re_current = get_run_expectancy(b1, b2, b3, outs)
+                re_success = get_run_expectancy(False, True, b3, outs)  # runner now on 2nd
+                re_caught = get_run_expectancy(False, b2, b3, outs + 1)  # runner out, outs+1
+                re_gain = re_success - re_current
+                re_loss = re_current - re_caught
+                denom = re_gain + re_loss
+                break_even = (re_loss / denom) if denom > 0 else 0.72
+                if r["sb_success"] >= break_even:
+                    if random.random() < r["sb_success"]:
+                        b2, b1 = True, False  # successful steal of 2nd
+                    else:
+                        b1 = False  # caught stealing — runner is out
+                        outs += 1
+                        if outs >= 3:
+                            break
 
         # ── Select probability array ──────────────────────────────────────────
         # Switch to RISP stats when runner is on 2nd or 3rd (scoring position).
@@ -1800,6 +1838,31 @@ def run_simulation(
     """
     # League-average pitcher stats used as the "generic bullpen" modifier
     LEAGUE_AVG_PITCHER = {"era": "4.20", "whip": "1.30"}
+
+    # ── Series familiarity: batters improve vs a pitcher they've seen ────────
+    # In game 2+ of a series, batters have already seen the starter's stuff.
+    # Research shows ~5% wOBA boost in game 2, ~9% in game 3+.
+    # We model this by blending pitcher stats slightly toward league average
+    # (the pitcher appears "easier" because batters have scouted him live).
+    #
+    # series_game_number: 1 = series opener, 2 = second game, 3+ = third+
+    # We degrade the pitcher ERA/FIP to simulate batter familiarity advantage.
+    _SERIES_ERA_BUMP = {1: 0.0, 2: 0.15, 3: 0.28}  # ERA added to starter
+    _era_bump = _SERIES_ERA_BUMP.get(series_game_number, 0.28)
+
+    def _apply_series_familiarity(pitcher):
+        if _era_bump == 0 or not pitcher:
+            return pitcher
+        p = dict(pitcher)
+        try:
+            p["era"] = str(round(float(p.get("era", 4.20)) + _era_bump, 2))
+            p["fip"] = str(round(float(p.get("fip", 4.00)) + _era_bump * 0.8, 2))
+        except (ValueError, TypeError):
+            pass
+        return p
+
+    away_pitcher = _apply_series_familiarity(away_pitcher)
+    home_pitcher = _apply_series_familiarity(home_pitcher)
 
     # ── Apply rest day modifier to starter stats ─────────────────────
     # Short rest = arm not recovered = worse ERA/WHIP across all innings.
