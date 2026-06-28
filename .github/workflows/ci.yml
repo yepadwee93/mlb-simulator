@@ -1,0 +1,50 @@
+name: CI
+
+# Runs on every push to any branch, and on every pull request
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  check:
+    name: Lint, Test & Security
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Check out your code
+      - uses: actions/checkout@v4
+
+      # 2. Set up Python
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      # 3. Install dependencies
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install ruff pytest pip-audit
+
+      # 4. Lint with ruff (check formatting + code quality)
+      #    This will show a red X on GitHub if any lint errors exist.
+      - name: Lint (ruff)
+        run: ruff check . && ruff format --check .
+
+      # 5. Run tests
+      #    Red X if any test fails.
+      - name: Tests (pytest)
+        env:
+          SECRET_KEY: "ci-test-secret-key"
+          SUPABASE_URL: "https://fake.supabase.co"
+          SUPABASE_KEY: "fake-key"
+        run: pytest
+
+      # 6. Dependency vulnerability scan
+      #    Red X if any installed package has a known security vulnerability.
+      - name: Dependency audit (pip-audit)
+        run: pip-audit -r requirements.txt --ignore-vuln PYSEC-2022-42974 || true
+        # "|| true" means vulnerability warnings don't fail the build (yet).
+        # Remove "|| true" when you're ready to enforce this strictly.

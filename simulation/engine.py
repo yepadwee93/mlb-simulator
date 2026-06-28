@@ -17,23 +17,23 @@ How it works:
 
 import random
 from bisect import bisect
-from itertools import accumulate
 from collections import Counter
+from itertools import accumulate
 
 # ── Outcome labels ──────────────────────────────────────────────
-SINGLE    = "single"
-DOUBLE    = "double"
-TRIPLE    = "triple"
-HR        = "home_run"
-WALK      = "walk"
+SINGLE = "single"
+DOUBLE = "double"
+TRIPLE = "triple"
+HR = "home_run"
+WALK = "walk"
 STRIKEOUT = "strikeout"
-OUT       = "out"
+OUT = "out"
 
 # Order matters — this is the fixed order we use for probability arrays
 OUTCOME_ORDER = [WALK, STRIKEOUT, SINGLE, DOUBLE, TRIPLE, HR, OUT]
 
 # League average benchmarks (2025 MLB season approximations)
-LEAGUE_AVG_ERA  = 4.00
+LEAGUE_AVG_ERA = 4.00
 LEAGUE_AVG_WHIP = 1.28
 
 # ── Ballpark factors ─────────────────────────────────────────────
@@ -51,42 +51,40 @@ LEAGUE_AVG_WHIP = 1.28
 
 BALLPARK_FACTORS = {
     # ── Hitter-friendly parks ──────────────────────────────────────
-    "Coors Field":              {"hr": 1.30, "hit": 1.15, "run": 1.20},  # altitude, thin air
+    "Coors Field": {"hr": 1.30, "hit": 1.15, "run": 1.20},  # altitude, thin air
     "Great American Ball Park": {"hr": 1.18, "hit": 1.05, "run": 1.10},  # small park, Ohio wind
-    "Globe Life Field":         {"hr": 1.12, "hit": 1.04, "run": 1.06},  # hitter-friendly indoors
-    "Minute Maid Park":         {"hr": 1.10, "hit": 1.03, "run": 1.05},  # short left field
-    "Yankee Stadium":           {"hr": 1.15, "hit": 1.02, "run": 1.07},  # short porch in right
-    "Citizens Bank Park":       {"hr": 1.12, "hit": 1.04, "run": 1.07},  # Philly wind, small gaps
-    "American Family Field":    {"hr": 1.08, "hit": 1.03, "run": 1.05},
-    "Truist Park":              {"hr": 1.06, "hit": 1.02, "run": 1.04},
-    "Kauffman Stadium":         {"hr": 1.05, "hit": 1.02, "run": 1.03},
-    "Angel Stadium":            {"hr": 1.04, "hit": 1.01, "run": 1.02},
-    "Daikin Park":              {"hr": 1.04, "hit": 1.01, "run": 1.03},
+    "Globe Life Field": {"hr": 1.12, "hit": 1.04, "run": 1.06},  # hitter-friendly indoors
+    "Minute Maid Park": {"hr": 1.10, "hit": 1.03, "run": 1.05},  # short left field
+    "Yankee Stadium": {"hr": 1.15, "hit": 1.02, "run": 1.07},  # short porch in right
+    "Citizens Bank Park": {"hr": 1.12, "hit": 1.04, "run": 1.07},  # Philly wind, small gaps
+    "American Family Field": {"hr": 1.08, "hit": 1.03, "run": 1.05},
+    "Truist Park": {"hr": 1.06, "hit": 1.02, "run": 1.04},
+    "Kauffman Stadium": {"hr": 1.05, "hit": 1.02, "run": 1.03},
+    "Angel Stadium": {"hr": 1.04, "hit": 1.01, "run": 1.02},
+    "Daikin Park": {"hr": 1.04, "hit": 1.01, "run": 1.03},
     "Oriole Park at Camden Yards": {"hr": 1.08, "hit": 1.03, "run": 1.05},
-
     # ── Neutral parks ─────────────────────────────────────────────
-    "Dodger Stadium":           {"hr": 1.00, "hit": 1.00, "run": 1.00},
-    "Wrigley Field":            {"hr": 1.02, "hit": 1.01, "run": 1.01},  # varies with wind
-    "Target Field":             {"hr": 0.98, "hit": 1.00, "run": 0.99},
-    "Busch Stadium":            {"hr": 0.97, "hit": 0.99, "run": 0.98},
-    "Progressive Field":        {"hr": 0.98, "hit": 1.00, "run": 0.99},
-    "Comerica Park":            {"hr": 0.96, "hit": 1.00, "run": 0.98},
-    "Rogers Centre":            {"hr": 1.01, "hit": 1.00, "run": 1.00},
-    "Nationals Park":           {"hr": 0.99, "hit": 1.00, "run": 0.99},
-    "Chase Field":              {"hr": 1.01, "hit": 1.01, "run": 1.01},  # retractable roof
-    "loanDepot park":           {"hr": 0.97, "hit": 0.99, "run": 0.98},  # pitcher-friendly
-
+    "Dodger Stadium": {"hr": 1.00, "hit": 1.00, "run": 1.00},
+    "Wrigley Field": {"hr": 1.02, "hit": 1.01, "run": 1.01},  # varies with wind
+    "Target Field": {"hr": 0.98, "hit": 1.00, "run": 0.99},
+    "Busch Stadium": {"hr": 0.97, "hit": 0.99, "run": 0.98},
+    "Progressive Field": {"hr": 0.98, "hit": 1.00, "run": 0.99},
+    "Comerica Park": {"hr": 0.96, "hit": 1.00, "run": 0.98},
+    "Rogers Centre": {"hr": 1.01, "hit": 1.00, "run": 1.00},
+    "Nationals Park": {"hr": 0.99, "hit": 1.00, "run": 0.99},
+    "Chase Field": {"hr": 1.01, "hit": 1.01, "run": 1.01},  # retractable roof
+    "loanDepot park": {"hr": 0.97, "hit": 0.99, "run": 0.98},  # pitcher-friendly
     # ── Pitcher-friendly parks ─────────────────────────────────────
-    "Oracle Park":              {"hr": 0.82, "hit": 0.96, "run": 0.88},  # sea breeze kills HRs
-    "T-Mobile Park":            {"hr": 0.88, "hit": 0.97, "run": 0.92},  # marine layer
-    "Petco Park":               {"hr": 0.86, "hit": 0.97, "run": 0.90},  # large dimensions
-    "PNC Park":                 {"hr": 0.90, "hit": 0.98, "run": 0.93},
-    "Fenway Park":              {"hr": 0.92, "hit": 1.02, "run": 0.97},  # Green Monster = hits not HRs
-    "Citi Field":               {"hr": 0.88, "hit": 0.97, "run": 0.91},
-    "Tropicana Field":          {"hr": 0.90, "hit": 0.97, "run": 0.92},
-    "Guaranteed Rate Field":    {"hr": 0.93, "hit": 0.98, "run": 0.95},
-    "Sutter Health Park":       {"hr": 0.95, "hit": 0.99, "run": 0.97},
-    "Sahlen Field":             {"hr": 0.95, "hit": 0.99, "run": 0.97},
+    "Oracle Park": {"hr": 0.82, "hit": 0.96, "run": 0.88},  # sea breeze kills HRs
+    "T-Mobile Park": {"hr": 0.88, "hit": 0.97, "run": 0.92},  # marine layer
+    "Petco Park": {"hr": 0.86, "hit": 0.97, "run": 0.90},  # large dimensions
+    "PNC Park": {"hr": 0.90, "hit": 0.98, "run": 0.93},
+    "Fenway Park": {"hr": 0.92, "hit": 1.02, "run": 0.97},  # Green Monster = hits not HRs
+    "Citi Field": {"hr": 0.88, "hit": 0.97, "run": 0.91},
+    "Tropicana Field": {"hr": 0.90, "hit": 0.97, "run": 0.92},
+    "Guaranteed Rate Field": {"hr": 0.93, "hit": 0.98, "run": 0.95},
+    "Sutter Health Park": {"hr": 0.95, "hit": 0.99, "run": 0.97},
+    "Sahlen Field": {"hr": 0.95, "hit": 0.99, "run": 0.97},
 }
 
 # Default for any park not in the list (league average)
@@ -97,17 +95,35 @@ DEFAULT_PARK_FACTOR = {"hr": 1.0, "hit": 1.0, "run": 1.0}
 # Cold weather = fewer HRs (ball doesn't carry); hot summer = more HRs
 MONTHLY_HR_MODIFIER = {
     # month: {venue: multiplier}  — only override parks that vary significantly
-    4:  {"Coors Field": 0.88, "Wrigley Field": 0.85, "Target Field": 0.82,
-         "Kauffman Stadium": 0.90, "Progressive Field": 0.88, "Guaranteed Rate Field": 0.87},
-    5:  {"Coors Field": 0.93, "Wrigley Field": 0.92, "Target Field": 0.90,
-         "Kauffman Stadium": 0.94, "Progressive Field": 0.93},
-    6:  {},   # approaching average — no overrides
-    7:  {"Coors Field": 1.08, "Great American Ball Park": 1.06,
-         "Globe Life Field": 0.94,  # AC keeps it cool
-         "Chase Field": 0.93},      # retractable roof vs heat
-    8:  {"Coors Field": 1.10, "Great American Ball Park": 1.07,
-         "Citizens Bank Park": 1.05, "Yankee Stadium": 1.04},
-    9:  {"Coors Field": 1.05, "Wrigley Field": 0.94, "T-Mobile Park": 0.92},
+    4: {
+        "Coors Field": 0.88,
+        "Wrigley Field": 0.85,
+        "Target Field": 0.82,
+        "Kauffman Stadium": 0.90,
+        "Progressive Field": 0.88,
+        "Guaranteed Rate Field": 0.87,
+    },
+    5: {
+        "Coors Field": 0.93,
+        "Wrigley Field": 0.92,
+        "Target Field": 0.90,
+        "Kauffman Stadium": 0.94,
+        "Progressive Field": 0.93,
+    },
+    6: {},  # approaching average — no overrides
+    7: {
+        "Coors Field": 1.08,
+        "Great American Ball Park": 1.06,
+        "Globe Life Field": 0.94,  # AC keeps it cool
+        "Chase Field": 0.93,
+    },  # retractable roof vs heat
+    8: {
+        "Coors Field": 1.10,
+        "Great American Ball Park": 1.07,
+        "Citizens Bank Park": 1.05,
+        "Yankee Stadium": 1.04,
+    },
+    9: {"Coors Field": 1.05, "Wrigley Field": 0.94, "T-Mobile Park": 0.92},
     10: {"Wrigley Field": 0.88, "Target Field": 0.85, "Progressive Field": 0.87},
 }
 
@@ -127,6 +143,7 @@ def apply_ballpark_factor(probs: list, venue: str, month: int = None) -> list:
     base_factors = BALLPARK_FACTORS.get(venue, DEFAULT_PARK_FACTOR)
     # Apply monthly modifier to HR factor if available
     import copy
+
     factors = copy.copy(base_factors)
     if month:
         mo_mod = MONTHLY_HR_MODIFIER.get(month, {}).get(venue)
@@ -135,10 +152,10 @@ def apply_ballpark_factor(probs: list, venue: str, month: int = None) -> list:
             factors["hr"] = round(factors["hr"] * mo_mod, 3)
 
     adjusted = list(probs)
-    adjusted[2] *= factors["hit"]   # singles
-    adjusted[3] *= factors["hit"]   # doubles
-    adjusted[4] *= factors["hit"]   # triples
-    adjusted[5] *= factors["hr"]    # home runs
+    adjusted[2] *= factors["hit"]  # singles
+    adjusted[3] *= factors["hit"]  # doubles
+    adjusted[4] *= factors["hit"]  # triples
+    adjusted[5] *= factors["hr"]  # home runs
 
     # Normalize so probabilities still sum to 1.0
     total = sum(adjusted)
@@ -146,6 +163,7 @@ def apply_ballpark_factor(probs: list, venue: str, month: int = None) -> list:
 
 
 # ── STEP 1: Build batter probability distribution ───────────────
+
 
 def build_batter_probs(stats: dict) -> list:
     """
@@ -164,21 +182,21 @@ def build_batter_probs(stats: dict) -> list:
         # Not enough data — use a league-average hitter as fallback
         return [0.082, 0.224, 0.148, 0.048, 0.004, 0.033, 0.461]
 
-    hits    = stats.get("hits", 0)
-    bb      = stats.get("baseOnBalls", 0)
-    k       = stats.get("strikeOuts", 0)
-    hr      = stats.get("homeRuns", 0)
+    hits = stats.get("hits", 0)
+    bb = stats.get("baseOnBalls", 0)
+    k = stats.get("strikeOuts", 0)
+    hr = stats.get("homeRuns", 0)
     doubles = stats.get("doubles", 0)
     triples = stats.get("triples", 0)
     singles = max(0, hits - doubles - triples - hr)
 
-    p_walk = bb      / pa
-    p_k    = k       / pa
-    p_1b   = singles / pa
-    p_2b   = doubles / pa
-    p_3b   = triples / pa
-    p_hr   = hr      / pa
-    p_out  = max(0.0, 1.0 - p_walk - p_k - p_1b - p_2b - p_3b - p_hr)
+    p_walk = bb / pa
+    p_k = k / pa
+    p_1b = singles / pa
+    p_2b = doubles / pa
+    p_3b = triples / pa
+    p_hr = hr / pa
+    p_out = max(0.0, 1.0 - p_walk - p_k - p_1b - p_2b - p_3b - p_hr)
 
     # Return in OUTCOME_ORDER: WALK, K, 1B, 2B, 3B, HR, OUT
     return [p_walk, p_k, p_1b, p_2b, p_3b, p_hr, p_out]
@@ -199,16 +217,16 @@ def apply_weather_modifier(probs: list, weather: dict) -> list:
     Otherwise it's blowing OUT or across.
     """
     if not weather:
-        return probs   # no weather data, no change
+        return probs  # no weather data, no change
 
     adjusted = list(probs)
 
     # Temperature effect on HR (index 5 = HR in OUTCOME_ORDER)
     temp = weather.get("temp_f", 72)
     if temp < 50:
-        hr_temp_factor = 0.85    # cold air: 15% fewer HRs
+        hr_temp_factor = 0.85  # cold air: 15% fewer HRs
     elif temp > 85:
-        hr_temp_factor = 1.10    # hot air: 10% more HRs
+        hr_temp_factor = 1.10  # hot air: 10% more HRs
     else:
         hr_temp_factor = 1.0
 
@@ -230,7 +248,7 @@ def apply_weather_modifier(probs: list, weather: dict) -> list:
             hr_wind_factor = 1.0
 
     total_hr_factor = hr_temp_factor * hr_wind_factor
-    adjusted[5] *= total_hr_factor   # index 5 = HR
+    adjusted[5] *= total_hr_factor  # index 5 = HR
 
     # Normalize
     total = sum(adjusted)
@@ -250,9 +268,9 @@ def apply_pitcher_modifier(probs: list, pitcher_stats: dict) -> list:
     """
     # Get pitcher ERA and WHIP (they come from the API as strings like "3.31")
     try:
-        era  = float(pitcher_stats.get("era",  LEAGUE_AVG_ERA))
+        era = float(pitcher_stats.get("era", LEAGUE_AVG_ERA))
     except (ValueError, TypeError):
-        era  = LEAGUE_AVG_ERA
+        era = LEAGUE_AVG_ERA
 
     try:
         whip = float(pitcher_stats.get("whip", LEAGUE_AVG_WHIP))
@@ -260,16 +278,16 @@ def apply_pitcher_modifier(probs: list, pitcher_stats: dict) -> list:
         whip = LEAGUE_AVG_WHIP
 
     # Hit scale: ERA 2.00 → hits × 0.50, ERA 4.00 → hits × 1.00, ERA 6.00 → hits × 1.50
-    hit_scale  = min(max(era  / LEAGUE_AVG_ERA,  0.50), 1.50)
+    hit_scale = min(max(era / LEAGUE_AVG_ERA, 0.50), 1.50)
     walk_scale = min(max(whip / LEAGUE_AVG_WHIP, 0.50), 1.50)
 
     # Indices in OUTCOME_ORDER: WALK=0, K=1, 1B=2, 2B=3, 3B=4, HR=5, OUT=6
     adjusted = list(probs)
-    adjusted[0] *= walk_scale          # walk
-    adjusted[2] *= hit_scale           # single
-    adjusted[3] *= hit_scale           # double
-    adjusted[4] *= hit_scale           # triple
-    adjusted[5] *= hit_scale           # home run
+    adjusted[0] *= walk_scale  # walk
+    adjusted[2] *= hit_scale  # single
+    adjusted[3] *= hit_scale  # double
+    adjusted[4] *= hit_scale  # triple
+    adjusted[5] *= hit_scale  # home run
 
     # Normalize so probabilities still sum to 1.0
     total = sum(adjusted)
@@ -296,33 +314,33 @@ def apply_rest_modifier(pitcher_stats: dict, rest_days: int) -> dict:
         return pitcher_stats
 
     if rest_days <= 3:
-        era_factor  = 1.18    # Short rest — very taxing on the arm
+        era_factor = 1.18  # Short rest — very taxing on the arm
         whip_factor = 1.11
     elif rest_days == 4:
-        era_factor  = 1.08    # One day short of optimal
+        era_factor = 1.08  # One day short of optimal
         whip_factor = 1.05
     elif rest_days <= 6:
-        era_factor  = 1.0     # Ideal rest — no change
+        era_factor = 1.0  # Ideal rest — no change
         whip_factor = 1.0
     elif rest_days <= 9:
-        era_factor  = 1.04    # Slightly rusty
+        era_factor = 1.04  # Slightly rusty
         whip_factor = 1.02
     else:
-        era_factor  = 1.10    # Extended break — possible injury return / rustiness
+        era_factor = 1.10  # Extended break — possible injury return / rustiness
         whip_factor = 1.06
 
     try:
-        era  = float(pitcher_stats.get("era",  LEAGUE_AVG_ERA))
+        era = float(pitcher_stats.get("era", LEAGUE_AVG_ERA))
     except (ValueError, TypeError):
-        era  = LEAGUE_AVG_ERA
+        era = LEAGUE_AVG_ERA
     try:
         whip = float(pitcher_stats.get("whip", LEAGUE_AVG_WHIP))
     except (ValueError, TypeError):
         whip = LEAGUE_AVG_WHIP
 
     return {
-        **pitcher_stats,                               # keep wins, losses, etc.
-        "era":  str(round(era  * era_factor,  2)),
+        **pitcher_stats,  # keep wins, losses, etc.
+        "era": str(round(era * era_factor, 2)),
         "whip": str(round(whip * whip_factor, 2)),
     }
 
@@ -344,21 +362,33 @@ def build_fatigue_curve(pitcher_game_log: list) -> dict:
     Multiplier > 1.0 means pitcher is WORSE (ERA scaled up by that factor).
     """
     if not pitcher_game_log:
-        return {"phase1": 1.0, "phase2": 1.07, "phase3": 1.16,
-                "avg_pitches": None, "last_pitches": None, "pitch_carryover": False}
+        return {
+            "phase1": 1.0,
+            "phase2": 1.07,
+            "phase3": 1.16,
+            "avg_pitches": None,
+            "last_pitches": None,
+            "pitch_carryover": False,
+        }
 
     n = len(pitcher_game_log)
     if n == 0:
-        return {"phase1": 1.0, "phase2": 1.07, "phase3": 1.16,
-                "avg_pitches": None, "last_pitches": None, "pitch_carryover": False}
+        return {
+            "phase1": 1.0,
+            "phase2": 1.07,
+            "phase3": 1.16,
+            "avg_pitches": None,
+            "last_pitches": None,
+            "pitch_carryover": False,
+        }
 
-    avg_ip   = sum(g["ip"] for g in pitcher_game_log) / n
+    avg_ip = sum(g["ip"] for g in pitcher_game_log) / n
     total_ip = sum(g["ip"] for g in pitcher_game_log)
     total_er = sum(g["er"] for g in pitcher_game_log)
 
     # ── Pitch count analysis ──────────────────────────────────────────────
     pitch_counts = [g.get("pitches", 0) for g in pitcher_game_log if g.get("pitches", 0) > 0]
-    avg_pitches  = round(sum(pitch_counts) / len(pitch_counts), 1) if pitch_counts else None
+    avg_pitches = round(sum(pitch_counts) / len(pitch_counts), 1) if pitch_counts else None
     last_pitches = pitcher_game_log[-1].get("pitches", 0) if pitcher_game_log else 0
 
     # Carry-over fatigue: if last start was 115+ pitches, arm not fully recovered
@@ -374,13 +404,13 @@ def build_fatigue_curve(pitcher_game_log: list) -> dict:
     # Use pitch count to refine the IP-based estimate when available
     if avg_pitches is not None:
         if avg_pitches >= 105:
-            phase2 = 1.03   # high-volume arm — tires slowly
+            phase2 = 1.03  # high-volume arm — tires slowly
         elif avg_pitches >= 95:
-            phase2 = 1.07   # normal workload
+            phase2 = 1.07  # normal workload
         elif avg_pitches >= 85:
-            phase2 = 1.12   # kept on a short leash — tires faster
+            phase2 = 1.12  # kept on a short leash — tires faster
         else:
-            phase2 = 1.20   # short-arm type, frequently managed out early
+            phase2 = 1.20  # short-arm type, frequently managed out early
     else:
         # Fall back to IP-based estimate
         if avg_ip >= 6.5:
@@ -419,11 +449,11 @@ def build_fatigue_curve(pitcher_game_log: list) -> dict:
         phase3 *= 0.90
 
     return {
-        "phase1":         1.0,
-        "phase2":         round(min(phase2, 1.50), 3),
-        "phase3":         round(min(phase3, 1.90), 3),
-        "avg_pitches":    avg_pitches,
-        "last_pitches":   last_pitches if last_pitches else None,
+        "phase1": 1.0,
+        "phase2": round(min(phase2, 1.50), 3),
+        "phase3": round(min(phase3, 1.90), 3),
+        "avg_pitches": avg_pitches,
+        "last_pitches": last_pitches if last_pitches else None,
         "pitch_carryover": pitch_carryover,
     }
 
@@ -440,16 +470,16 @@ def build_fatigued_pitcher_stats(base_stats: dict, fatigue_factor: float) -> dic
     don't degrade as quickly as run-prevention in late innings.
     """
     try:
-        era  = float(base_stats.get("era",  LEAGUE_AVG_ERA))
+        era = float(base_stats.get("era", LEAGUE_AVG_ERA))
     except (ValueError, TypeError):
-        era  = LEAGUE_AVG_ERA
+        era = LEAGUE_AVG_ERA
     try:
         whip = float(base_stats.get("whip", LEAGUE_AVG_WHIP))
     except (ValueError, TypeError):
         whip = LEAGUE_AVG_WHIP
 
     return {
-        "era":  str(round(era  * fatigue_factor, 2)),
+        "era": str(round(era * fatigue_factor, 2)),
         # WHIP degrades at ~75% the rate of ERA
         "whip": str(round(whip * (1 + (fatigue_factor - 1) * 0.75), 2)),
     }
@@ -470,13 +500,13 @@ def apply_batter_rest_modifier(probs: list, rest_days: int) -> list:
 
     adjusted = list(probs)
     if rest_days == 1:
-        hit_factor = 0.96   # back-to-back: 4% hit reduction
+        hit_factor = 0.96  # back-to-back: 4% hit reduction
     elif rest_days == 3:
-        hit_factor = 1.01   # one extra day off
+        hit_factor = 1.01  # one extra day off
     else:
-        hit_factor = 1.02   # 4+ days rest: fresh
+        hit_factor = 1.02  # 4+ days rest: fresh
 
-    for i in (2, 3, 4, 5):   # 1B, 2B, 3B, HR
+    for i in (2, 3, 4, 5):  # 1B, 2B, 3B, HR
         adjusted[i] *= hit_factor
 
     total = sum(adjusted)
@@ -484,8 +514,8 @@ def apply_batter_rest_modifier(probs: list, rest_days: int) -> list:
 
 
 # Statcast league averages (2024 MLB)
-LEAGUE_AVG_BARREL   = 7.0    # 7% barrel rate
-LEAGUE_AVG_HARD_HIT = 38.0   # 38% hard-hit rate (95+ mph)
+LEAGUE_AVG_BARREL = 7.0  # 7% barrel rate
+LEAGUE_AVG_HARD_HIT = 38.0  # 38% hard-hit rate (95+ mph)
 
 
 def apply_statcast_modifier(probs: list, barrel_pct: float, hard_hit_pct: float) -> list:
@@ -503,13 +533,13 @@ def apply_statcast_modifier(probs: list, barrel_pct: float, hard_hit_pct: float)
     if barrel_pct <= 0 or hard_hit_pct <= 0:
         return probs
 
-    barrel_factor   = (barrel_pct   / LEAGUE_AVG_BARREL)   ** 0.35
+    barrel_factor = (barrel_pct / LEAGUE_AVG_BARREL) ** 0.35
     hard_hit_factor = (hard_hit_pct / LEAGUE_AVG_HARD_HIT) ** 0.25
     combined = barrel_factor * 0.65 + hard_hit_factor * 0.35
 
     adjusted = list(probs)
-    adjusted[5] *= combined                          # HR: full effect
-    adjusted[3] *= (1 + (combined - 1) * 0.40)      # 2B: 40% of effect
+    adjusted[5] *= combined  # HR: full effect
+    adjusted[3] *= 1 + (combined - 1) * 0.40  # 2B: 40% of effect
 
     total = sum(adjusted)
     return [p / total for p in adjusted]
@@ -528,19 +558,23 @@ def blend_probs(season_probs: list, recent_probs: list, recent_weight: float = 0
     as a hitter over 150+ games.
     """
     season_weight = 1.0 - recent_weight
-    blended = [season_weight * s + recent_weight * r
-               for s, r in zip(season_probs, recent_probs)]
+    blended = [season_weight * s + recent_weight * r for s, r in zip(season_probs, recent_probs)]
     total = sum(blended)
     return [p / total for p in blended]
 
 
-def precompute_lineup(lineup_stats: list, pitcher_stats: dict,
-                      weather: dict = None, recent_stats_list: list = None,
-                      venue: str = None, matchup_stats_list: list = None,
-                      daynight_stats_list: list = None,
-                      batter_rest_days: int = None,
-                      savant_list: list = None,
-                      umpire_name: str = None) -> list:
+def precompute_lineup(
+    lineup_stats: list,
+    pitcher_stats: dict,
+    weather: dict = None,
+    recent_stats_list: list = None,
+    venue: str = None,
+    matchup_stats_list: list = None,
+    daynight_stats_list: list = None,
+    batter_rest_days: int = None,
+    savant_list: list = None,
+    umpire_name: str = None,
+) -> list:
     """
     Pre-calculate cumulative probability arrays for every batter in a lineup.
     Doing this ONCE before the simulation loop (instead of inside it) is the
@@ -593,26 +627,28 @@ def precompute_lineup(lineup_stats: list, pitcher_stats: dict,
         # OUTCOME_ORDER index 0 = WALK
         try:
             n_batters = len(lineup_stats)
-            curr_ops = float(stats.get('ops', '0') or '0')
+            curr_ops = float(stats.get("ops", "0") or "0")
             next_stats = lineup_stats[(i + 1) % n_batters]
-            next_ops = float(next_stats.get('ops', '0') or '0')
+            next_ops = float(next_stats.get("ops", "0") or "0")
             ops_diff = next_ops - curr_ops
             if ops_diff >= 0.120:
-                probs[0] *= 1.18   # next batter is a monster -- lots of nibbling
+                probs[0] *= 1.18  # next batter is a monster -- lots of nibbling
             elif ops_diff >= 0.060:
-                probs[0] *= 1.10   # next batter is clearly better
+                probs[0] *= 1.10  # next batter is clearly better
             elif ops_diff >= 0.030:
-                probs[0] *= 1.05   # next batter is somewhat better
+                probs[0] *= 1.05  # next batter is somewhat better
             elif ops_diff <= -0.060:
-                probs[0] *= 0.94   # next batter is weaker -- pitcher attacks zone
+                probs[0] *= 0.94  # next batter is weaker -- pitcher attacks zone
             total = sum(probs)
             probs = [p / total for p in probs]
         except (ValueError, TypeError, ZeroDivisionError):
-            pass   # missing OPS data -- skip protection modifier
+            pass  # missing OPS data -- skip protection modifier
 
         # Ballpark factor (dimensions, altitude, park tendencies)
         if venue:
-            probs = apply_ballpark_factor(probs, venue, month=__import__("datetime").date.today().month)
+            probs = apply_ballpark_factor(
+                probs, venue, month=__import__("datetime").date.today().month
+            )
 
         # Today's weather on top of ballpark baseline
         if weather:
@@ -627,8 +663,8 @@ def precompute_lineup(lineup_stats: list, pitcher_stats: dict,
             sv = savant_list[i]
             probs = apply_statcast_modifier(
                 probs,
-                sv.get('barrel_pct',   0),
-                sv.get('hard_hit_pct', 0),
+                sv.get("barrel_pct", 0),
+                sv.get("hard_hit_pct", 0),
             )
 
         # Umpire tendencies: wide/tight zone shifts K and BB rates
@@ -643,10 +679,10 @@ def precompute_lineup(lineup_stats: list, pitcher_stats: dict,
 # ── Batter situational tendency rates ────────────────────────────
 
 # League-average rates used as fallback when a batter lacks enough sample
-LEAGUE_GDP_RATE    = 0.09   # % of non-K outs with runner on 1st that become DPs
-LEAGUE_SF_RATE     = 0.04   # % of outs with runner on 3rd, <2 out that score as sac flies
-LEAGUE_SB_RATE     = 0.04   # % of at-bats with runner on 1st only where steal is attempted
-LEAGUE_SB_SUCCESS  = 0.72   # % of steal attempts that succeed (league average)
+LEAGUE_GDP_RATE = 0.09  # % of non-K outs with runner on 1st that become DPs
+LEAGUE_SF_RATE = 0.04  # % of outs with runner on 3rd, <2 out that score as sac flies
+LEAGUE_SB_RATE = 0.04  # % of at-bats with runner on 1st only where steal is attempted
+LEAGUE_SB_SUCCESS = 0.72  # % of steal attempts that succeed (league average)
 
 
 def compute_batter_rates(lineup_stats: list) -> list:
@@ -668,61 +704,65 @@ def compute_batter_rates(lineup_stats: list) -> list:
     """
     rates = []
     for stats in lineup_stats:
-        ab  = int(stats.get("atBats",              0) or 0)
+        ab = int(stats.get("atBats", 0) or 0)
         gdp = int(stats.get("groundIntoDoublePlay", 0) or 0)
-        sf  = int(stats.get("sacFlies",            0) or 0)
-        sb  = int(stats.get("stolenBases",         0) or 0)
-        cs  = int(stats.get("caughtStealing",      0) or 0)
-        hits = int(stats.get("hits",               0) or 0)
-        k    = int(stats.get("strikeOuts",         0) or 0)
-        pa   = int(stats.get("plateAppearances",   0) or 0)
+        sf = int(stats.get("sacFlies", 0) or 0)
+        sb = int(stats.get("stolenBases", 0) or 0)
+        cs = int(stats.get("caughtStealing", 0) or 0)
+        hits = int(stats.get("hits", 0) or 0)
+        k = int(stats.get("strikeOuts", 0) or 0)
+        pa = int(stats.get("plateAppearances", 0) or 0)
 
         if ab >= 100:
             # GIDP rate: GDP / (non-K outs) — these are the outs where a DP is even possible
             non_k_outs = max(ab - hits - k, 1)
-            gdp_rate   = gdp / non_k_outs
+            gdp_rate = gdp / non_k_outs
 
             # Sac fly rate: SF / (estimated PA with runner on 3rd, <2 out)
             # ~20% of PA come with runner on 3rd and <2 out (rough MLB estimate)
             sf_eligible = max(pa * 0.20, 1)
-            sf_rate     = sf / sf_eligible
+            sf_rate = sf / sf_eligible
 
             # SB: attempt rate per PA where runner on 1st only (~30% of PA)
             sb_attempts = sb + cs
             sb_eligible = max(pa * 0.30, 1)
-            sb_rate     = sb_attempts / sb_eligible
-            sb_success  = (sb / sb_attempts) if sb_attempts >= 5 else LEAGUE_SB_SUCCESS
+            sb_rate = sb_attempts / sb_eligible
+            sb_success = (sb / sb_attempts) if sb_attempts >= 5 else LEAGUE_SB_SUCCESS
         else:
             # Insufficient sample — use league averages
-            gdp_rate   = LEAGUE_GDP_RATE
-            sf_rate    = LEAGUE_SF_RATE
-            sb_rate    = LEAGUE_SB_RATE
+            gdp_rate = LEAGUE_GDP_RATE
+            sf_rate = LEAGUE_SF_RATE
+            sb_rate = LEAGUE_SB_RATE
             sb_success = LEAGUE_SB_SUCCESS
 
-        rates.append({
-            "gdp_rate":   round(min(max(gdp_rate,   0.01), 0.25), 3),
-            "sf_rate":    round(min(max(sf_rate,    0.005), 0.15), 3),
-            "sb_rate":    round(min(max(sb_rate,    0.005), 0.20), 3),
-            "sb_success": round(min(max(sb_success, 0.45), 0.92), 3),
-        })
+        rates.append(
+            {
+                "gdp_rate": round(min(max(gdp_rate, 0.01), 0.25), 3),
+                "sf_rate": round(min(max(sf_rate, 0.005), 0.15), 3),
+                "sb_rate": round(min(max(sb_rate, 0.005), 0.20), 3),
+                "sb_success": round(min(max(sb_success, 0.45), 0.92), 3),
+            }
+        )
 
     return rates
 
 
 # ── STEP 2: Simulate one at-bat ─────────────────────────────────
 
+
 def simulate_at_bat(cum_weights: list) -> str:
     """
     Draw one random at-bat outcome.
     Uses a random float + binary search (bisect) — faster than random.choices().
     """
-    r = random.random()                      # random float 0.0–1.0
-    i = bisect(cum_weights, r)               # find which bucket it lands in
-    i = min(i, len(OUTCOME_ORDER) - 1)      # safety clamp
+    r = random.random()  # random float 0.0–1.0
+    i = bisect(cum_weights, r)  # find which bucket it lands in
+    i = min(i, len(OUTCOME_ORDER) - 1)  # safety clamp
     return OUTCOME_ORDER[i]
 
 
 # ── STEP 3: Advance base runners ─────────────────────────────────
+
 
 def advance_runners(b1: bool, b2: bool, b3: bool, outcome: str) -> tuple:
     """
@@ -739,27 +779,27 @@ def advance_runners(b1: bool, b2: bool, b3: bool, outcome: str) -> tuple:
     """
     if outcome == WALK:
         if b1 and b2 and b3:
-            return True,  True,  True,  1     # 3rd pushed home
+            return True, True, True, 1  # 3rd pushed home
         if b1 and b2:
-            return True,  True,  True,  0     # load bases
+            return True, True, True, 0  # load bases
         if b1:
-            return True,  True,  b3,    0     # 1st pushes to 2nd
-        return True,  b2,   b3,   0           # batter takes 1st
+            return True, True, b3, 0  # 1st pushes to 2nd
+        return True, b2, b3, 0  # batter takes 1st
 
     if outcome in (STRIKEOUT, OUT):
-        return b1, b2, b3, 0                  # no movement
+        return b1, b2, b3, 0  # no movement
 
     if outcome == SINGLE:
-        runs = int(b3) + int(b2)              # 3rd and 2nd score
-        return True, b1, False, runs          # batter→1st, old 1st→2nd
+        runs = int(b3) + int(b2)  # 3rd and 2nd score
+        return True, b1, False, runs  # batter→1st, old 1st→2nd
 
     if outcome == DOUBLE:
-        runs = int(b3) + int(b2) + int(b1)   # everyone scores (simplified)
-        return False, True, False, runs       # batter→2nd
+        runs = int(b3) + int(b2) + int(b1)  # everyone scores (simplified)
+        return False, True, False, runs  # batter→2nd
 
     if outcome == TRIPLE:
         runs = int(b1) + int(b2) + int(b3)
-        return False, False, True, runs       # batter→3rd
+        return False, False, True, runs  # batter→3rd
 
     if outcome == HR:
         runs = int(b1) + int(b2) + int(b3) + 1  # everyone + batter
@@ -777,48 +817,48 @@ def advance_runners(b1: bool, b2: bool, b3: bool, outcome: str) -> tuple:
 # Updated periodically based on UmpScorecards data.
 UMP_TENDENCIES = {
     # Wide zone (more Ks, fewer BBs)
-    "Laz Diaz":             {"k": 1.14, "bb": 0.86},
-    "Alfonso Marquez":      {"k": 1.10, "bb": 0.91},
-    "Hunter Wendelstedt":   {"k": 1.08, "bb": 0.92},
-    "Jim Reynolds":         {"k": 1.08, "bb": 0.93},
-    "Mike Winters":         {"k": 1.07, "bb": 0.93},
-    "Marvin Hudson":        {"k": 1.06, "bb": 0.94},
-    "Brian Knight":         {"k": 1.05, "bb": 0.95},
-    "Fieldin Culbreth":     {"k": 1.05, "bb": 0.95},
-    "Doug Eddings":         {"k": 1.04, "bb": 0.96},
-    "Scott Barry":          {"k": 1.03, "bb": 0.97},
-    "Adam Beck":            {"k": 1.03, "bb": 0.97},
-    "Tripp Gibson":         {"k": 1.02, "bb": 0.98},
-    "Gabe Morales":         {"k": 1.02, "bb": 0.98},
-    "Chris Segal":          {"k": 1.02, "bb": 0.98},
-    "Stu Scheurwater":      {"k": 1.02, "bb": 0.98},
+    "Laz Diaz": {"k": 1.14, "bb": 0.86},
+    "Alfonso Marquez": {"k": 1.10, "bb": 0.91},
+    "Hunter Wendelstedt": {"k": 1.08, "bb": 0.92},
+    "Jim Reynolds": {"k": 1.08, "bb": 0.93},
+    "Mike Winters": {"k": 1.07, "bb": 0.93},
+    "Marvin Hudson": {"k": 1.06, "bb": 0.94},
+    "Brian Knight": {"k": 1.05, "bb": 0.95},
+    "Fieldin Culbreth": {"k": 1.05, "bb": 0.95},
+    "Doug Eddings": {"k": 1.04, "bb": 0.96},
+    "Scott Barry": {"k": 1.03, "bb": 0.97},
+    "Adam Beck": {"k": 1.03, "bb": 0.97},
+    "Tripp Gibson": {"k": 1.02, "bb": 0.98},
+    "Gabe Morales": {"k": 1.02, "bb": 0.98},
+    "Chris Segal": {"k": 1.02, "bb": 0.98},
+    "Stu Scheurwater": {"k": 1.02, "bb": 0.98},
     # Neutral / accurate
-    "Pat Hoberg":           {"k": 1.00, "bb": 1.00},
-    "Will Little":          {"k": 1.01, "bb": 0.99},
-    "Ben May":              {"k": 1.01, "bb": 0.99},
-    "Ryan Blakney":         {"k": 1.01, "bb": 0.99},
-    "Todd Tichenor":        {"k": 1.01, "bb": 0.99},
-    "Roberto Ortiz":        {"k": 1.00, "bb": 1.00},
-    "James Hoye":           {"k": 1.00, "bb": 1.00},
-    "Mark Carlson":         {"k": 0.99, "bb": 1.01},
-    "Erich Bacchus":        {"k": 0.99, "bb": 1.01},
-    "DJ Reyburn":           {"k": 1.01, "bb": 0.99},
-    "John Tumpane":         {"k": 0.99, "bb": 1.01},
-    "Paul Nauert":          {"k": 1.00, "bb": 1.00},
+    "Pat Hoberg": {"k": 1.00, "bb": 1.00},
+    "Will Little": {"k": 1.01, "bb": 0.99},
+    "Ben May": {"k": 1.01, "bb": 0.99},
+    "Ryan Blakney": {"k": 1.01, "bb": 0.99},
+    "Todd Tichenor": {"k": 1.01, "bb": 0.99},
+    "Roberto Ortiz": {"k": 1.00, "bb": 1.00},
+    "James Hoye": {"k": 1.00, "bb": 1.00},
+    "Mark Carlson": {"k": 0.99, "bb": 1.01},
+    "Erich Bacchus": {"k": 0.99, "bb": 1.01},
+    "DJ Reyburn": {"k": 1.01, "bb": 0.99},
+    "John Tumpane": {"k": 0.99, "bb": 1.01},
+    "Paul Nauert": {"k": 1.00, "bb": 1.00},
     # Tight zone (fewer Ks, more BBs)
-    "Andy Fletcher":        {"k": 0.98, "bb": 1.02},
-    "Mark Wegner":          {"k": 0.98, "bb": 1.02},
-    "Chad Fairchild":       {"k": 0.98, "bb": 1.02},
-    "Kerwin Danley":        {"k": 0.98, "bb": 1.02},
-    "Lance Barksdale":      {"k": 0.97, "bb": 1.03},
-    "Sam Holbrook":         {"k": 0.96, "bb": 1.04},
-    "Dan Iassogna":         {"k": 0.95, "bb": 1.06},
-    "Ted Barrett":          {"k": 0.94, "bb": 1.07},
-    "Phil Cuzzi":           {"k": 0.93, "bb": 1.08},
-    "Vic Carapazza":        {"k": 0.93, "bb": 1.08},
-    "Tom Hallion":          {"k": 0.91, "bb": 1.10},
-    "Bill Miller":          {"k": 0.90, "bb": 1.12},
-    "CB Bucknor":           {"k": 0.87, "bb": 1.16},
+    "Andy Fletcher": {"k": 0.98, "bb": 1.02},
+    "Mark Wegner": {"k": 0.98, "bb": 1.02},
+    "Chad Fairchild": {"k": 0.98, "bb": 1.02},
+    "Kerwin Danley": {"k": 0.98, "bb": 1.02},
+    "Lance Barksdale": {"k": 0.97, "bb": 1.03},
+    "Sam Holbrook": {"k": 0.96, "bb": 1.04},
+    "Dan Iassogna": {"k": 0.95, "bb": 1.06},
+    "Ted Barrett": {"k": 0.94, "bb": 1.07},
+    "Phil Cuzzi": {"k": 0.93, "bb": 1.08},
+    "Vic Carapazza": {"k": 0.93, "bb": 1.08},
+    "Tom Hallion": {"k": 0.91, "bb": 1.10},
+    "Bill Miller": {"k": 0.90, "bb": 1.12},
+    "CB Bucknor": {"k": 0.87, "bb": 1.16},
 }
 
 
@@ -840,8 +880,8 @@ def apply_umpire_modifier(probs: list, umpire_name: str) -> list:
         return probs
 
     adjusted = list(probs)
-    adjusted[0] *= tend["bb"]   # WALK
-    adjusted[1] *= tend["k"]    # STRIKEOUT
+    adjusted[0] *= tend["bb"]  # WALK
+    adjusted[1] *= tend["k"]  # STRIKEOUT
     total = sum(adjusted)
     return [p / total for p in adjusted]
 
@@ -849,13 +889,13 @@ def apply_umpire_modifier(probs: list, umpire_name: str) -> list:
 # League-average error and wild pitch rates (2024 MLB season)
 # Error: ~0.50 errors per team per game / 27 outs = ~1.85% per non-K out
 # Wild pitch/PB: ~0.40 WP+PB per team per game = ~1.5% per AB with runners on
-ERROR_RATE      = 0.018
+ERROR_RATE = 0.018
 WILD_PITCH_RATE = 0.015
 
 
-def simulate_half_inning(precomp_lineup: list, lineup_pos: int,
-                         risp_precomp: list = None,
-                         batter_rates: list = None) -> tuple:
+def simulate_half_inning(
+    precomp_lineup: list, lineup_pos: int, risp_precomp: list = None, batter_rates: list = None
+) -> tuple:
     """
     Simulate one half-inning (3 outs) for one team.
 
@@ -884,13 +924,13 @@ def simulate_half_inning(precomp_lineup: list, lineup_pos: int,
         # We check BEFORE the current batter faces a pitch.
         # Uses the previous batter's (the runner's) steal tendency.
         if batter_rates and b1 and not b2 and outs < 2:
-            runner_idx = (pos - 1) % 9   # runner on 1st was the prior batter
+            runner_idx = (pos - 1) % 9  # runner on 1st was the prior batter
             r = batter_rates[runner_idx]
             if random.random() < r["sb_rate"]:
                 if random.random() < r["sb_success"]:
-                    b2, b1 = True, False    # successful steal of 2nd
+                    b2, b1 = True, False  # successful steal of 2nd
                 else:
-                    b1 = False              # caught stealing — runner is out
+                    b1 = False  # caught stealing — runner is out
                     outs += 1
                     if outs >= 3:
                         break
@@ -912,8 +952,8 @@ def simulate_half_inning(precomp_lineup: list, lineup_pos: int,
                 # Ground ball turns into a double play — two outs, runner erased.
                 if b1:
                     if random.random() < batter_rates[batter_idx]["gdp_rate"]:
-                        outs += 2       # batter AND runner are both out
-                        b1 = False      # runner on 1st is erased
+                        outs += 2  # batter AND runner are both out
+                        b1 = False  # runner on 1st is erased
                         pos += 1
                         continue
 
@@ -922,8 +962,8 @@ def simulate_half_inning(precomp_lineup: list, lineup_pos: int,
                 # (Only checked if GIDP didn't fire above)
                 if b3:
                     if random.random() < batter_rates[batter_idx]["sf_rate"]:
-                        runs += 1       # run scores on the sac fly
-                        b3 = False      # runner on 3rd scores
+                        runs += 1  # run scores on the sac fly
+                        b3 = False  # runner on 3rd scores
                         outs += 1
                         pos += 1
                         continue
@@ -934,14 +974,15 @@ def simulate_half_inning(precomp_lineup: list, lineup_pos: int,
                 b1, b2, b3, new_runs = advance_runners(b1, b2, b3, SINGLE)
                 runs += new_runs
                 pos += 1
-                continue   # no out recorded
+                continue  # no out recorded
 
             outs += 1
 
             # -- Wild pitch / passed ball: advance all runners one base
             # Only matters when there are runners on base.
             if (b1 or b2 or b3) and random.random() < WILD_PITCH_RATE:
-                if b3: runs += 1
+                if b3:
+                    runs += 1
                 b3 = b2
                 b2 = b1
                 b1 = False
@@ -949,7 +990,8 @@ def simulate_half_inning(precomp_lineup: list, lineup_pos: int,
         else:
             # -- Wild pitch before the hit: runners advance on passed ball
             if (b1 or b2 or b3) and random.random() < WILD_PITCH_RATE:
-                if b3: runs += 1
+                if b3:
+                    runs += 1
                 b3 = b2
                 b2 = b1
                 b1 = False
@@ -964,21 +1006,22 @@ def simulate_half_inning(precomp_lineup: list, lineup_pos: int,
 
 # ── STEP 5: Simulate one full game ──────────────────────────────
 
+
 def simulate_game(
-    away_precomp_early: list,           # innings 1-2: fresh starter
+    away_precomp_early: list,  # innings 1-2: fresh starter
     home_precomp_early: list,
-    away_precomp_mid:   list = None,    # innings 3-5: starter showing fatigue
-    home_precomp_mid:   list = None,
-    away_precomp_late:  list = None,    # innings 6+: bullpen
-    home_precomp_late:  list = None,
-    away_precomp_risp:  list = None,    # RISP probs for away batters (b2 or b3 occupied)
-    home_precomp_risp:  list = None,    # RISP probs for home batters
-    away_batter_rates:  list = None,    # per-batter GIDP/SF/SB rates for away batters
-    home_batter_rates:  list = None,    # per-batter GIDP/SF/SB rates for home batters
+    away_precomp_mid: list = None,  # innings 3-5: starter showing fatigue
+    home_precomp_mid: list = None,
+    away_precomp_late: list = None,  # innings 6+: bullpen
+    home_precomp_late: list = None,
+    away_precomp_risp: list = None,  # RISP probs for away batters (b2 or b3 occupied)
+    home_precomp_risp: list = None,  # RISP probs for home batters
+    away_batter_rates: list = None,  # per-batter GIDP/SF/SB rates for away batters
+    home_batter_rates: list = None,  # per-batter GIDP/SF/SB rates for home batters
     innings: int = 9,
-    bullpen_start: int = 5,             # 0-indexed: inning 6 in human terms
-    mid_start:     int = 2,             # 0-indexed: inning 3 in human terms
-    resolve_ties:  bool = True,         # False = return tied score as-is (for F3/F5/F7 push calc)
+    bullpen_start: int = 5,  # 0-indexed: inning 6 in human terms
+    mid_start: int = 2,  # 0-indexed: inning 3 in human terms
+    resolve_ties: bool = True,  # False = return tied score as-is (for F3/F5/F7 push calc)
 ) -> tuple:
     """
     Simulate one complete 9-inning game with 3 pitching phases + RISP clutch stats:
@@ -995,8 +1038,8 @@ def simulate_game(
     """
     away_runs = 0
     home_runs = 0
-    away_pos  = 0
-    home_pos  = 0
+    away_pos = 0
+    home_pos = 0
 
     for inning in range(innings):
         # Select which precomputed lineup to use based on inning
@@ -1014,8 +1057,9 @@ def simulate_game(
             home_cur = home_precomp_early
 
         # Away team bats (RISP probs swap in when b2/b3; GIDP/SF/SB from batter_rates)
-        runs, away_pos = simulate_half_inning(away_cur, away_pos,
-                                              away_precomp_risp, away_batter_rates)
+        runs, away_pos = simulate_half_inning(
+            away_cur, away_pos, away_precomp_risp, away_batter_rates
+        )
         away_runs += runs
 
         # Walk-off rule: home team wins in 9th without finishing if already ahead
@@ -1023,8 +1067,9 @@ def simulate_game(
             break
 
         # Home team bats
-        runs, home_pos = simulate_half_inning(home_cur, home_pos,
-                                              home_precomp_risp, home_batter_rates)
+        runs, home_pos = simulate_half_inning(
+            home_cur, home_pos, home_precomp_risp, home_batter_rates
+        )
         home_runs += runs
 
     # Extra innings if tied (up to 3 extra) — use bullpen probs
@@ -1034,11 +1079,13 @@ def simulate_game(
         extra_home = home_precomp_late or home_precomp_mid or home_precomp_early
         extra = 0
         while away_runs == home_runs and extra < 3:
-            runs, away_pos = simulate_half_inning(extra_away, away_pos,
-                                                  away_precomp_risp, away_batter_rates)
+            runs, away_pos = simulate_half_inning(
+                extra_away, away_pos, away_precomp_risp, away_batter_rates
+            )
             away_runs += runs
-            runs, home_pos = simulate_half_inning(extra_home, home_pos,
-                                                  home_precomp_risp, home_batter_rates)
+            runs, home_pos = simulate_half_inning(
+                extra_home, home_pos, home_precomp_risp, home_batter_rates
+            )
             home_runs += runs
             extra += 1
         # If still tied, random winner (very rare)
@@ -1053,42 +1100,43 @@ def simulate_game(
 
 # ── STEP 6: Run N simulations ────────────────────────────────────
 
+
 def run_simulation(
-    away_team:         str,
-    home_team:         str,
-    away_lineup:       list,        # batter stat dicts (L/R split) for away team
-    home_lineup:       list,        # batter stat dicts (L/R split) for home team
-    away_pitcher:      dict,        # away starting pitcher's season stats
-    home_pitcher:      dict,        # home starting pitcher's season stats
-    weather:           dict = None, # ballpark weather
-    away_recent:       list = None, # last-20-game stats for away batters
-    home_recent:       list = None, # last-20-game stats for home batters
-    away_rp_stats:     list = None, # away batters' stats vs relief pitchers (bullpen)
-    home_rp_stats:     list = None, # home batters' stats vs relief pitchers (bullpen)
-    away_bullpen:      dict = None, # away team's actual bullpen ERA/WHIP (for innings 6-9)
-    home_bullpen:      dict = None, # home team's actual bullpen ERA/WHIP (for innings 6-9)
-    venue:             str  = None, # ballpark name for park factor adjustment
-    away_pitcher_log:  list = None, # away starter's last 10 game logs (ip, er per start)
-    home_pitcher_log:  list = None, # home starter's last 10 game logs
-    away_rest_days:    int  = None, # days since away starter's last start
-    home_rest_days:    int  = None, # days since home starter's last start
-    away_risp_stats:    list = None, # away batters' RISP stats (runners on 2nd/3rd)
-    home_risp_stats:    list = None, # home batters' RISP stats
-    away_matchup_stats:  list = None, # away batters' career stats vs home starter
-    home_matchup_stats:  list = None, # home batters' career stats vs away starter
-    away_daynight_stats: list = None, # away batters' day or night game splits
-    home_daynight_stats: list = None, # home batters' day or night game splits
-    away_batter_rest:    int  = None,
-    home_batter_rest:    int  = None,
-    away_savant:         list = None,  # Statcast data per away batter
-    home_savant:         list = None,  # Statcast data per home batter
-    umpire_name:         str  = None,  # home plate umpire for K/BB modifier
-    away_bp_fatigue:     dict = None,  # bullpen fatigue {era_modifier, whip_modifier, fatigue}
-    home_bp_fatigue:     dict = None,  # bullpen fatigue for home team
-    series_game_number:  int = 1,      # game number in current series (1=opener, 2/3/4=familiarity boost)
-    away_catcher_cs:     float = 0.28, # opposing (home) catcher caught-stealing rate
-    home_catcher_cs:     float = 0.28, # opposing (away) catcher caught-stealing rate
-    n:                   int = 100_000,
+    away_team: str,
+    home_team: str,
+    away_lineup: list,  # batter stat dicts (L/R split) for away team
+    home_lineup: list,  # batter stat dicts (L/R split) for home team
+    away_pitcher: dict,  # away starting pitcher's season stats
+    home_pitcher: dict,  # home starting pitcher's season stats
+    weather: dict = None,  # ballpark weather
+    away_recent: list = None,  # last-20-game stats for away batters
+    home_recent: list = None,  # last-20-game stats for home batters
+    away_rp_stats: list = None,  # away batters' stats vs relief pitchers (bullpen)
+    home_rp_stats: list = None,  # home batters' stats vs relief pitchers (bullpen)
+    away_bullpen: dict = None,  # away team's actual bullpen ERA/WHIP (for innings 6-9)
+    home_bullpen: dict = None,  # home team's actual bullpen ERA/WHIP (for innings 6-9)
+    venue: str = None,  # ballpark name for park factor adjustment
+    away_pitcher_log: list = None,  # away starter's last 10 game logs (ip, er per start)
+    home_pitcher_log: list = None,  # home starter's last 10 game logs
+    away_rest_days: int = None,  # days since away starter's last start
+    home_rest_days: int = None,  # days since home starter's last start
+    away_risp_stats: list = None,  # away batters' RISP stats (runners on 2nd/3rd)
+    home_risp_stats: list = None,  # home batters' RISP stats
+    away_matchup_stats: list = None,  # away batters' career stats vs home starter
+    home_matchup_stats: list = None,  # home batters' career stats vs away starter
+    away_daynight_stats: list = None,  # away batters' day or night game splits
+    home_daynight_stats: list = None,  # home batters' day or night game splits
+    away_batter_rest: int = None,
+    home_batter_rest: int = None,
+    away_savant: list = None,  # Statcast data per away batter
+    home_savant: list = None,  # Statcast data per home batter
+    umpire_name: str = None,  # home plate umpire for K/BB modifier
+    away_bp_fatigue: dict = None,  # bullpen fatigue {era_modifier, whip_modifier, fatigue}
+    home_bp_fatigue: dict = None,  # bullpen fatigue for home team
+    series_game_number: int = 1,  # game number in current series (1=opener, 2/3/4=familiarity boost)
+    away_catcher_cs: float = 0.28,  # opposing (home) catcher caught-stealing rate
+    home_catcher_cs: float = 0.28,  # opposing (away) catcher caught-stealing rate
+    n: int = 100_000,
 ) -> dict:
     """
     Run N Monte Carlo simulations and return aggregated results.
@@ -1119,35 +1167,91 @@ def run_simulation(
 
     # ── Phase 1: innings 1-2 (starter is fresh) ───────────────────────
     away_precomp_early = precompute_lineup(
-        away_lineup, home_pitcher, weather, away_recent, venue,
-        away_matchup_stats, away_daynight_stats, away_batter_rest, away_savant, umpire_name)
+        away_lineup,
+        home_pitcher,
+        weather,
+        away_recent,
+        venue,
+        away_matchup_stats,
+        away_daynight_stats,
+        away_batter_rest,
+        away_savant,
+        umpire_name,
+    )
     home_precomp_early = precompute_lineup(
-        home_lineup, away_pitcher, weather, home_recent, venue,
-        home_matchup_stats, home_daynight_stats, home_batter_rest, home_savant, umpire_name)
+        home_lineup,
+        away_pitcher,
+        weather,
+        home_recent,
+        venue,
+        home_matchup_stats,
+        home_daynight_stats,
+        home_batter_rest,
+        home_savant,
+        umpire_name,
+    )
 
     # ── Phase 2: innings 3-5 (starter showing fatigue) ───────────────
     home_pitcher_mid = build_fatigued_pitcher_stats(home_pitcher, home_fatigue["phase2"])
     away_pitcher_mid = build_fatigued_pitcher_stats(away_pitcher, away_fatigue["phase2"])
     away_precomp_mid = precompute_lineup(
-        away_lineup, home_pitcher_mid, weather, away_recent, venue,
-        away_matchup_stats, away_daynight_stats, away_batter_rest, away_savant, umpire_name)
+        away_lineup,
+        home_pitcher_mid,
+        weather,
+        away_recent,
+        venue,
+        away_matchup_stats,
+        away_daynight_stats,
+        away_batter_rest,
+        away_savant,
+        umpire_name,
+    )
     home_precomp_mid = precompute_lineup(
-        home_lineup, away_pitcher_mid, weather, home_recent, venue,
-        home_matchup_stats, home_daynight_stats, home_batter_rest, home_savant, umpire_name)
+        home_lineup,
+        away_pitcher_mid,
+        weather,
+        home_recent,
+        venue,
+        home_matchup_stats,
+        home_daynight_stats,
+        home_batter_rest,
+        home_savant,
+        umpire_name,
+    )
 
     # ── RISP: clutch stats when runner on 2nd or 3rd ─────────────────
     away_precomp_risp = None
     home_precomp_risp = None
 
-    if away_risp_stats and any(s for s in away_risp_stats if s and s.get("plateAppearances", 0) >= 20):
+    if away_risp_stats and any(
+        s for s in away_risp_stats if s and s.get("plateAppearances", 0) >= 20
+    ):
         away_precomp_risp = precompute_lineup(
-            away_risp_stats, home_pitcher, weather, away_recent, venue,
-            away_matchup_stats, away_daynight_stats, away_batter_rest, away_savant, umpire_name
+            away_risp_stats,
+            home_pitcher,
+            weather,
+            away_recent,
+            venue,
+            away_matchup_stats,
+            away_daynight_stats,
+            away_batter_rest,
+            away_savant,
+            umpire_name,
         )
-    if home_risp_stats and any(s for s in home_risp_stats if s and s.get("plateAppearances", 0) >= 20):
+    if home_risp_stats and any(
+        s for s in home_risp_stats if s and s.get("plateAppearances", 0) >= 20
+    ):
         home_precomp_risp = precompute_lineup(
-            home_risp_stats, away_pitcher, weather, home_recent, venue,
-            home_matchup_stats, home_daynight_stats, home_batter_rest, home_savant, umpire_name
+            home_risp_stats,
+            away_pitcher,
+            weather,
+            home_recent,
+            venue,
+            home_matchup_stats,
+            home_daynight_stats,
+            home_batter_rest,
+            home_savant,
+            umpire_name,
         )
 
     # ── Late game: batters vs the bullpen (innings 6+) ───────────────
@@ -1157,12 +1261,12 @@ def run_simulation(
         """Scale bullpen ERA/WHIP up when the pen is tired."""
         if not fatigue or not bp_stats:
             return bp_stats
-        era_mod  = fatigue.get('era_modifier',  1.0)
-        whip_mod = fatigue.get('whip_modifier', 1.0)
+        era_mod = fatigue.get("era_modifier", 1.0)
+        whip_mod = fatigue.get("whip_modifier", 1.0)
         result = dict(bp_stats)
         try:
-            result['era']  = str(round(float(result.get('era',  4.20)) * era_mod,  2))
-            result['whip'] = str(round(float(result.get('whip', 1.30)) * whip_mod, 3))
+            result["era"] = str(round(float(result.get("era", 4.20)) * era_mod, 2))
+            result["whip"] = str(round(float(result.get("whip", 1.30)) * whip_mod, 3))
         except (ValueError, TypeError):
             pass
         return result
@@ -1192,27 +1296,32 @@ def run_simulation(
     home_batter_rates = compute_batter_rates(home_lineup)
 
     # ── Run the simulation loop ───────────────────────────────────────
-    away_wins  = 0
-    home_wins  = 0
+    away_wins = 0
+    home_wins = 0
     away_total = 0
     home_total = 0
-    away_cover   = 0   # wins by 2+ (covers -1.5 run line)
-    home_cover   = 0
+    away_cover = 0  # wins by 2+ (covers -1.5 run line)
+    home_cover = 0
     away_cover_p15 = 0  # wins by 2+ (alt: +1.5, away must win outright OR lose by 1)
     home_cover_p15 = 0
     away_cover_m25 = 0  # wins by 3+ (alt: -2.5)
     home_cover_m25 = 0
     total_runs_hist = Counter()  # {total_runs: count} for O/U model
-    score_pairs     = Counter()  # {(away_runs, home_runs): count} for SGP correlated probs
+    score_pairs = Counter()  # {(away_runs, home_runs): count} for SGP correlated probs
 
     def _sim(**kw):
         return simulate_game(
-            away_precomp_early, home_precomp_early,
-            away_precomp_mid,   home_precomp_mid,
-            away_precomp_late,  home_precomp_late,
-            away_precomp_risp,  home_precomp_risp,
-            away_batter_rates,  home_batter_rates,
-            **kw
+            away_precomp_early,
+            home_precomp_early,
+            away_precomp_mid,
+            home_precomp_mid,
+            away_precomp_late,
+            home_precomp_late,
+            away_precomp_risp,
+            home_precomp_risp,
+            away_batter_rates,
+            home_batter_rates,
+            **kw,
         )
 
     for _ in range(n):
@@ -1249,7 +1358,8 @@ def run_simulation(
         aw = hw = at = ht = ties = 0
         for _ in range(n_seg):
             a, h = _sim(innings=inn, resolve_ties=False)
-            at += a; ht += h
+            at += a
+            ht += h
             if a > h:
                 aw += 1
             elif h > a:
@@ -1261,7 +1371,7 @@ def run_simulation(
         seg_results[label] = {
             "away_win_pct": round(aw / non_tie * 100, 1) if non_tie else 50.0,
             "home_win_pct": round(hw / non_tie * 100, 1) if non_tie else 50.0,
-            "tie_pct":      round(ties / n_seg * 100, 1),
+            "tie_pct": round(ties / n_seg * 100, 1),
             "away_avg_runs": round(at / n_seg, 2),
             "home_avg_runs": round(ht / n_seg, 2),
         }
@@ -1275,14 +1385,14 @@ def run_simulation(
     # and the psychological edge of playing at home.
     # We apply a small shift: nudge home team +2% and away team -2%,
     # then re-normalize so the two still sum to 100%.
-    HOME_FIELD_BOOST = 2.0   # percentage points
+    HOME_FIELD_BOOST = 2.0  # percentage points
     adj_home = raw_home_pct + HOME_FIELD_BOOST
     adj_away = raw_away_pct - HOME_FIELD_BOOST
     # Clamp so neither goes below 1% or above 99%
     adj_home = min(max(adj_home, 1.0), 99.0)
     adj_away = min(max(adj_away, 1.0), 99.0)
     # Re-normalize to exactly 100
-    total    = adj_away + adj_home
+    total = adj_away + adj_home
     adj_away = round(adj_away / total * 100, 1)
     adj_home = round(adj_home / total * 100, 1)
 
@@ -1291,7 +1401,7 @@ def run_simulation(
         if not log:
             return "Typical", None
         avg_ip = sum(g["ip"] for g in log) / len(log)
-        p2     = fatigue["phase2"]
+        p2 = fatigue["phase2"]
         if avg_ip >= 6.5 and p2 <= 1.04:
             label = "Durable"
         elif avg_ip >= 5.0 and p2 <= 1.10:
@@ -1331,58 +1441,59 @@ def run_simulation(
     avg_r = (away_total + home_total) / n
     if hist:
         variance = sum((k - avg_r) ** 2 * v for k, v in hist.items()) / n
-        run_std  = round(variance ** 0.5, 2)
+        run_std = round(variance**0.5, 2)
     else:
         run_std = 3.0
 
     return {
-        "away_team":           away_team,
-        "home_team":           home_team,
-        "simulations":         n,
-        "confidence_score":    confidence_score,
-        "run_std":             run_std,
-        "away_win_pct":        adj_away,
-        "home_win_pct":        adj_home,
-        "away_win_pct_raw":    round(raw_away_pct, 1),  # pre-HFA, for display
-        "home_win_pct_raw":    round(raw_home_pct, 1),
-        "away_avg_runs":       round(away_total / n, 2),
-        "home_avg_runs":       round(home_total / n, 2),
-        "uses_bullpen_data":   away_precomp_late is not None,
+        "away_team": away_team,
+        "home_team": home_team,
+        "simulations": n,
+        "confidence_score": confidence_score,
+        "run_std": run_std,
+        "away_win_pct": adj_away,
+        "home_win_pct": adj_home,
+        "away_win_pct_raw": round(raw_away_pct, 1),  # pre-HFA, for display
+        "home_win_pct_raw": round(raw_home_pct, 1),
+        "away_avg_runs": round(away_total / n, 2),
+        "home_avg_runs": round(home_total / n, 2),
+        "uses_bullpen_data": away_precomp_late is not None,
         # Pitcher fatigue profile
-        "away_fatigue_label":      away_fatigue_label,
-        "away_avg_ip":             away_avg_ip,
-        "away_avg_pitches":        away_fatigue.get("avg_pitches"),
-        "away_last_pitches":       away_fatigue.get("last_pitches"),
-        "away_pitch_carryover":    away_fatigue.get("pitch_carryover", False),
-        "home_fatigue_label":      home_fatigue_label,
-        "home_avg_ip":             home_avg_ip,
-        "home_avg_pitches":        home_fatigue.get("avg_pitches"),
-        "home_last_pitches":       home_fatigue.get("last_pitches"),
-        "home_pitch_carryover":    home_fatigue.get("pitch_carryover", False),
+        "away_fatigue_label": away_fatigue_label,
+        "away_avg_ip": away_avg_ip,
+        "away_avg_pitches": away_fatigue.get("avg_pitches"),
+        "away_last_pitches": away_fatigue.get("last_pitches"),
+        "away_pitch_carryover": away_fatigue.get("pitch_carryover", False),
+        "home_fatigue_label": home_fatigue_label,
+        "home_avg_ip": home_avg_ip,
+        "home_avg_pitches": home_fatigue.get("avg_pitches"),
+        "home_last_pitches": home_fatigue.get("last_pitches"),
+        "home_pitch_carryover": home_fatigue.get("pitch_carryover", False),
         # Pitcher rest days
-        "away_rest_days":      away_rest_label,
-        "away_rest_type":      away_rest_type,
-        "home_rest_days":      home_rest_label,
-        "home_rest_type":      home_rest_type,
+        "away_rest_days": away_rest_label,
+        "away_rest_type": away_rest_type,
+        "home_rest_days": home_rest_label,
+        "home_rest_type": home_rest_type,
         # Run line coverage
-        "away_cover_pct":      round(away_cover    / n * 100, 1),
-        "home_cover_pct":      round(home_cover    / n * 100, 1),
-        "away_cover_p15_pct":  round(away_cover_p15 / n * 100, 1),
-        "home_cover_p15_pct":  round(home_cover_p15 / n * 100, 1),
-        "away_cover_m25_pct":  round(away_cover_m25 / n * 100, 1),
-        "home_cover_m25_pct":  round(home_cover_m25 / n * 100, 1),
+        "away_cover_pct": round(away_cover / n * 100, 1),
+        "home_cover_pct": round(home_cover / n * 100, 1),
+        "away_cover_p15_pct": round(away_cover_p15 / n * 100, 1),
+        "home_cover_p15_pct": round(home_cover_p15 / n * 100, 1),
+        "away_cover_m25_pct": round(away_cover_m25 / n * 100, 1),
+        "home_cover_m25_pct": round(home_cover_m25 / n * 100, 1),
         # Over/Under: full distribution so web layer can calc P(total > any line)
-        "total_runs_hist":     dict(total_runs_hist),
-        "score_pairs":         {str(k): v for k, v in score_pairs.items()},
-        "avg_total_runs":      round((away_total + home_total) / n, 2),
+        "total_runs_hist": dict(total_runs_hist),
+        "score_pairs": {str(k): v for k, v in score_pairs.items()},
+        "avg_total_runs": round((away_total + home_total) / n, 2),
         # Inning-segment results (F3/F5/F7)
-        "f3":                  seg_results["f3"],
-        "f5":                  seg_results["f5"],
-        "f7":                  seg_results["f7"],
+        "f3": seg_results["f3"],
+        "f5": seg_results["f5"],
+        "f7": seg_results["f7"],
     }
 
 
 # ── Pitcher strikeout prop model ─────────────────────────────────────────────
+
 
 def detect_pitcher_form(pitcher_log: list, pitcher_stats: dict) -> dict:
     """
@@ -1391,50 +1502,71 @@ def detect_pitcher_form(pitcher_log: list, pitcher_stats: dict) -> dict:
     modifier < 1.0 = lower projection, > 1.0 = boost
     """
     if not pitcher_log or len(pitcher_log) < 2:
-        return {"form": "stable", "note": "", "modifier": 1.0, "recent_whip": None,
-                "k9_recent": None, "bb9_recent": None}
+        return {
+            "form": "stable",
+            "note": "",
+            "modifier": 1.0,
+            "recent_whip": None,
+            "k9_recent": None,
+            "bb9_recent": None,
+        }
 
     # Season averages
     ip_season = float(pitcher_stats.get("inningsPitched", 1) or 1)
-    k_season  = int(pitcher_stats.get("strikeOuts", 0) or 0)
+    k_season = int(pitcher_stats.get("strikeOuts", 0) or 0)
     bb_season = int(pitcher_stats.get("baseOnBalls", 0) or 0)
     er_season = int(pitcher_stats.get("earnedRuns", 0) or 0)
-    k9_season  = k_season  / ip_season * 9 if ip_season > 0 else 7.0
+    k9_season = k_season / ip_season * 9 if ip_season > 0 else 7.0
     bb9_season = bb_season / ip_season * 9 if ip_season > 0 else 3.0
     era_season = er_season / ip_season * 9 if ip_season > 0 else 4.20
 
     # Last 2 starts
     recent = pitcher_log[-2:]
     recent_ip = sum(float(g.get("inningsPitched", 0) or 0) for g in recent)
-    recent_k  = sum(int(g.get("strikeOuts", 0) or 0) for g in recent)
+    recent_k = sum(int(g.get("strikeOuts", 0) or 0) for g in recent)
     recent_bb = sum(int(g.get("baseOnBalls", 0) or 0) for g in recent)
     recent_er = sum(int(g.get("earnedRuns", 0) or 0) for g in recent)
 
     if recent_ip < 3:
         return {"form": "stable", "note": "", "modifier": 1.0}
 
-    k9_recent  = recent_k  / recent_ip * 9
+    k9_recent = recent_k / recent_ip * 9
     bb9_recent = recent_bb / recent_ip * 9
     era_recent = recent_er / recent_ip * 9
 
     # Score change
-    k_drop  = k9_season  - k9_recent    # positive = losing Ks
-    bb_rise = bb9_recent - bb9_season   # positive = walking more
+    k_drop = k9_season - k9_recent  # positive = losing Ks
+    bb_rise = bb9_recent - bb9_season  # positive = walking more
     era_rise = era_recent - era_season  # positive = ERA spiking
 
     if k_drop > 2.0 or bb_rise > 1.5 or era_rise > 2.0:
         note = []
-        if k_drop > 2.0:   note.append(f"K/9 down {k_drop:.1f}")
-        if bb_rise > 1.5:  note.append(f"BB/9 up {bb_rise:.1f}")
-        if era_rise > 2.0: note.append(f"ERA up {era_rise:.1f}")
+        if k_drop > 2.0:
+            note.append(f"K/9 down {k_drop:.1f}")
+        if bb_rise > 1.5:
+            note.append(f"BB/9 up {bb_rise:.1f}")
+        if era_rise > 2.0:
+            note.append(f"ERA up {era_rise:.1f}")
         modifier = max(0.85, 1.0 - (k_drop * 0.02 + bb_rise * 0.02 + era_rise * 0.01))
         recent_whip = round((recent_bb + recent_er * 0.6) / recent_ip, 2) if recent_ip > 0 else None
-        return {"form": "declining", "note": ", ".join(note), "modifier": round(modifier, 3),
-                "recent_whip": recent_whip, "k9_recent": round(k9_recent,1), "bb9_recent": round(bb9_recent,1)}
+        return {
+            "form": "declining",
+            "note": ", ".join(note),
+            "modifier": round(modifier, 3),
+            "recent_whip": recent_whip,
+            "k9_recent": round(k9_recent, 1),
+            "bb9_recent": round(bb9_recent, 1),
+        }
     elif k9_recent > k9_season + 1.5 and era_recent < era_season - 1.0:
         recent_whip = round((recent_bb + recent_er * 0.6) / recent_ip, 2) if recent_ip > 0 else None
-        return {"form": "hot", "note": f"K/9 up {k9_recent-k9_season:.1f}, ERA down {era_season-era_recent:.1f}",
-                "modifier": min(1.12, 1.0 + (k9_recent - k9_season) * 0.015), "recent_whip": recent_whip, "k9_recent": round(k9_recent,1), "bb9_recent": round(bb9_recent,1)}
+        return {
+            "form": "hot",
+            "note": f"K/9 up {k9_recent - k9_season:.1f}, ERA down {era_season - era_recent:.1f}",
+            "modifier": min(1.12, 1.0 + (k9_recent - k9_season) * 0.015),
+            "recent_whip": recent_whip,
+            "k9_recent": round(k9_recent, 1),
+            "bb9_recent": round(bb9_recent, 1),
+        }
     return {"form": "stable", "note": "", "modifier": 1.0}
 
 
@@ -1468,7 +1600,7 @@ def predict_batter_props(
     PA_BY_SLOT = [4.8, 4.4, 4.3, 4.2, 4.1, 4.0, 3.9, 3.8, 3.6]
 
     park = BALLPARK_FACTORS.get(venue, {}) if venue else {}
-    hr_park  = park.get("hr",  1.0)
+    hr_park = park.get("hr", 1.0)
     hit_park = park.get("hit", 1.0)
 
     results = []
@@ -1488,29 +1620,29 @@ def predict_batter_props(
 
         # Apply park factor to HR and hits
         adj = list(probs)
-        adj[5] *= hr_park    # HR
-        adj[2] *= hit_park   # single
-        adj[3] *= hit_park   # double
+        adj[5] *= hr_park  # HR
+        adj[2] *= hit_park  # single
+        adj[3] *= hit_park  # double
         total = sum(adj)
         probs = [p / total for p in adj]
 
         # OUTCOME_ORDER = [WALK, K, 1B, 2B, 3B, HR, OUT]
         p_walk = probs[0]
-        p_1b   = probs[2]
-        p_2b   = probs[3]
-        p_3b   = probs[4]
-        p_hr   = probs[5]
-        p_hit  = p_1b + p_2b + p_3b + p_hr
+        p_1b = probs[2]
+        p_2b = probs[3]
+        p_3b = probs[4]
+        p_hr = probs[5]
+        p_hit = p_1b + p_2b + p_3b + p_hr
 
         # Expected per PA
         exp_hits_pa = p_hit
-        exp_hr_pa   = p_hr
-        exp_tb_pa   = p_1b * 1 + p_2b * 2 + p_3b * 3 + p_hr * 4
+        exp_hr_pa = p_hr
+        exp_tb_pa = p_1b * 1 + p_2b * 2 + p_3b * 3 + p_hr * 4
 
         # Scale to expected PAs
         avg_hits = exp_hits_pa * pa_expected
-        avg_hr   = exp_hr_pa   * pa_expected
-        avg_tb   = exp_tb_pa   * pa_expected
+        avg_hr = exp_hr_pa * pa_expected
+        avg_tb = exp_tb_pa * pa_expected
 
         # RBI approximation: ~30% of hits drive in a run (runners on base ~30% of time)
         # HRs always score at least 1 run
@@ -1518,37 +1650,43 @@ def predict_batter_props(
 
         # P(at least 1 hit) = 1 - P(no hits in all PAs)
         p_no_hit_pa = 1 - p_hit
-        hit_pct     = round((1 - p_no_hit_pa ** pa_expected) * 100, 1)
+        hit_pct = round((1 - p_no_hit_pa**pa_expected) * 100, 1)
 
         # P(at least 1 HR)
         p_no_hr_pa = 1 - p_hr
-        hr_pct     = round((1 - p_no_hr_pa ** pa_expected) * 100, 1)
+        hr_pct = round((1 - p_no_hr_pa**pa_expected) * 100, 1)
 
         # P(2+ hits) using Poisson approximation
         import math
+
         lam = avg_hits
         p_0 = math.exp(-lam)
         p_1 = lam * math.exp(-lam)
         multi_hit_pct = round((1 - p_0 - p_1) * 100, 1)
 
-        results.append({
-            "slot":          slot,
-            "avg_hits":      round(avg_hits, 2),
-            "avg_hr":        round(avg_hr, 3),
-            "avg_rbi":       round(avg_rbi, 2),
-            "avg_tb":        round(avg_tb, 2),
-            "hit_pct":       hit_pct,
-            "hr_pct":        hr_pct,
-            "multi_hit_pct": multi_hit_pct,
-        })
+        results.append(
+            {
+                "slot": slot,
+                "avg_hits": round(avg_hits, 2),
+                "avg_hr": round(avg_hr, 3),
+                "avg_rbi": round(avg_rbi, 2),
+                "avg_tb": round(avg_tb, 2),
+                "hit_pct": hit_pct,
+                "hr_pct": hr_pct,
+                "multi_hit_pct": multi_hit_pct,
+            }
+        )
 
     return results
 
 
-def predict_pitcher_ks(pitcher_stats: dict, lineup_stats: list,
-                        umpire_name: str = None,
-                        pitcher_log: list = None,
-                        fatigue: dict = None) -> dict:
+def predict_pitcher_ks(
+    pitcher_stats: dict,
+    lineup_stats: list,
+    umpire_name: str = None,
+    pitcher_log: list = None,
+    fatigue: dict = None,
+) -> dict:
     """
     Predict how many strikeouts a starting pitcher will record.
 
@@ -1569,11 +1707,11 @@ def predict_pitcher_ks(pitcher_stats: dict, lineup_stats: list,
     """
     # ── Pitcher K/9 ────────────────────────────────────────────────
     ip_season = float(pitcher_stats.get("inningsPitched", 0) or 0)
-    k_season  = int(pitcher_stats.get("strikeOuts", 0) or 0)
+    k_season = int(pitcher_stats.get("strikeOuts", 0) or 0)
     if ip_season >= 10:
         k_per_9 = k_season / ip_season * 9
     else:
-        k_per_9 = 8.5   # league average starter K/9
+        k_per_9 = 8.5  # league average starter K/9
 
     # ── Opposing lineup K rate ────────────────────────────────────
     opp_k_rates = []
@@ -1587,7 +1725,7 @@ def predict_pitcher_ks(pitcher_stats: dict, lineup_stats: list,
     # Blend: pitcher K rate adjusted for opponent K tendency
     # League avg batter K rate ~22.4% — if opp is 25%, pitcher gets +1 K/9 boost
     LG_K_RATE = 0.224
-    opp_factor = opp_k_rate / LG_K_RATE   # >1 = strikeout-prone lineup
+    opp_factor = opp_k_rate / LG_K_RATE  # >1 = strikeout-prone lineup
     blended_k9 = k_per_9 * (0.70 + 0.30 * opp_factor)
 
     # ── Umpire adjustment ─────────────────────────────────────────
@@ -1607,24 +1745,24 @@ def predict_pitcher_ks(pitcher_stats: dict, lineup_stats: list,
     # Fatigue: if pitcher is on short rest, expect fewer innings
     if fatigue:
         phase2 = fatigue.get("phase2", 1.0)
-        if phase2 >= 1.14:    # short rest / gasses quickly
+        if phase2 >= 1.14:  # short rest / gasses quickly
             avg_ip = min(avg_ip, 4.5)
         elif phase2 >= 1.08:
             avg_ip = min(avg_ip, 5.5)
 
-    expected_ip = min(avg_ip, 6.0)   # rarely goes beyond 6 in modern game
+    expected_ip = min(avg_ip, 6.0)  # rarely goes beyond 6 in modern game
 
     # ── Final K prediction ─────────────────────────────────────────
     model_k = blended_k9 / 9 * expected_ip
 
     # Rough variance: K totals follow Poisson-ish distribution
     # std dev ~ sqrt(mean) but empirically ~1.5 for starters
-    std = max(1.5, model_k ** 0.5)
+    std = max(1.5, model_k**0.5)
     return {
-        "model_k":      round(model_k, 1),
-        "model_k_low":  round(max(0, model_k - std), 1),
+        "model_k": round(model_k, 1),
+        "model_k_low": round(max(0, model_k - std), 1),
         "model_k_high": round(model_k + std, 1),
-        "expected_ip":  round(expected_ip, 1),
+        "expected_ip": round(expected_ip, 1),
     }
 
 
@@ -1659,7 +1797,7 @@ def optimize_batting_order(
         return {}
 
     park = BALLPARK_FACTORS.get(venue, {}) if venue else {}
-    hr_park  = park.get("hr",  1.0)
+    hr_park = park.get("hr", 1.0)
     hit_park = park.get("hit", 1.0)
 
     # Score each batter
@@ -1678,29 +1816,39 @@ def optimize_batting_order(
         probs = [p / total for p in adj]
 
         p_walk = probs[0]
-        p_1b   = probs[2]
-        p_2b   = probs[3]
-        p_3b   = probs[4]
-        p_hr   = probs[5]
-        p_hit  = p_1b + p_2b + p_3b + p_hr
-        p_obp  = p_hit + p_walk
+        p_1b = probs[2]
+        p_2b = probs[3]
+        p_3b = probs[4]
+        p_hr = probs[5]
+        p_hit = p_1b + p_2b + p_3b + p_hr
+        p_obp = p_hit + p_walk
 
         # wOBA weights (approximate)
         woba = p_walk * 0.69 + p_1b * 0.888 + p_2b * 1.271 + p_3b * 1.616 + p_hr * 2.101
-        slg  = p_1b * 1 + p_2b * 2 + p_3b * 3 + p_hr * 4
+        slg = p_1b * 1 + p_2b * 2 + p_3b * 3 + p_hr * 4
 
-        scored.append({
-            "orig_slot": i + 1,
-            "name":  stats.get("name", f"Batter {i+1}"),
-            "obp":   round(p_obp, 3),
-            "slg":   round(slg,   3),
-            "woba":  round(woba,  3),
-            "p_hr":  round(p_hr,  4),
-        })
+        scored.append(
+            {
+                "orig_slot": i + 1,
+                "name": stats.get("name", f"Batter {i + 1}"),
+                "obp": round(p_obp, 3),
+                "slg": round(slg, 3),
+                "woba": round(woba, 3),
+                "p_hr": round(p_hr, 4),
+            }
+        )
 
     # Build current order info
-    current = [{"slot": b["orig_slot"], "name": b["name"],
-                "obp": b["obp"], "slg": b["slg"], "woba": b["woba"]} for b in scored]
+    current = [
+        {
+            "slot": b["orig_slot"],
+            "name": b["name"],
+            "obp": b["obp"],
+            "slg": b["slg"],
+            "woba": b["woba"],
+        }
+        for b in scored
+    ]
 
     # Sort by wOBA descending to rank players
     ranked = sorted(scored, key=lambda x: x["woba"], reverse=True)
@@ -1708,9 +1856,9 @@ def optimize_batting_order(
     # Apply lineup construction rules:
     # Slot 1 → highest OBP, Slot 2 → 2nd highest OBP, 3 → top wOBA,
     # 4 → top HR, 5 → 2nd HR, 6-9 → remaining by wOBA desc
-    by_obp  = sorted(scored, key=lambda x: x["obp"],  reverse=True)
+    by_obp = sorted(scored, key=lambda x: x["obp"], reverse=True)
     by_woba = sorted(scored, key=lambda x: x["woba"], reverse=True)
-    by_hr   = sorted(scored, key=lambda x: x["p_hr"], reverse=True)
+    by_hr = sorted(scored, key=lambda x: x["p_hr"], reverse=True)
 
     assigned = []
     used = set()
@@ -1721,31 +1869,39 @@ def optimize_batting_order(
                 used.add(p["name"])
                 return p
 
-    slot1 = pick(by_obp,  used)
-    slot2 = pick(by_obp,  used)
+    slot1 = pick(by_obp, used)
+    slot2 = pick(by_obp, used)
     slot3 = pick(by_woba, used)
-    slot4 = pick(by_hr,   used)
-    slot5 = pick(by_hr,   used)
-    rest  = [b for b in by_woba if b["name"] not in used]
+    slot4 = pick(by_hr, used)
+    slot5 = pick(by_hr, used)
+    rest = [b for b in by_woba if b["name"] not in used]
 
     optimized_order = [slot1, slot2, slot3, slot4, slot5] + rest
 
-    optimized = [{"slot": i + 1, "name": b["name"],
-                  "obp": b["obp"], "slg": b["slg"], "woba": b["woba"],
-                  "orig_slot": b["orig_slot"]}
-                 for i, b in enumerate(optimized_order) if b]
+    optimized = [
+        {
+            "slot": i + 1,
+            "name": b["name"],
+            "obp": b["obp"],
+            "slg": b["slg"],
+            "woba": b["woba"],
+            "orig_slot": b["orig_slot"],
+        }
+        for i, b in enumerate(optimized_order)
+        if b
+    ]
 
     # Count changes
     changes = sum(1 for a, b in zip(current, optimized) if a["name"] != b["name"])
 
     # Estimate run gain: top-of-order wOBA improvement × ~0.3 runs per wOBA point per slot
-    current_top3_woba  = sum(c["woba"] for c in current[:3])  / 3
+    current_top3_woba = sum(c["woba"] for c in current[:3]) / 3
     optimized_top3_woba = sum(o["woba"] for o in optimized[:3]) / 3
     run_gain = round((optimized_top3_woba - current_top3_woba) * 3.0, 2)
 
     return {
-        "current":   current,
+        "current": current,
         "optimized": optimized,
-        "changes":   changes,
-        "run_gain":  run_gain,
+        "changes": changes,
+        "run_gain": run_gain,
     }

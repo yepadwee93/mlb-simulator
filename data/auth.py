@@ -7,6 +7,7 @@ store plaintext passwords, and Supabase never sees them unmasked.
 """
 
 import re
+
 from data.db import supa
 
 
@@ -24,18 +25,25 @@ def create_user(username, password):
         return False, "Username must be at least 3 characters."
     if len(password) < 8:
         return False, "Password must be at least 8 characters."
-    if not re.search(r'[A-Z]', password):
+    if not re.search(r"[A-Z]", password):
         return False, "Password must contain at least one capital letter."
-    if not re.search(r'[0-9]', password):
+    if not re.search(r"[0-9]", password):
         return False, "Password must contain at least one number."
 
     pw_hash = generate_password_hash(password)
 
     try:
-        res = supa().table("users").insert({
-            "username": username,
-            "password": pw_hash,
-        }).execute()
+        res = (
+            supa()
+            .table("users")
+            .insert(
+                {
+                    "username": username,
+                    "password": pw_hash,
+                }
+            )
+            .execute()
+        )
         if res.data:
             return True, res.data[0]["id"]
         return False, "Could not create account. Try again."

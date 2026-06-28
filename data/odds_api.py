@@ -9,10 +9,11 @@ Free tier: 500 requests/month — plenty for daily use.
 
 import os
 import time
+
 import requests
 
 ODDS_API_KEY = os.getenv("ODDS_API_KEY", "")
-ODDS_BASE    = "https://api.the-odds-api.com/v4"
+ODDS_BASE = "https://api.the-odds-api.com/v4"
 
 # Sportsbooks to average across (all available on free tier)
 PREFERRED_BOOKS = {"draftkings", "fanduel", "betmgm", "bovada", "williamhill_us"}
@@ -23,6 +24,7 @@ import json as _json_mod
 import os as _os
 
 _CACHE_DIR = _os.path.join(_os.path.dirname(__file__), "_odds_cache")
+
 
 def _file_cache_get(key: str, ttl: float) -> dict | None:
     """Return cached data if still fresh, else None."""
@@ -36,6 +38,7 @@ def _file_cache_get(key: str, ttl: float) -> dict | None:
         pass
     return None
 
+
 def _file_cache_set(key: str, data):
     """Write data + timestamp to disk cache."""
     try:
@@ -46,12 +49,13 @@ def _file_cache_set(key: str, data):
     except Exception:
         pass
 
+
 # ── In-memory cache for moneyline odds ──────────────────────────────
 # Odds barely move inning to inning, so we cache for 30 minutes.
 # This cuts API usage from 1 request per simulation down to
 # ~1 request per 30-minute window regardless of how many games you run.
 _ODDS_CACHE = {"data": {}, "ts": 0.0}
-_CACHE_TTL  = 60 * 60   # 60 minutes in seconds
+_CACHE_TTL = 60 * 60  # 60 minutes in seconds
 
 # Requests remaining — updated from response headers after every API call
 _requests_remaining = None
@@ -131,10 +135,10 @@ def get_mlb_odds() -> dict:
         resp = requests.get(
             f"{ODDS_BASE}/sports/baseball_mlb/odds/",
             params={
-                "apiKey":      ODDS_API_KEY,
-                "regions":     "us",
-                "markets":     "h2h",          # h2h = moneyline
-                "oddsFormat":  "american",
+                "apiKey": ODDS_API_KEY,
+                "regions": "us",
+                "markets": "h2h",  # h2h = moneyline
+                "oddsFormat": "american",
             },
             timeout=8,
         )
@@ -199,22 +203,22 @@ def get_mlb_odds() -> dict:
 
         key = frozenset([away, home])
         result[key] = {
-            "away_team":        away,
-            "home_team":        home,
+            "away_team": away,
+            "home_team": home,
             "away_implied_pct": away_prob_clean,
             "home_implied_pct": home_prob_clean,
-            "away_avg_odds":    avg_away,
-            "home_avg_odds":    avg_home,
-            "books_used":       len(away_odds_list),
-            "best_away_odds":   best_away_odds or avg_away,
-            "best_away_book":   best_away_book,
-            "best_home_odds":   best_home_odds or avg_home,
-            "best_home_book":   best_home_book,
+            "away_avg_odds": avg_away,
+            "home_avg_odds": avg_home,
+            "books_used": len(away_odds_list),
+            "best_away_odds": best_away_odds or avg_away,
+            "best_away_book": best_away_book,
+            "best_home_odds": best_home_odds or avg_home,
+            "best_home_book": best_home_book,
         }
 
     # Store in cache with current timestamp
     _ODDS_CACHE["data"] = result
-    _ODDS_CACHE["ts"]   = time.time()
+    _ODDS_CACHE["ts"] = time.time()
     # Persist to file so cache survives server restarts
     _file_cache_set("moneyline", {"|".join(sorted(k)): v for k, v in result.items()})
     return result
@@ -285,21 +289,21 @@ def get_player_props(event_id: str) -> dict:
 
     # Short display labels for each market
     MARKET_LABELS = {
-        "batter_home_runs":   "HR",
-        "batter_hits":        "Hits",
+        "batter_home_runs": "HR",
+        "batter_hits": "Hits",
         "batter_total_bases": "TB",
         "pitcher_strikeouts": "K",
-        "batter_rbis":        "RBI",
+        "batter_rbis": "RBI",
     }
 
     try:
         resp = requests.get(
             f"{ODDS_BASE}/sports/baseball_mlb/events/{event_id}/odds",
             params={
-                "apiKey":      ODDS_API_KEY,
-                "regions":     "us",
-                "markets":     ",".join(prop_markets),
-                "oddsFormat":  "american",
+                "apiKey": ODDS_API_KEY,
+                "regions": "us",
+                "markets": ",".join(prop_markets),
+                "oddsFormat": "american",
             },
             timeout=10,
         )
@@ -312,7 +316,7 @@ def get_player_props(event_id: str) -> dict:
     # Build player → props mapping
     # We only take the BEST (most favorable) odds for each player+market combo
     # across all books, so we show the highest-paying option
-    player_props = {}   # player_name → {market_key → {desc, odds, book}}
+    player_props = {}  # player_name → {market_key → {desc, odds, book}}
 
     for book in data.get("bookmakers", []):
         book_name = book.get("title", "")
@@ -323,9 +327,9 @@ def get_player_props(event_id: str) -> dict:
                 player = outcome.get("description", "")  # player name is in "description"
                 if not player:
                     player = outcome.get("name", "")
-                point  = outcome.get("point", "")
-                name   = outcome.get("name", "")   # "Over" or "Under"
-                price  = outcome.get("price", 0)
+                point = outcome.get("point", "")
+                name = outcome.get("name", "")  # "Over" or "Under"
+                price = outcome.get("price", 0)
 
                 # Only show Over lines for most props (more actionable)
                 if name == "Under":
@@ -340,11 +344,11 @@ def get_player_props(event_id: str) -> dict:
                 existing = player_props[player].get(mkey)
                 if existing is None or price > existing["raw_odds"]:
                     player_props[player][mkey] = {
-                        "market":   label,
-                        "desc":     desc,
-                        "odds":     format_odds(price),
+                        "market": label,
+                        "desc": desc,
+                        "odds": format_odds(price),
                         "raw_odds": price,
-                        "book":     book_name,
+                        "book": book_name,
                     }
 
     # Convert to final format: player_name → sorted list of props
@@ -404,9 +408,9 @@ def get_mlb_totals() -> dict:
         resp = requests.get(
             f"{ODDS_BASE}/sports/baseball_mlb/odds/",
             params={
-                "apiKey":     ODDS_API_KEY,
-                "regions":    "us",
-                "markets":    "totals",
+                "apiKey": ODDS_API_KEY,
+                "regions": "us",
+                "markets": "totals",
                 "oddsFormat": "american",
             },
             timeout=8,
@@ -421,9 +425,9 @@ def get_mlb_totals() -> dict:
     for game in games:
         away = game.get("away_team", "")
         home = game.get("home_team", "")
-        over_lines  = []
+        over_lines = []
         under_lines = []
-        over_odds_list  = []
+        over_odds_list = []
         under_odds_list = []
 
         for book in game.get("bookmakers", []):
@@ -444,27 +448,29 @@ def get_mlb_totals() -> dict:
         if not over_lines:
             continue
 
-        avg_line       = round(sum(over_lines) / len(over_lines), 1)
-        avg_over_odds  = round(sum(over_odds_list) / len(over_odds_list))
-        avg_under_odds = round(sum(under_odds_list) / len(under_odds_list)) if under_odds_list else -110
+        avg_line = round(sum(over_lines) / len(over_lines), 1)
+        avg_over_odds = round(sum(over_odds_list) / len(over_odds_list))
+        avg_under_odds = (
+            round(sum(under_odds_list) / len(under_odds_list)) if under_odds_list else -110
+        )
 
-        over_impl  = _american_to_prob(avg_over_odds)
+        over_impl = _american_to_prob(avg_over_odds)
         under_impl = _american_to_prob(avg_under_odds)
         total_impl = over_impl + under_impl
-        over_impl_clean  = round(over_impl  / total_impl * 100, 1)
+        over_impl_clean = round(over_impl / total_impl * 100, 1)
         under_impl_clean = round(under_impl / total_impl * 100, 1)
 
         key = frozenset([away, home])
         result[key] = {
-            "line":          avg_line,
-            "over_odds":     avg_over_odds,
-            "under_odds":    avg_under_odds,
-            "over_implied":  over_impl_clean,
+            "line": avg_line,
+            "over_odds": avg_over_odds,
+            "under_odds": avg_under_odds,
+            "over_implied": over_impl_clean,
             "under_implied": under_impl_clean,
         }
 
     _TOTALS_CACHE["data"] = result
-    _TOTALS_CACHE["ts"]   = time.time()
+    _TOTALS_CACHE["ts"] = time.time()
     _file_cache_set("totals", {"|".join(sorted(k)): v for k, v in result.items()})
     return result
 
@@ -488,8 +494,12 @@ def get_mlb_runline() -> dict:
     try:
         resp = requests.get(
             f"{ODDS_BASE}/sports/baseball_mlb/odds/",
-            params={"apiKey": ODDS_API_KEY, "regions": "us",
-                    "markets": "spreads", "oddsFormat": "american"},
+            params={
+                "apiKey": ODDS_API_KEY,
+                "regions": "us",
+                "markets": "spreads",
+                "oddsFormat": "american",
+            },
             timeout=8,
         )
         resp.raise_for_status()
@@ -507,7 +517,7 @@ def get_mlb_runline() -> dict:
                 if market["key"] != "spreads":
                     continue
                 for outcome in market.get("outcomes", []):
-                    if outcome.get("point", 0) < 0:   # negative spread = favorite covers
+                    if outcome.get("point", 0) < 0:  # negative spread = favorite covers
                         if outcome["name"] == away:
                             away_list.append(outcome["price"])
                         else:
@@ -521,15 +531,17 @@ def get_mlb_runline() -> dict:
             continue
         avg_away = round(sum(away_list) / len(away_list))
         avg_home = round(sum(home_list) / len(home_list))
-        ai = _american_to_prob(avg_away); hi = _american_to_prob(avg_home)
+        ai = _american_to_prob(avg_away)
+        hi = _american_to_prob(avg_home)
         t = ai + hi
         result[frozenset([away, home])] = {
-            "away_rl_odds":    avg_away,
-            "home_rl_odds":    avg_home,
+            "away_rl_odds": avg_away,
+            "home_rl_odds": avg_home,
             "away_rl_implied": round(ai / t * 100, 1),
             "home_rl_implied": round(hi / t * 100, 1),
         }
-    c["data"] = result; c["ts"] = time.time()
+    c["data"] = result
+    c["ts"] = time.time()
     return result
 
 
@@ -561,12 +573,12 @@ def calc_kelly(model_prob: float, american_odds: int, fraction: float = 0.5) -> 
     """
     p = model_prob / 100
     q = 1 - p
-    b = american_to_decimal(american_odds) - 1   # net profit per $1 risked
+    b = american_to_decimal(american_odds) - 1  # net profit per $1 risked
     if b <= 0:
         return 0.0
     kelly = (b * p - q) / b
     kelly_f = kelly * fraction
-    return round(max(0.0, min(kelly_f * 100, 25.0)), 1)   # as %
+    return round(max(0.0, min(kelly_f * 100, 25.0)), 1)  # as %
 
 
 # ── Line movement tracker ────────────────────────────────────────────────────
@@ -617,13 +629,13 @@ def get_line_movement() -> dict:
         return {}
 
     today = __import__("datetime").date.today().isoformat()
-    snap  = _load_snapshot()
+    snap = _load_snapshot()
 
     # If snapshot is from a different day, reset it
     if snap.get("date") != today:
         snap = {"date": today, "games": {}}
 
-    result   = {}
+    result = {}
     snap_games = snap.get("games", {})
 
     for key, odds in current.items():
@@ -654,23 +666,23 @@ def get_line_movement() -> dict:
         # A moneyline moving from -130 to -145 = move of -15 = sharp on away (favorite getting heavier)
         # Simple rule: sharp_away if away line moved 10+ points toward being shorter (away implied prob went up)
         away_impl_open = _american_to_prob(away_open) * 100
-        away_impl_cur  = _american_to_prob(away_cur)  * 100
+        away_impl_cur = _american_to_prob(away_cur) * 100
         home_impl_open = _american_to_prob(home_open) * 100
-        home_impl_cur  = _american_to_prob(home_cur)  * 100
+        home_impl_cur = _american_to_prob(home_cur) * 100
 
-        away_impl_move = away_impl_cur - away_impl_open   # positive = sharp on away
+        away_impl_move = away_impl_cur - away_impl_open  # positive = sharp on away
         home_impl_move = home_impl_cur - home_impl_open
 
         fkey = frozenset([away, home])
         result[fkey] = {
-            "away_open":       away_open,
-            "home_open":       home_open,
-            "away_current":    away_cur,
-            "home_current":    home_cur,
-            "away_impl_move":  round(away_impl_move, 1),
-            "home_impl_move":  round(home_impl_move, 1),
-            "sharp_away":      away_impl_move >= 3.0,   # 3+ pp implies sharp money
-            "sharp_home":      home_impl_move >= 3.0,
+            "away_open": away_open,
+            "home_open": home_open,
+            "away_current": away_cur,
+            "home_current": home_cur,
+            "away_impl_move": round(away_impl_move, 1),
+            "home_impl_move": round(home_impl_move, 1),
+            "sharp_away": away_impl_move >= 3.0,  # 3+ pp implies sharp money
+            "sharp_home": home_impl_move >= 3.0,
         }
 
     snap["games"] = snap_games
@@ -681,7 +693,7 @@ def get_line_movement() -> dict:
 # ── Public Betting % (Action Network) ───────────────────────────────────────
 
 _PUBLIC_BET_CACHE: dict = {}
-_PUBLIC_BET_TTL = 60 * 30   # 30 minutes
+_PUBLIC_BET_TTL = 60 * 30  # 30 minutes
 
 
 def get_public_betting_pcts() -> dict:
@@ -702,6 +714,7 @@ def get_public_betting_pcts() -> dict:
         return {frozenset(k.split("|")): v for k, v in cached.items()}
 
     from datetime import date
+
     today = date.today().strftime("%Y%m%d")
 
     try:
@@ -775,8 +788,8 @@ def get_public_betting_pcts() -> dict:
                 if o.get("book_id") in (15, 16, 17, 138):  # popular books on AN
                     ml = o.get("ml_away_bet_pct") or o.get("away_ml_bet_pct")
                     if ml is not None:
-                        away_bet  = int(ml)
-                        home_bet  = 100 - away_bet
+                        away_bet = int(ml)
+                        home_bet = 100 - away_bet
                     mm = o.get("ml_away_money_pct") or o.get("away_ml_money_pct")
                     if mm is not None:
                         away_money = int(mm)
@@ -789,8 +802,8 @@ def get_public_betting_pcts() -> dict:
                 for o in odds_list:
                     for key in ("ml_away_bet_pct", "away_ml_bet_pct", "away_bet_pct"):
                         if o.get(key) is not None:
-                            away_bet  = int(o[key])
-                            home_bet  = 100 - away_bet
+                            away_bet = int(o[key])
+                            home_bet = 100 - away_bet
                             break
                     if away_bet is not None:
                         break
@@ -804,16 +817,16 @@ def get_public_betting_pcts() -> dict:
             sharp = None
             if away_money is not None:
                 if away_money - away_bet >= 15:
-                    sharp = "away"    # sharp money on away despite public on home
+                    sharp = "away"  # sharp money on away despite public on home
                 elif home_money - home_bet >= 15:
                     sharp = "home"
 
             fkey = frozenset([away_name, home_name])
             result[fkey] = {
-                "away_bet_pct":    away_bet,
-                "home_bet_pct":    home_bet,
-                "away_money_pct":  away_money,
-                "home_money_pct":  home_money,
+                "away_bet_pct": away_bet,
+                "home_bet_pct": home_bet,
+                "away_money_pct": away_money,
+                "home_money_pct": home_money,
                 "sharp_indicator": sharp,
             }
         except Exception:

@@ -18,6 +18,7 @@ def supa():
     global _client
     if _client is None:
         from supabase import create_client
+
         url = os.environ.get("SUPABASE_URL", "")
         key = os.environ.get("SUPABASE_KEY", "")
         if not url or not key:

@@ -7,3 +7,9 @@ supabase>=2.0.0
 python-dotenv==1.0.1
 gunicorn==23.0.0
 httpx[socks]
+
+# Dev / CI tools (not needed at runtime on Vercel)
+ruff>=0.4.10
+pytest>=8.0.0
+pip-audit>=2.7.0
+pre-commit>=3.7.0
