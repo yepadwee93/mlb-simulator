@@ -1206,6 +1206,35 @@ def apply_umpire_modifier(probs: list, umpire_name: str) -> list:
 ERROR_RATE = 0.005
 WILD_PITCH_RATE = 0.004
 
+# ── Times-through-order (TTO) penalty ────────────────────────────────────────
+# Batters see the starter better each time through the order. Research from
+# Tango/MGL shows:
+#   1st time through (PA 1-9):   baseline — starter has the info advantage
+#   2nd time through (PA 10-18): +6% wOBA boost to batters (~batters learning)
+#   3rd time through (PA 19+):   +12% wOBA boost — why managers pull at 6 innings
+#
+# We apply this as a multiplier on cumulative probs (blended toward offense):
+#   TTO_FACTORS[n] = factor to blend probs toward league-avg offense (hitter-friendly)
+# 0 = no change, 0.06 = 6% blend toward league-average batters
+TTO_FACTORS = {1: 0.0, 2: 0.06, 3: 0.12}
+
+
+def apply_tto(precomp: list, tto: int) -> list:
+    """
+    Adjust cumulative weight arrays for the times-through-order effect.
+    tto=1: no change. tto=2: 6% blend toward league-avg. tto=3: 12%.
+    """
+    factor = TTO_FACTORS.get(tto, 0.12)
+    if factor == 0 or not precomp:
+        return precomp
+    from itertools import accumulate as _acc
+
+    lg_cum = list(_acc(LEAGUE_AVG_PROBS))
+    return [
+        [c * (1 - factor) + lg * factor for c, lg in zip(batter_cum, lg_cum)]
+        for batter_cum in precomp
+    ]
+
 
 def simulate_half_inning(
     precomp_lineup: list, lineup_pos: int, risp_precomp: list = None, batter_rates: list = None
@@ -1374,6 +1403,12 @@ def simulate_game(
     away_starter_pulled = False  # away team's SP removed → home_cur switches to late
     home_starter_pulled = False  # home team's SP removed → away_cur switches to late
 
+    # TTO tracking: count batters faced by each starter.
+    # away_starter faces HOME batters → home_batters_faced
+    # home_starter faces AWAY batters → away_batters_faced
+    away_batters_faced = 0  # batters HOME lineup has sent up vs away starter
+    home_batters_faced = 0  # batters AWAY lineup has sent up vs home starter
+
     def _should_pull_starter(runs_allowed: int, inning: int) -> bool:
         """
         Probabilistic starter removal based on runs allowed and game situation.
@@ -1484,11 +1519,21 @@ def simulate_game(
                 away_cur = _mopup(away_cur)
 
         # Away team bats (facing home pitching staff)
-        runs, away_pos = simulate_half_inning(
-            away_cur, away_pos, away_precomp_risp, away_batter_rates
-        )
+        # Apply TTO penalty to home starter's probs while they're still in.
+        # home_batters_faced tracks AWAY batters seen by the home starter.
         if not home_starter_pulled:
-            home_starter_runs += runs  # track only while home starter is still in
+            away_tto = 1 + home_batters_faced // 9
+            tto_away_cur = apply_tto(away_cur, away_tto)
+        else:
+            tto_away_cur = away_cur  # bullpen resets TTO
+        runs, new_away_pos = simulate_half_inning(
+            tto_away_cur, away_pos, away_precomp_risp, away_batter_rates
+        )
+        batters_this_half = (new_away_pos - away_pos) % len(away_cur) or len(away_cur)
+        if not home_starter_pulled:
+            home_starter_runs += runs
+            home_batters_faced += batters_this_half
+        away_pos = new_away_pos
         away_runs += runs
 
         # Walk-off rule: home team wins in 9th without finishing if already ahead
@@ -1496,11 +1541,21 @@ def simulate_game(
             break
 
         # Home team bats (facing away pitching staff)
-        runs, home_pos = simulate_half_inning(
-            home_cur, home_pos, home_precomp_risp, home_batter_rates
-        )
+        # Apply TTO penalty to away starter's probs while they're still in.
+        # away_batters_faced tracks HOME batters seen by the away starter.
         if not away_starter_pulled:
-            away_starter_runs += runs  # track only while away starter is still in
+            home_tto = 1 + away_batters_faced // 9
+            tto_home_cur = apply_tto(home_cur, home_tto)
+        else:
+            tto_home_cur = home_cur  # bullpen resets TTO
+        runs, new_home_pos = simulate_half_inning(
+            tto_home_cur, home_pos, home_precomp_risp, home_batter_rates
+        )
+        batters_this_half = (new_home_pos - home_pos) % len(home_cur) or len(home_cur)
+        if not away_starter_pulled:
+            away_starter_runs += runs
+            away_batters_faced += batters_this_half
+        home_pos = new_home_pos
         home_runs += runs
 
     # Extra innings if tied (up to 3 extra) — use bullpen probs
