@@ -3,6 +3,7 @@ Tests for My Picks data logic — the parts that don't need a database.
 
 These test pure Python functions in isolation, which is fast and reliable.
 """
+
 from unittest.mock import MagicMock, patch
 
 
@@ -17,8 +18,14 @@ def test_add_pick_rejects_missing_user():
 
         # Missing user_id — should either return None or raise a clear error
         try:
-            add_pick(game_pk="123", game_date="2026-01-01", away_team="NYY",
-                     home_team="BOS", my_pick="NYY", user_id=None)
+            add_pick(
+                game_pk="123",
+                game_date="2026-01-01",
+                away_team="NYY",
+                home_team="BOS",
+                my_pick="NYY",
+                user_id=None,
+            )
         except Exception:
             pass  # Crashing is acceptable — but it shouldn't be a silent data write
 

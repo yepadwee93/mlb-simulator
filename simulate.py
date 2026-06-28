@@ -27,7 +27,7 @@ def fetch_batter_stats(batters: list) -> list:
         if b.get("id"):
             stats = get_player_season_stats(b["id"], group="hitting")
         else:
-            stats = {}   # empty = simulation uses league-average fallback
+            stats = {}  # empty = simulation uses league-average fallback
         stats_list.append(stats)
     return stats_list
 
@@ -98,22 +98,22 @@ def main():
     home_pitcher_stats = {}
 
     if lineup["away_pitcher"] and lineup["away_pitcher"].get("id"):
-        away_pitcher_stats = get_player_season_stats(
-            lineup["away_pitcher"]["id"], group="pitching"
-        )
+        away_pitcher_stats = get_player_season_stats(lineup["away_pitcher"]["id"], group="pitching")
     if lineup["home_pitcher"] and lineup["home_pitcher"].get("id"):
-        home_pitcher_stats = get_player_season_stats(
-            lineup["home_pitcher"]["id"], group="pitching"
-        )
+        home_pitcher_stats = get_player_season_stats(lineup["home_pitcher"]["id"], group="pitching")
 
     away_p = (lineup["away_pitcher"] or {}).get("name", "Unknown pitcher")
     home_p = (lineup["home_pitcher"] or {}).get("name", "Unknown pitcher")
 
     print("\n  Pitching matchup:")
-    print(f"    {away_p:30s}  ERA: {away_pitcher_stats.get('era', 'N/A'):>5}  "
-          f"WHIP: {away_pitcher_stats.get('whip', 'N/A'):>5}")
-    print(f"    {home_p:30s}  ERA: {home_pitcher_stats.get('era', 'N/A'):>5}  "
-          f"WHIP: {home_pitcher_stats.get('whip', 'N/A'):>5}")
+    print(
+        f"    {away_p:30s}  ERA: {away_pitcher_stats.get('era', 'N/A'):>5}  "
+        f"WHIP: {away_pitcher_stats.get('whip', 'N/A'):>5}"
+    )
+    print(
+        f"    {home_p:30s}  ERA: {home_pitcher_stats.get('era', 'N/A'):>5}  "
+        f"WHIP: {home_pitcher_stats.get('whip', 'N/A'):>5}"
+    )
 
     # ── 5. Run the simulation ──────────────────────────────────
     n = 100_000
@@ -123,13 +123,13 @@ def main():
     start = time.time()
 
     results = run_simulation(
-        away_team    = away,
-        home_team    = home,
-        away_lineup  = away_batter_stats,
-        home_lineup  = home_batter_stats,
-        away_pitcher = away_pitcher_stats,
-        home_pitcher = home_pitcher_stats,
-        n            = n,
+        away_team=away,
+        home_team=home,
+        away_lineup=away_batter_stats,
+        home_lineup=home_batter_stats,
+        away_pitcher=away_pitcher_stats,
+        home_pitcher=home_pitcher_stats,
+        n=n,
     )
 
     elapsed = time.time() - start
@@ -144,7 +144,7 @@ def main():
     home_runs = results["home_avg_runs"]
 
     # Visual probability bar (50 chars wide)
-    bar_width  = 50
+    bar_width = 50
     away_chars = round(away_pct / 100 * bar_width)
     home_chars = bar_width - away_chars
     bar = "█" * away_chars + "░" * home_chars

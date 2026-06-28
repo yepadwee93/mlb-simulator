@@ -1,6 +1,7 @@
 """
 Tests for JSON API routes — these should all return JSON, not crash.
 """
+
 from unittest.mock import patch
 
 

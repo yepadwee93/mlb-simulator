@@ -6,6 +6,7 @@ We create a test version of the Flask app that:
 - Has TESTING=True so Flask gives clearer error messages during tests
 - Has WTF_CSRF_ENABLED=False so we don't need CSRF tokens in test requests
 """
+
 import os
 
 import pytest

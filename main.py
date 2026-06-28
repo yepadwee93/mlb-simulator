@@ -75,7 +75,7 @@ def main():
 
     for side in ("away", "home"):
         team_name = sample_game[f"{side}_team"]
-        batters   = lineup[f"{side}_batters"][:3]   # just first 3 to keep output manageable
+        batters = lineup[f"{side}_batters"][:3]  # just first 3 to keep output manageable
 
         print(f"\n  {team_name}")
         for b in batters:
@@ -84,14 +84,16 @@ def main():
             stats = get_player_season_stats(b["id"], group="hitting")
             if stats:
                 # avg/obp/slg come back as strings like ".244" — print as-is
-                print(f"    {b['name']:25s}  "
-                      f"AVG:{stats.get('avg','N/A'):>5}  "
-                      f"OBP:{stats.get('obp','N/A'):>5}  "
-                      f"SLG:{stats.get('slg','N/A'):>5}  "
-                      f"HR:{stats.get('homeRuns',0):>3}  "
-                      f"RBI:{stats.get('rbi',0):>3}  "
-                      f"K:{stats.get('strikeOuts',0):>3}  "
-                      f"BB:{stats.get('baseOnBalls',0):>3}")
+                print(
+                    f"    {b['name']:25s}  "
+                    f"AVG:{stats.get('avg', 'N/A'):>5}  "
+                    f"OBP:{stats.get('obp', 'N/A'):>5}  "
+                    f"SLG:{stats.get('slg', 'N/A'):>5}  "
+                    f"HR:{stats.get('homeRuns', 0):>3}  "
+                    f"RBI:{stats.get('rbi', 0):>3}  "
+                    f"K:{stats.get('strikeOuts', 0):>3}  "
+                    f"BB:{stats.get('baseOnBalls', 0):>3}"
+                )
             else:
                 print(f"    {b['name']:25s}  (no stats yet)")
 
@@ -109,11 +111,11 @@ def main():
             print(f"\n  {pitcher['name']} ({sample_game[f'{side}_team']})")
             print(f"    ERA:  {stats.get('era', 'N/A')}")
             print(f"    WHIP: {stats.get('whip', 'N/A')}")
-            print(f"    W-L:  {stats.get('wins',0)}-{stats.get('losses',0)}")
-            print(f"    IP:   {stats.get('inningsPitched','N/A')}")
-            print(f"    K:    {stats.get('strikeOuts',0)}")
-            print(f"    BB:   {stats.get('baseOnBalls',0)}")
-            print(f"    HR allowed: {stats.get('homeRuns',0)}")
+            print(f"    W-L:  {stats.get('wins', 0)}-{stats.get('losses', 0)}")
+            print(f"    IP:   {stats.get('inningsPitched', 'N/A')}")
+            print(f"    K:    {stats.get('strikeOuts', 0)}")
+            print(f"    BB:   {stats.get('baseOnBalls', 0)}")
+            print(f"    HR allowed: {stats.get('homeRuns', 0)}")
         else:
             print(f"  {pitcher['name']}: no stats yet")
 
@@ -123,24 +125,26 @@ def main():
 
     demo_batter = (lineup["away_batters"] or lineup["home_batters"] or [None])[0]
     if demo_batter and demo_batter["id"]:
-        info   = get_player_info(demo_batter["id"])
+        info = get_player_info(demo_batter["id"])
         recent = get_player_recent_stats(demo_batter["id"], group="hitting", num_games=10)
 
-        print(f"\n  Player: {info.get('name')}  |  Bats: {info.get('bats')}  |  Team: {info.get('current_team')}")
+        print(
+            f"\n  Player: {info.get('name')}  |  Bats: {info.get('bats')}  |  Team: {info.get('current_team')}"
+        )
         print(f"  Games sampled: {recent.get('games_found', 0)}")
         print()
 
         # Key recent stats
         keys_to_show = [
-            ("atBats",           "AB"),
-            ("hits",             "H"),
-            ("homeRuns",         "HR"),
-            ("rbi",              "RBI"),
-            ("strikeOuts",       "K"),
-            ("baseOnBalls",      "BB"),
-            ("avg_recent",       "AVG (recent)"),
-            ("obp_recent",       "OBP (recent)"),
-            ("slg_recent",       "SLG (recent)"),
+            ("atBats", "AB"),
+            ("hits", "H"),
+            ("homeRuns", "HR"),
+            ("rbi", "RBI"),
+            ("strikeOuts", "K"),
+            ("baseOnBalls", "BB"),
+            ("avg_recent", "AVG (recent)"),
+            ("obp_recent", "OBP (recent)"),
+            ("slg_recent", "SLG (recent)"),
         ]
         for key, label in keys_to_show:
             val = recent.get(key, "N/A")
