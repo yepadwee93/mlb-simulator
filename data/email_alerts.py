@@ -10,9 +10,9 @@ Generate a 16-char app password and store as EMAIL_PASS.
 
 import os
 import smtplib
+from datetime import date
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from datetime import date
 
 from data.db import supa
 

@@ -8,8 +8,9 @@ Usage:
 Then open:  http://127.0.0.1:5000
 """
 
-from datetime import date
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import date
+
 
 def _today_est():
     """Return today's date in US/Eastern time (avoids UTC midnight drift on Vercel)."""
@@ -21,50 +22,87 @@ def _today_est():
         return (_dt.datetime.utcnow() - _dt.timedelta(hours=5)).date()
 
 from dotenv import load_dotenv
+
 load_dotenv()   # loads ODDS_API_KEY from .env file
 
 import os
-from flask import Flask, render_template, abort, request, redirect, url_for, jsonify
-from flask_login import (LoginManager, UserMixin, login_user,
-                         logout_user, login_required, current_user)
-from flask_wtf.csrf import CSRFProtect, generate_csrf
+
+from flask import Flask, abort, jsonify, redirect, render_template, request, url_for
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from flask_login import (
+    LoginManager,
+    UserMixin,
+    current_user,
+    login_required,
+    login_user,
+    logout_user,
+)
+from flask_wtf.csrf import CSRFProtect, generate_csrf
 
-from data.odds_api import get_mlb_odds, get_mlb_events, get_player_props, format_odds, calc_edge, get_requests_remaining, get_mlb_totals, get_mlb_runline, calc_ev, calc_kelly, get_line_movement, get_public_betting_pcts
-from data.tracker import log_prediction, update_results, get_accuracy_stats, get_all_predictions, log_odds, get_odds_history, save_game_note, delete_game_note, get_game_notes
-from data.my_picks import add_pick, update_pick_results, get_all_picks, get_pick_stats
-from data.bet_tracker import log_bet, settle_bets, get_bet_stats, get_all_bets
-from data.auth import create_user, check_password, get_user_by_id
+from data.auth import check_password, create_user, get_user_by_id
+from data.bet_tracker import get_all_bets, get_bet_stats, log_bet, settle_bets
 from data.mlb_api import (
-    get_today_schedule,
-    get_game_lineup,
-    get_player_season_stats,
-    get_player_recent_stats,
-    get_batter_split_stats,
-    get_batter_sitcode_stats,
-    get_batter_risp_stats,
-    get_pitcher_hand,
+    compute_injury_impact,
     get_ballpark_weather,
-    get_team_bullpen_stats,
-    get_pitcher_game_log,
+    get_batter_risp_stats,
+    get_batter_sitcode_stats,
+    get_batter_split_stats,
     get_batter_vs_pitcher,
-    get_team_rest_days,
-    get_savant_stats_all,
+    get_bullpen_depth_score,
+    get_catcher_cs_rate,
+    get_game_lineup,
     get_game_umpire,
+    get_lineup_status,
+    get_live_scores,
+    get_pitcher_arsenal,
+    get_pitcher_game_log,
+    get_pitcher_hand,
+    get_player_recent_stats,
+    get_player_season_stats,
+    get_recent_transactions,
+    get_savant_stats_all,
+    get_series_game_number,
+    get_team_bullpen_stats,
     get_team_bullpen_usage,
     get_team_il_players,
-    get_recent_transactions,
-    get_series_game_number,
-    get_catcher_cs_rate,
-    get_bullpen_depth_score,
-    get_lineup_status,
+    get_team_rest_days,
     get_team_streak,
-    get_live_scores,
-    compute_injury_impact,
-    get_pitcher_arsenal,
+    get_today_schedule,
 )
-from simulation.engine import run_simulation, predict_pitcher_ks, detect_pitcher_form, predict_batter_props, optimize_batting_order
+from data.my_picks import add_pick, get_all_picks, get_pick_stats, update_pick_results
+from data.odds_api import (
+    calc_edge,
+    calc_ev,
+    calc_kelly,
+    format_odds,
+    get_line_movement,
+    get_mlb_events,
+    get_mlb_odds,
+    get_mlb_runline,
+    get_mlb_totals,
+    get_player_props,
+    get_public_betting_pcts,
+    get_requests_remaining,
+)
+from data.tracker import (
+    delete_game_note,
+    get_accuracy_stats,
+    get_all_predictions,
+    get_game_notes,
+    get_odds_history,
+    log_odds,
+    log_prediction,
+    save_game_note,
+    update_results,
+)
+from simulation.engine import (
+    detect_pitcher_form,
+    optimize_batting_order,
+    predict_batter_props,
+    predict_pitcher_ks,
+    run_simulation,
+)
 
 app = Flask(__name__, template_folder="app/templates")
 _secret = os.environ.get("SECRET_KEY")
@@ -508,7 +546,7 @@ def build_game_result(game, n_sims, use_splits=True):
             return None
         g = log[-1]
         ip = g.get("inningsPitched") or g.get("ip") or ""
-        er = g.get("earnedRuns", "") 
+        er = g.get("earnedRuns", "")
         ks = g.get("strikeOuts", "")
         opp = g.get("opponent", "") or g.get("opp", "")
         dt = g.get("date", "")
@@ -517,7 +555,8 @@ def build_game_result(game, n_sims, use_splits=True):
         if er != "": parts.append(f"{er} ER")
         if ks != "": parts.append(f"{ks} K")
         if opp: parts.append(f"vs {opp}")
-        from datetime import datetime as _dt, date as _d
+        from datetime import date as _d
+        from datetime import datetime as _dt
         if dt:
             try:
                 d = _dt.strptime(dt[:10], "%Y-%m-%d").date()
@@ -1154,7 +1193,7 @@ def api_save_note(game_pk):
             note       = note,
         )
         return jsonify({"ok": True})
-    except Exception as e:
+    except Exception:
         return jsonify({"ok": False, "error": "An error occurred"}), 500
 
 
@@ -1164,7 +1203,7 @@ def api_delete_note(game_pk):
     try:
         delete_game_note(current_user.id, game_pk)
         return jsonify({"ok": True})
-    except Exception as e:
+    except Exception:
         return jsonify({"ok": False, "error": "An error occurred"}), 500
 
 
@@ -1679,8 +1718,9 @@ def my_picks():
                 user_id      = _uid(),
             )
             return jsonify({"status": "ok"})
-        except Exception as e:
-            import traceback; traceback.print_exc()
+        except Exception:
+            import traceback
+            traceback.print_exc()
             return jsonify({"status": "error", "error": "An error occurred"}), 500
     update_pick_results(user_id=_uid())
     games = get_today_schedule()
@@ -1790,7 +1830,7 @@ def bets_dashboard():
         pass
     try:
         stats = get_bet_stats(user_id=_uid())
-    except Exception as e:
+    except Exception:
         stats = {
             "bets": [], "total_bets": 0, "settled": 0, "pending": 0,
             "wins": 0, "losses": 0, "pushes": 0, "win_pct": None,
@@ -1826,7 +1866,7 @@ def log_bet_route():
             user_id    = _uid(),
         )
         return jsonify({"status": "ok"})
-    except Exception as e:
+    except Exception:
         return jsonify({"status": "error", "msg": "Invalid request"}), 400
 
 
@@ -1842,7 +1882,7 @@ def settle_bets_route():
 @app.route("/settings", methods=["GET", "POST"])
 @login_required
 def settings_page():
-    from data.email_alerts import update_user_email, get_user_email_settings
+    from data.email_alerts import get_user_email_settings, update_user_email
     uid = _uid()
     message = None
     error   = None

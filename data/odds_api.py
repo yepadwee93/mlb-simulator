@@ -9,6 +9,7 @@ Free tier: 500 requests/month — plenty for daily use.
 
 import os
 import time
+
 import requests
 
 ODDS_API_KEY = os.getenv("ODDS_API_KEY", "")

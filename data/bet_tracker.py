@@ -8,8 +8,8 @@ csv_path is accepted as a no-op keyword arg for backwards compatibility.
 """
 
 from datetime import datetime
-from data.db import supa
 
+from data.db import supa
 
 # ── Write ────────────────────────────────────────────────────────
 

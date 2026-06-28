@@ -7,6 +7,7 @@ store plaintext passwords, and Supabase never sees them unmasked.
 """
 
 import re
+
 from data.db import supa
 
 

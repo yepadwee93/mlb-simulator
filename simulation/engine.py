@@ -17,8 +17,8 @@ How it works:
 
 import random
 from bisect import bisect
-from itertools import accumulate
 from collections import Counter
+from itertools import accumulate
 
 # ── Outcome labels ──────────────────────────────────────────────
 SINGLE    = "single"

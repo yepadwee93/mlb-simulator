@@ -7,9 +7,10 @@ Base URL: https://statsapi.mlb.com/api/v1/
 No API key needed — MLB makes this data public.
 """
 
-import requests
 import time
 from datetime import date
+
+import requests
 
 # The root URL for every API call we make
 BASE_URL = "https://statsapi.mlb.com/api/v1"
@@ -87,7 +88,8 @@ def _get_nocache(path, params=None):
     response.raise_for_status()
     data = response.json()
     # Also update the cache so subsequent cached calls get fresh data
-    import hashlib, json as _json
+    import hashlib
+    import json as _json
     key = path + (("?" + _json.dumps(params, sort_keys=True)) if params else "")
     _API_CACHE[key] = (time.time(), data)
     return data
@@ -98,7 +100,8 @@ def _get(path, params=None):
     Internal helper: GET with in-memory TTL cache (10 min).
     Identical params → same cache key, so repeated batter stat fetches in one sim are free.
     """
-    import hashlib, json as _json
+    import hashlib
+    import json as _json
     key = path + (("?" + _json.dumps(params, sort_keys=True)) if params else "")
     now = time.time()
     cached = _API_CACHE.get(key)
@@ -881,7 +884,8 @@ def get_team_rest_days(team_name, today=None):
     1 = normal rest, 2+ = extra rest, 3+ = well rested.
     Returns 1 as fallback if lookup fails.
     """
-    from datetime import date as _date, timedelta
+    from datetime import date as _date
+    from datetime import timedelta
     today_dt = _date.fromisoformat(today[:10]) if today else _date.today()
 
     for days_back in range(1, 6):
@@ -924,7 +928,8 @@ def get_savant_stats_all(year=None):
       {"barrel_pct": float, "hard_hit_pct": float, "exit_velo_avg": float}
     Returns empty dict if the fetch fails -- sim runs fine without it.
     """
-    import csv, io
+    import csv
+    import io
     from datetime import date as _date
 
     if year is None:
@@ -1012,7 +1017,8 @@ def get_team_bullpen_usage(team_id: int, days_back: int = 3) -> dict:
         "whip_modifier": float,
       }
     """
-    from datetime import date as _date, timedelta
+    from datetime import date as _date
+    from datetime import timedelta
     today = _date.today()
     total_bp_ip = 0.0
     games_played = 0
@@ -1157,7 +1163,7 @@ def get_series_game_number(game_pk: int, away_team_id: int, home_team_id: int) -
         # Fetch home team schedule for last 5 days (covers a full 3-4 game series)
         start = (today - timedelta(days=5)).isoformat()
         end   = today.isoformat()
-        data  = _get(f"/schedule", params={
+        data  = _get("/schedule", params={
             "teamId":    home_team_id,
             "startDate": start,
             "endDate":   end,

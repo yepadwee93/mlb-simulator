@@ -9,12 +9,13 @@ Usage:
 """
 
 import json
+
 from data.mlb_api import (
-    get_today_schedule,
     get_game_lineup,
-    get_player_season_stats,
-    get_player_recent_stats,
     get_player_info,
+    get_player_recent_stats,
+    get_player_season_stats,
+    get_today_schedule,
 )
 
 

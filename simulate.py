@@ -8,10 +8,11 @@ Usage:
 """
 
 import time
+
 from data.mlb_api import (
-    get_today_schedule,
     get_game_lineup,
     get_player_season_stats,
+    get_today_schedule,
 )
 from simulation.engine import run_simulation
 
@@ -108,7 +109,7 @@ def main():
     away_p = (lineup["away_pitcher"] or {}).get("name", "Unknown pitcher")
     home_p = (lineup["home_pitcher"] or {}).get("name", "Unknown pitcher")
 
-    print(f"\n  Pitching matchup:")
+    print("\n  Pitching matchup:")
     print(f"    {away_p:30s}  ERA: {away_pitcher_stats.get('era', 'N/A'):>5}  "
           f"WHIP: {away_pitcher_stats.get('whip', 'N/A'):>5}")
     print(f"    {home_p:30s}  ERA: {home_pitcher_stats.get('era', 'N/A'):>5}  "

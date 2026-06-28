@@ -1,8 +1,9 @@
 """Quick debug script — shows what the Odds API returns for team names."""
 from dotenv import load_dotenv
+
 load_dotenv()
-from data.odds_api import get_mlb_odds
 from data.mlb_api import get_today_schedule
+from data.odds_api import get_mlb_odds
 
 print("\n=== ODDS API TEAM NAMES ===")
 odds = get_mlb_odds()

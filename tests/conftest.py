@@ -7,6 +7,7 @@ We create a test version of the Flask app that:
 - Has WTF_CSRF_ENABLED=False so we don't need CSRF tokens in test requests
 """
 import os
+
 import pytest
 
 # Set env vars BEFORE importing web.py so the app doesn't raise on missing keys
