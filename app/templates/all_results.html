@@ -1091,9 +1091,7 @@
             {%- endif %}
           {%- else %}
             <div class="market-val">
-              {%- if away_margin > 1.5 %}{{ r.away_team }} -1.5
-              {%- elif -away_margin > 1.5 %}{{ r.home_team }} -1.5
-              {%- else %}Too close — skip RL{%- endif %}
+              {%- if away_margin >= 0 %}{{ r.away_team }}{%- else %}{{ r.home_team }}{%- endif %} -1.5
               <span style="color:#9aa0b8;font-size:.65rem;">(proj {{ "%.1f"|format(away_margin|abs) }} run margin)</span>
             </div>
           {%- endif %}
