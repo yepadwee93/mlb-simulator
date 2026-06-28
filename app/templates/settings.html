@@ -158,6 +158,7 @@
   <div class="card">
     <h2>📧 Daily Email Alerts</h2>
     <form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
       <label for="email">Your email address</label>
       <input type="email" id="email" name="email" placeholder="you@example.com"
@@ -345,6 +346,7 @@ function setTheme(name) {
 
 </body>
 </html>
+
 
 
 
