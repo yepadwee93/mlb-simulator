@@ -851,13 +851,15 @@ def get_ballpark_weather(venue_name, game_time_utc: str = None):
 
             today = date.today()
             params["hourly"] = (
-                "temperature_2m,wind_speed_10m,wind_direction_10m,weather_code,precipitation_probability"
+                "temperature_2m,wind_speed_10m,wind_direction_10m,weather_code,"
+                "precipitation_probability,surface_pressure,relative_humidity_2m"
             )
             params["start_date"] = today.isoformat()
             params["end_date"] = (today + timedelta(days=2)).isoformat()
         else:
             params["current"] = (
-                "temperature_2m,wind_speed_10m,wind_direction_10m,weather_code,precipitation_probability"
+                "temperature_2m,wind_speed_10m,wind_direction_10m,weather_code,"
+                "precipitation_probability,surface_pressure,relative_humidity_2m"
             )
 
         resp = requests.get("https://api.open-meteo.com/v1/forecast", params=params, timeout=5)
@@ -895,6 +897,16 @@ def get_ballpark_weather(venue_name, game_time_utc: str = None):
                 if idx < len(hourly.get("precipitation_probability", [0] * 100))
                 else 0
             )
+            pressure_hpa = (
+                hourly["surface_pressure"][idx]
+                if idx < len(hourly.get("surface_pressure", []))
+                else 1013.25
+            )
+            humidity_pct = (
+                hourly["relative_humidity_2m"][idx]
+                if idx < len(hourly.get("relative_humidity_2m", []))
+                else 50
+            )
         else:
             current = data.get("current", {})
             temp_f = current.get("temperature_2m", 70)
@@ -902,6 +914,8 @@ def get_ballpark_weather(venue_name, game_time_utc: str = None):
             wind_deg = current.get("wind_direction_10m", 0)
             wmo_code = current.get("weather_code", 0)
             precip_pct = current.get("precipitation_probability", 0)
+            pressure_hpa = current.get("surface_pressure", 1013.25)
+            humidity_pct = current.get("relative_humidity_2m", 50)
 
         # Condition label and icon
         condition, condition_icon = WMO_CONDITIONS.get(int(wmo_code), ("Unknown", "🌡"))
@@ -947,6 +961,8 @@ def get_ballpark_weather(venue_name, game_time_utc: str = None):
             "is_forecast": is_forecast,
             "hr_boost_pct": hr_boost_pct,
             "temp_effect": temp_effect,
+            "pressure_hpa": round(float(pressure_hpa), 1),
+            "humidity_pct": int(humidity_pct),
         }
 
     except Exception:

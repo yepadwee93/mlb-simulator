@@ -367,7 +367,31 @@ def apply_weather_modifier(probs: list, weather: dict) -> list:
         else:
             hr_wind_factor = 1.0
 
-    total_hr_factor = hr_temp_factor * hr_wind_factor
+    # Barometric pressure effect on HR.
+    # Lower pressure = less air resistance = ball carries further.
+    # Sea level standard = 1013.25 hPa. Coors Field sits at ~843 hPa.
+    # Research shows ~1% HR increase per 17 hPa below sea level standard.
+    pressure_hpa = weather.get("pressure_hpa")
+    if pressure_hpa and pressure_hpa > 0:
+        pressure_delta = 1013.25 - pressure_hpa  # positive = below sea level
+        hr_pressure_factor = 1.0 + (pressure_delta / 17.0) * 0.01
+        hr_pressure_factor = min(1.25, max(0.90, hr_pressure_factor))
+    else:
+        hr_pressure_factor = 1.0
+
+    # Humidity effect on HR.
+    # Humid air is less dense than dry air (water vapor displaces heavier N2/O2).
+    # High humidity (>70%) adds ~2-3% to HR carry; dry air (<30%) suppresses slightly.
+    humidity_pct = weather.get("humidity_pct", 50)
+    if humidity_pct > 70:
+        hr_humidity_factor = 1.0 + (humidity_pct - 70) / 30 * 0.03
+    elif humidity_pct < 30:
+        hr_humidity_factor = 1.0 - (30 - humidity_pct) / 30 * 0.02
+    else:
+        hr_humidity_factor = 1.0
+    hr_humidity_factor = min(1.05, max(0.97, hr_humidity_factor))
+
+    total_hr_factor = hr_temp_factor * hr_wind_factor * hr_pressure_factor * hr_humidity_factor
     adjusted[5] *= total_hr_factor  # index 5 = HR
 
     # Normalize
@@ -457,13 +481,24 @@ def apply_pitcher_modifier(probs: list, pitcher_stats: dict) -> list:
     # High GB% (52%+) = fewer HRs; Low GB% (35%-) = more HRs
     gb_hr_modifier = min(max(1.0 - (gb_pct - 44.0) * 0.008, 0.75), 1.25)
 
+    # ── 6. Stuff grade composite ───────────────────────────────────────────
+    # A pitcher who excels in ALL of K%, BB%, and GB% simultaneously has
+    # elite "stuff" that adds a small but real additional suppression beyond
+    # what each factor contributes individually.
+    #
+    # Formula: stuff_score = (k_scale - 1) - (bb_scale - 1) + (gb_hr_modifier - 1)
+    #   Positive = above-average stuff; negative = below-average.
+    # Effect: caps at ±5% additional hit suppression across singles/doubles.
+    stuff_score = (k_scale - 1.0) - (bb_scale - 1.0) * 0.5 + (1.0 - gb_hr_modifier) * 0.5
+    stuff_hit_mod = min(1.05, max(0.95, 1.0 - stuff_score * 0.05))
+
     # ── Apply all adjustments ──────────────────────────────────────────────
     adjusted = list(probs)
     adjusted[0] *= bb_scale  # walk — driven by BB%
     adjusted[1] *= k_scale  # strikeout — driven by K%
-    adjusted[2] *= hit_scale  # single
-    adjusted[3] *= hit_scale  # double
-    adjusted[4] *= hit_scale  # triple
+    adjusted[2] *= hit_scale * stuff_hit_mod  # single
+    adjusted[3] *= hit_scale * stuff_hit_mod  # double
+    adjusted[4] *= hit_scale * stuff_hit_mod  # triple
     adjusted[5] *= hit_scale * hr_scale * gb_hr_modifier  # HR — three-factor adjustment
 
     # Normalize so probabilities still sum to 1.0
