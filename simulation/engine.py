@@ -169,22 +169,66 @@ def apply_ballpark_factor(probs: list, venue: str, month: int = None) -> list:
 # ── STEP 1: Build batter probability distribution ───────────────
 
 
+# League-average outcome rates (2023-2024 MLB, per plate appearance)
+# OUTCOME_ORDER = [WALK, K, 1B, 2B, 3B, HR, OUT]
+LEAGUE_AVG_PROBS = [0.082, 0.224, 0.148, 0.048, 0.004, 0.033, 0.461]
+
+# Stabilization points (PA needed before a stat is 50% reliable).
+# Source: Tango/MGL "The Book" + Pizza Cutter stabilization research.
+# Lower = stat stabilizes faster (K rate is quick; HR rate takes all season).
+# Formula: shrunk = (observed_count + stab * league_avg) / (pa + stab)
+# At pa=0: pure league avg. At pa=stab: 50/50 blend. At pa>>stab: trust observed.
+_STAB = {
+    "walk": 120,  # BB% stabilizes around 120 PA
+    "k": 60,  # K%  stabilizes fastest — pitchers control this
+    "1b": 460,  # Singles (BABIP-driven) — very slow to stabilize
+    "2b": 290,  # Doubles — moderate
+    "3b": 1200,  # Triples — almost never stabilize (speed/park dependent)
+    "hr": 170,  # HR rate — mid-range
+}
+
+
+def _shrink(observed_count: float, pa: int, league_avg_rate: float, stab: int) -> float:
+    """
+    Bayesian shrinkage toward league average.
+
+    Blends the observed rate with the league average rate, weighted by
+    how much data we have vs how much data we'd need to fully trust it.
+
+      shrunk = (observed_count + stab * league_avg) / (pa + stab)
+
+    At pa=0:    returns league_avg (no data, use prior entirely)
+    At pa=stab: returns midpoint between observed and league avg (50/50)
+    At pa=500 with stab=120: returns ~80% observed, 20% league avg
+    """
+    return (observed_count + stab * league_avg_rate) / (pa + stab)
+
+
 def build_batter_probs(stats: dict) -> list:
     """
     Convert a batter's season stats into a list of probabilities,
     one per outcome, in OUTCOME_ORDER.
 
-    For example, a .300 hitter with 30 HR might look like:
-      [walk=8%, K=20%, single=15%, double=5%, triple=1%, HR=5%, out=46%]
+    Applies Bayesian shrinkage (Empirical Bayes) toward league average
+    for each outcome, weighted by how many PA the player has vs the
+    stabilization point for that stat.
 
-    If we have no stats (e.g. player didn't play yet), we fall back
-    to a generic league-average hitter.
+    Why this matters:
+      A batter hitting .380 in 50 PA in April is almost certainly not
+      a .380 true-talent hitter — it's a hot start with luck involved.
+      A batter hitting .380 in 500 PA is almost certainly the real deal.
+      This function knows the difference; the old version did not.
+
+    Example: batter with 80 PA, 5 HR (6.3% HR rate vs 3.3% league avg)
+      Old: HR prob = 6.3% (takes hot start at face value)
+      New: HR prob = (5 + 170*0.033) / (80 + 170) = 10.6/250 = 4.2%
+           (pulls toward league avg because 80 PA is well below the 170 PA
+            needed for HR rate to stabilize — likely some luck involved)
     """
     pa = stats.get("plateAppearances", 0)
 
     if pa < 10:
-        # Not enough data — use a league-average hitter as fallback
-        return [0.082, 0.224, 0.148, 0.048, 0.004, 0.033, 0.461]
+        return list(LEAGUE_AVG_PROBS)
 
     hits = stats.get("hits", 0)
     bb = stats.get("baseOnBalls", 0)
@@ -194,12 +238,14 @@ def build_batter_probs(stats: dict) -> list:
     triples = stats.get("triples", 0)
     singles = max(0, hits - doubles - triples - hr)
 
-    p_walk = bb / pa
-    p_k = k / pa
-    p_1b = singles / pa
-    p_2b = doubles / pa
-    p_3b = triples / pa
-    p_hr = hr / pa
+    # Apply shrinkage per outcome using its individual stabilization point
+    p_walk = _shrink(bb, pa, LEAGUE_AVG_PROBS[0], _STAB["walk"])
+    p_k = _shrink(k, pa, LEAGUE_AVG_PROBS[1], _STAB["k"])
+    p_1b = _shrink(singles, pa, LEAGUE_AVG_PROBS[2], _STAB["1b"])
+    p_2b = _shrink(doubles, pa, LEAGUE_AVG_PROBS[3], _STAB["2b"])
+    p_3b = _shrink(triples, pa, LEAGUE_AVG_PROBS[4], _STAB["3b"])
+    p_hr = _shrink(hr, pa, LEAGUE_AVG_PROBS[5], _STAB["hr"])
+
     p_out = max(0.0, 1.0 - p_walk - p_k - p_1b - p_2b - p_3b - p_hr)
 
     # Return in OUTCOME_ORDER: WALK, K, 1B, 2B, 3B, HR, OUT
