@@ -173,6 +173,58 @@ def apply_ballpark_factor(probs: list, venue: str, month: int = None) -> list:
 # OUTCOME_ORDER = [WALK, K, 1B, 2B, 3B, HR, OUT]
 LEAGUE_AVG_PROBS = [0.082, 0.224, 0.148, 0.048, 0.004, 0.033, 0.461]
 
+# wOBA linear weights (2024 MLB run values per outcome, per Tango/FanGraphs)
+# These reflect how many runs each outcome is worth on average.
+# OUTCOME_ORDER = [WALK,  K,     1B,    2B,    3B,    HR,    OUT]
+WOBA_WEIGHTS =   [0.690, 0.000, 0.888, 1.271, 1.616, 2.101, 0.000]
+
+# League-average wOBA (2024 MLB)
+LEAGUE_AVG_WOBA = 0.315
+
+# Realistic wOBA bounds: below/above these → compounding factors have
+# pushed probs to an implausible extreme; clamp back toward league avg.
+WOBA_MIN = 0.200   # ~replacement level hitter
+WOBA_MAX = 0.450   # ~peak Barry Bonds / outlier season
+
+
+def compute_implied_woba(probs: list) -> float:
+    """Compute the implied wOBA from a probability vector (OUTCOME_ORDER)."""
+    return sum(p * w for p, w in zip(probs, WOBA_WEIGHTS))
+
+
+def clamp_woba(probs: list) -> list:
+    """
+    Soft-clamp the probability vector so its implied wOBA stays within
+    realistic MLB bounds [WOBA_MIN, WOBA_MAX].
+
+    Why this matters: when multiple adjustments stack (hot streak + favorable
+    park + weak pitcher + strong home split), the compounded probs can push
+    a batter's implied wOBA above 0.450 — a level that has never been
+    sustained over a full season by anyone in modern MLB. Similarly, a cold
+    batter facing a great pitcher in a pitcher's park might drop below 0.200.
+
+    The fix: if the wOBA is outside the realistic range, scale all offensive
+    outcome probs (walk, 1B, 2B, 3B, HR) toward the boundary. K and OUT
+    absorb the difference to keep the vector summing to 1.
+    """
+    woba = compute_implied_woba(probs)
+    if WOBA_MIN <= woba <= WOBA_MAX:
+        return probs  # already in realistic range — no change
+
+    target = max(WOBA_MIN, min(WOBA_MAX, woba))
+    if woba < 0.001:
+        return probs  # degenerate vector, skip
+
+    scale = target / woba
+    new_probs = list(probs)
+    # Scale offensive outcomes (indices 0,2,3,4,5 = walk,1B,2B,3B,HR)
+    for i in (0, 2, 3, 4, 5):
+        new_probs[i] = probs[i] * scale
+    # OUT absorbs the remainder to keep sum = 1
+    new_probs[6] = max(0.0, 1.0 - sum(new_probs[i] for i in range(6)))
+    return new_probs
+
+
 # Stabilization points (PA needed before a stat is 50% reliable).
 # Source: Tango/MGL "The Book" + Pizza Cutter stabilization research.
 # Lower = stat stabilizes faster (K rate is quick; HR rate takes all season).
@@ -860,6 +912,13 @@ def precompute_lineup(
         if umpire_name:
             probs = apply_umpire_modifier(probs, umpire_name)
 
+        # wOBA sanity clamp: if compounding factors pushed the implied wOBA
+        # outside the realistic MLB range [0.200, 0.450], scale it back.
+        # This prevents extreme edge cases (e.g. hot streak + hitter's park +
+        # weak pitcher + strong home split all stacking) from producing
+        # absurd per-PA run values that skew O/U and win% predictions.
+        probs = clamp_woba(probs)
+
         cum_weights = list(accumulate(probs))
         result.append(cum_weights)
     return result
@@ -1267,15 +1326,18 @@ def simulate_game(
     home_precomp_early: list,
     away_precomp_mid: list = None,  # innings 3-5: starter showing fatigue
     home_precomp_mid: list = None,
-    away_precomp_late: list = None,  # innings 6+: bullpen
+    away_precomp_late: list = None,  # innings 6-7: middle relievers
     home_precomp_late: list = None,
     away_precomp_risp: list = None,  # RISP probs for away batters (b2 or b3 occupied)
     home_precomp_risp: list = None,  # RISP probs for home batters
     away_batter_rates: list = None,  # per-batter GIDP/SF/SB rates for away batters
     home_batter_rates: list = None,  # per-batter GIDP/SF/SB rates for home batters
+    away_precomp_late2: list = None,  # innings 8-9: closer/setup tier
+    home_precomp_late2: list = None,
     innings: int = 9,
     bullpen_start: int = 5,  # 0-indexed: inning 6 in human terms
-    mid_start: int = 2,  # 0-indexed: inning 3 in human terms
+    closer_start: int = 7,   # 0-indexed: inning 8 in human terms
+    mid_start: int = 2,      # 0-indexed: inning 3 in human terms
     resolve_ties: bool = True,  # False = return tied score as-is (for F3/F5/F7 push calc)
 ) -> tuple:
     """
@@ -1359,20 +1421,69 @@ def simulate_game(
                 home_starter_pulled = True
 
         # ── Pick probs for AWAY batters (they face the HOME pitching staff) ─────
-        if home_starter_pulled and away_precomp_late:
-            away_cur = away_precomp_late  # home starter out → away batters face home bullpen
+        if home_starter_pulled:
+            if inning >= closer_start and away_precomp_late2:
+                away_cur = away_precomp_late2  # innings 8-9: closer/setup tier
+            elif away_precomp_late:
+                away_cur = away_precomp_late   # innings 6-7: middle relievers
+            else:
+                away_cur = away_precomp_early
         elif inning >= mid_start and away_precomp_mid:
             away_cur = away_precomp_mid  # innings 3-5: tired home starter
         else:
             away_cur = away_precomp_early  # innings 1-2: fresh home starter
 
         # ── Pick probs for HOME batters (they face the AWAY pitching staff) ─────
-        if away_starter_pulled and home_precomp_late:
-            home_cur = home_precomp_late  # away starter out → home batters face away bullpen
+        if away_starter_pulled:
+            if inning >= closer_start and home_precomp_late2:
+                home_cur = home_precomp_late2  # innings 8-9: closer/setup tier
+            elif home_precomp_late:
+                home_cur = home_precomp_late   # innings 6-7: middle relievers
+            else:
+                home_cur = home_precomp_early
         elif inning >= mid_start and home_precomp_mid:
             home_cur = home_precomp_mid  # innings 3-5: tired away starter
         else:
             home_cur = home_precomp_early  # innings 1-2: fresh away starter
+
+        # ── Score-state leverage (innings 7+) ────────────────────────────────
+        # In real MLB, when a team leads by 5+ runs in late innings, managers
+        # deploy mop-up arms (worse ERA) rather than burning setup/closer.
+        # The trailing team gets better relief arms to stop the bleeding.
+        #
+        # We model this by selecting between two precomputed versions of the
+        # bullpen probs: the normal late probs (good pen) and a slightly
+        # degraded version (mop-up arm = more hittable).
+        #
+        # Degradation: in a blowout the mop-up arm effectively adds ~0.5 ERA
+        # worth of quality reduction. We approximate this by blending the late
+        # probs 70% toward league-average offense (more hittable pitcher).
+        # The trailing team's bullpen is NOT degraded (they're using their best).
+        run_diff = away_runs - home_runs  # positive = away leading
+
+        def _mopup(cur, factor=0.20):
+            """Blend cumulative-weight arrays toward league avg (mop-up arm is more hittable)."""
+            if not cur:
+                return cur
+            # Build league-avg cumulative weights once
+            from itertools import accumulate as _acc
+            lg_cum = list(_acc(LEAGUE_AVG_PROBS))
+            result = []
+            for batter_cum in cur:
+                blended = [
+                    c * (1 - factor) + lg * factor
+                    for c, lg in zip(batter_cum, lg_cum)
+                ]
+                result.append(blended)
+            return result
+
+        if inning >= 6:  # inning 7+ (0-indexed)
+            if run_diff >= 5:
+                # Away team has big lead → home batters face away mop-up arm
+                home_cur = _mopup(home_cur)
+            elif run_diff <= -5:
+                # Home team has big lead → away batters face home mop-up arm
+                away_cur = _mopup(away_cur)
 
         # Away team bats (facing home pitching staff)
         runs, away_pos = simulate_half_inning(
@@ -1606,16 +1717,52 @@ def run_simulation(
     away_bp_pitcher = _apply_bp_fatigue(away_bp_pitcher_raw, away_bp_fatigue)
     home_bp_pitcher = _apply_bp_fatigue(home_bp_pitcher_raw, home_bp_fatigue)
 
+    # ── Bullpen quality tiers ──────────────────────────────────────────────
+    # A team's bullpen ERA is the average across all relievers. But in reality:
+    #   Innings 6-7: middle relievers (worse than average — ~0.40 ERA higher)
+    #   Innings 8-9: setup man + closer (better than average — ~0.35 ERA lower)
+    #
+    # We model this by building two pitcher profiles from the same bullpen ERA:
+    #   early_pen = bullpen ERA + 0.40 (less skilled arms in the 6th/7th)
+    #   late_pen  = bullpen ERA - 0.35 (closer/setup quality in the 8th/9th)
+    #
+    # simulate_game uses bullpen_start=5 (0-indexed inning 6). We split at
+    # inning 8 (0-indexed 7) to switch from early to late pen.
+    def _tier_bullpen(bp_stats, era_delta):
+        """Return a copy of bp_stats with ERA adjusted by era_delta."""
+        if not bp_stats:
+            return bp_stats
+        result = dict(bp_stats)
+        try:
+            base_era = float(result.get("era", 4.20))
+            result["era"] = str(round(max(1.50, base_era + era_delta), 2))
+        except (ValueError, TypeError):
+            pass
+        return result
+
+    away_bp_early = _tier_bullpen(away_bp_pitcher, +0.40)   # middle relievers
+    away_bp_late  = _tier_bullpen(away_bp_pitcher, -0.35)   # closer/setup
+    home_bp_early = _tier_bullpen(home_bp_pitcher, +0.40)
+    home_bp_late  = _tier_bullpen(home_bp_pitcher, -0.35)
+
     away_precomp_late = None
+    away_precomp_late2 = None   # innings 8-9: closer/setup tier
     home_precomp_late = None
+    home_precomp_late2 = None
 
     if away_rp_stats and any(s for s in away_rp_stats if s):
         away_precomp_late = precompute_lineup(
-            away_rp_stats, home_bp_pitcher, weather, away_recent, venue
+            away_rp_stats, home_bp_early, weather, away_recent, venue
+        )
+        away_precomp_late2 = precompute_lineup(
+            away_rp_stats, home_bp_late, weather, away_recent, venue
         )
     if home_rp_stats and any(s for s in home_rp_stats if s):
         home_precomp_late = precompute_lineup(
-            home_rp_stats, away_bp_pitcher, weather, home_recent, venue
+            home_rp_stats, away_bp_early, weather, home_recent, venue
+        )
+        home_precomp_late2 = precompute_lineup(
+            home_rp_stats, away_bp_late, weather, home_recent, venue
         )
 
     # ── Compute per-batter situational rates (GIDP, sac fly, stolen base) ──────
@@ -1651,6 +1798,8 @@ def run_simulation(
             home_precomp_risp,
             away_batter_rates,
             home_batter_rates,
+            away_precomp_late2,
+            home_precomp_late2,
             **kw,
         )
 
