@@ -1059,6 +1059,71 @@
         <div><span class="parlay-tag">🎯 PARLAY PICK</span></div>
       {% endif %}
 
+      <!-- Run line + O/U quick summary -->
+      <div class="market-row" style="padding:6px 0 4px;border-top:1px solid #2a2d3e;margin-top:6px;">
+        {%- set away_margin = r.away_avg_runs - r.home_avg_runs %}
+        {%- set proj_total  = r.away_avg_runs + r.home_avg_runs %}
+
+        <!-- Run line pick -->
+        <div>
+          <div class="market-label">Run Line Pick</div>
+          {%- if r.away_rl_odds and r.home_rl_odds %}
+            {%- if r.away_cover_pct and r.home_cover_pct %}
+              {%- if r.away_cover_pct >= r.home_cover_pct %}
+                <div class="market-val">{{ r.away_team }} -1.5
+                  <span style="color:#9aa0b8;font-size:.65rem;">({{ r.away_cover_pct }}% cover · {{ r.away_rl_odds }})</span>
+                </div>
+                <div style="font-size:.65rem;color:{% if r.away_rl_edge > 0 %}#4caf50{% else %}#ef5350{% endif %};">
+                  {% if r.away_rl_edge > 0 %}+{% endif %}{{ r.away_rl_edge }}% edge
+                </div>
+              {%- else %}
+                <div class="market-val">{{ r.home_team }} -1.5
+                  <span style="color:#9aa0b8;font-size:.65rem;">({{ r.home_cover_pct }}% cover · {{ r.home_rl_odds }})</span>
+                </div>
+                <div style="font-size:.65rem;color:{% if r.home_rl_edge > 0 %}#4caf50{% else %}#ef5350{% endif %};">
+                  {% if r.home_rl_edge > 0 %}+{% endif %}{{ r.home_rl_edge }}% edge
+                </div>
+              {%- endif %}
+            {%- else %}
+              <div class="market-val" style="color:#9aa0b8;">—</div>
+            {%- endif %}
+          {%- else %}
+            <div class="market-val">
+              {%- if away_margin > 1.5 %}{{ r.away_team }} -1.5
+              {%- elif -away_margin > 1.5 %}{{ r.home_team }} -1.5
+              {%- else %}Too close — skip RL{%- endif %}
+              <span style="color:#9aa0b8;font-size:.65rem;">(proj {{ "%.1f"|format(away_margin|abs) }} run margin)</span>
+            </div>
+          {%- endif %}
+        </div>
+
+        <!-- O/U pick -->
+        <div style="text-align:right;">
+          <div class="market-label">Over / Under</div>
+          {%- if r.ou_line %}
+            {%- if r.model_over_pct >= 50 %}
+              <div class="market-val">OVER {{ r.ou_line }}
+                <span style="color:#9aa0b8;font-size:.65rem;">({{ r.model_over_pct }}% · {{ r.ou_over_odds }})</span>
+              </div>
+              <div style="font-size:.65rem;color:{% if r.ou_over_edge > 0 %}#4caf50{% else %}#ef5350{% endif %};">
+                {% if r.ou_over_edge > 0 %}+{% endif %}{{ r.ou_over_edge }}% edge
+              </div>
+            {%- else %}
+              <div class="market-val">UNDER {{ r.ou_line }}
+                <span style="color:#9aa0b8;font-size:.65rem;">({{ r.model_under_pct }}% · {{ r.ou_under_odds }})</span>
+              </div>
+              <div style="font-size:.65rem;color:{% if r.ou_under_edge > 0 %}#4caf50{% else %}#ef5350{% endif %};">
+                {% if r.ou_under_edge > 0 %}+{% endif %}{{ r.ou_under_edge }}% edge
+              </div>
+            {%- endif %}
+          {%- else %}
+            <div class="market-val">Proj {{ "%.1f"|format(proj_total) }} runs
+              <span style="color:#9aa0b8;font-size:.65rem;">(no Vegas line)</span>
+            </div>
+          {%- endif %}
+        </div>
+      </div>
+
       <!-- Pitcher K predictions -->
       {%- if r.away_k_pred or r.home_k_pred %}
       <div class="market-row" style="padding-bottom:4px;">
