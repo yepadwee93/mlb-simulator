@@ -739,6 +739,7 @@ def precompute_lineup(
     batter_rest_days: int = None,
     savant_list: list = None,
     umpire_name: str = None,
+    homeaway_stats_list: list = None,
 ) -> list:
     """
     Pre-calculate cumulative probability arrays for every batter in a lineup.
@@ -748,10 +749,11 @@ def precompute_lineup(
     Applies (in order):
       1. Recent form blend (season 60% + last-20-games 40%)
       2. Day/night split blend (25% weight if batter has 50+ PA in this game type)
-      3. Matchup history blend (30% weight if batter has 20+ career PA vs this pitcher)
-      4. Pitcher modifier (ERA/WHIP)
-      5. Ballpark factor (Coors, Oracle Park, etc.)
-      6. Weather modifier (wind, temperature)
+      3. Home/away split blend (25% weight if batter has 80+ PA in this context)
+      4. Matchup history blend (30% weight if batter has 20+ career PA vs this pitcher)
+      5. Pitcher modifier (ERA/WHIP)
+      6. Ballpark factor (Coors, Oracle Park, etc.)
+      7. Weather modifier (wind, temperature)
     """
     result = []
     for i, stats in enumerate(lineup_stats):
@@ -781,6 +783,19 @@ def precompute_lineup(
             if dn and dn.get("plateAppearances", 0) >= 50:
                 dn_probs = build_batter_probs(dn)
                 probs = blend_probs(probs, dn_probs, recent_weight=0.25)
+
+        # Blend in home/away split — some batters perform very differently at home vs on road.
+        # Classic examples: Coors hitters who lose ~60 OPS pts away, or road warriors
+        # who see better pitches in unfamiliar parks.
+        # Require 80+ PA in this context (home or road) for a stable enough sample.
+        # Weight is PA-scaled: 80 PA → 12%, 200+ PA → 25% (max).
+        if homeaway_stats_list and i < len(homeaway_stats_list):
+            ha = homeaway_stats_list[i]
+            ha_pa = ha.get("plateAppearances", 0) if ha else 0
+            if ha and ha_pa >= 80:
+                ha_probs = build_batter_probs(ha)
+                ha_weight = min(0.12 + (ha_pa / 200.0) * 0.13, 0.25)
+                probs = blend_probs(probs, ha_probs, recent_weight=ha_weight)
 
         # Blend in matchup history if batter has 20+ career PA vs this specific pitcher.
         # 30% weight: meaningful enough to matter, small enough not to override
@@ -1356,6 +1371,8 @@ def run_simulation(
     home_matchup_stats: list = None,  # home batters' career stats vs away starter
     away_daynight_stats: list = None,  # away batters' day or night game splits
     home_daynight_stats: list = None,  # home batters' day or night game splits
+    away_homeaway_stats: list = None,  # away batters' road (away) splits
+    home_homeaway_stats: list = None,  # home batters' home splits
     away_batter_rest: int = None,
     home_batter_rest: int = None,
     away_savant: list = None,  # Statcast data per away batter
@@ -1407,6 +1424,7 @@ def run_simulation(
         away_batter_rest,
         away_savant,
         umpire_name,
+        away_homeaway_stats,
     )
     home_precomp_early = precompute_lineup(
         home_lineup,
@@ -1419,6 +1437,7 @@ def run_simulation(
         home_batter_rest,
         home_savant,
         umpire_name,
+        home_homeaway_stats,
     )
 
     # ── Phase 2: innings 3-5 (starter showing fatigue) ───────────────
@@ -1435,6 +1454,7 @@ def run_simulation(
         away_batter_rest,
         away_savant,
         umpire_name,
+        away_homeaway_stats,
     )
     home_precomp_mid = precompute_lineup(
         home_lineup,
@@ -1447,6 +1467,7 @@ def run_simulation(
         home_batter_rest,
         home_savant,
         umpire_name,
+        home_homeaway_stats,
     )
 
     # ── RISP: clutch stats when runner on 2nd or 3rd ─────────────────
@@ -1467,6 +1488,7 @@ def run_simulation(
             away_batter_rest,
             away_savant,
             umpire_name,
+            away_homeaway_stats,
         )
     if home_risp_stats and any(
         s for s in home_risp_stats if s and s.get("plateAppearances", 0) >= 20
@@ -1482,6 +1504,7 @@ def run_simulation(
             home_batter_rest,
             home_savant,
             umpire_name,
+            home_homeaway_stats,
         )
 
     # ── Late game: batters vs the bullpen (innings 6+) ───────────────
