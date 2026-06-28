@@ -625,6 +625,8 @@ def build_game_result(game, n_sims, use_splits=True):
         series_game_number=series_game_num,
         away_catcher_cs=away_catcher_cs,
         home_catcher_cs=home_catcher_cs,
+        away_bp_depth=away_bp_depth,
+        home_bp_depth=home_bp_depth,
         n=n_sims,
     )
 
