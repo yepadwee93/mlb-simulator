@@ -1190,6 +1190,7 @@ def simulate_all():
                                games=all_games,
                                date=date.today().strftime("%A, %B %d %Y"),
                                is_today=True,
+                               api_remaining=get_requests_remaining(),
                                error="No active or upcoming games to simulate right now.")
 
     # ── Step 1: Fetch all lineups in parallel ─────────────────────
@@ -1310,6 +1311,7 @@ def simulate_all():
                                games=all_games,
                                date=date.today().strftime("%A, %B %d %Y"),
                                is_today=True,
+                               api_remaining=get_requests_remaining(),
                                error="Lineups not posted yet for remaining games — check back closer to game time.")
 
     # ── Log predictions for accuracy tracking ─────────────────
