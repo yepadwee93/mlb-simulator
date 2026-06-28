@@ -27,6 +27,9 @@ import os
 from flask import Flask, render_template, abort, request, redirect, url_for, jsonify
 from flask_login import (LoginManager, UserMixin, login_user,
                          logout_user, login_required, current_user)
+from flask_wtf.csrf import CSRFProtect, generate_csrf
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 from data.odds_api import get_mlb_odds, get_mlb_events, get_player_props, format_odds, calc_edge, get_requests_remaining, get_mlb_totals, get_mlb_runline, calc_ev, calc_kelly, get_line_movement, get_public_betting_pcts
 from data.tracker import log_prediction, update_results, get_accuracy_stats, get_all_predictions, log_odds, get_odds_history, save_game_note, delete_game_note, get_game_notes
@@ -64,7 +67,26 @@ from data.mlb_api import (
 from simulation.engine import run_simulation, predict_pitcher_ks, detect_pitcher_form, predict_batter_props, optimize_batting_order
 
 app = Flask(__name__, template_folder="app/templates")
-app.secret_key = os.environ.get("SECRET_KEY", "mlb-sim-secret-change-in-prod-2026")
+_secret = os.environ.get("SECRET_KEY")
+if not _secret:
+    raise RuntimeError("SECRET_KEY environment variable must be set")
+app.secret_key = _secret
+app.config.update(
+    SESSION_COOKIE_SECURE    = True,
+    SESSION_COOKIE_HTTPONLY  = True,
+    SESSION_COOKIE_SAMESITE  = "Lax",
+    WTF_CSRF_TIME_LIMIT      = None,
+    WTF_CSRF_HEADERS         = ["X-CSRFToken"],   # accept token from JS header
+)
+
+csrf    = CSRFProtect(app)
+limiter = Limiter(get_remote_address, app=app, default_limits=[], storage_uri="memory://")
+
+# Inject CSRF token into every response so JS can read it from a meta tag
+@app.after_request
+def set_csrf_cookie(response):
+    response.set_cookie("csrf_token", generate_csrf(), samesite="Lax", httponly=False)
+    return response
 
 # ── Flask-Login setup ─────────────────────────────────────────────
 login_manager = LoginManager(app)
@@ -91,12 +113,8 @@ def _uid():
     """Return the current user's ID for Supabase queries."""
     return int(current_user.id) if current_user.is_authenticated else None
 
-# Backwards-compat alias used in older route code
-def _user_bets_csv():
-    return None  # deprecated — use user_id=_uid() instead
-
-
-_score_pairs_cache = {}   # game_pk -> score_pairs dict for SGP correlated prob
+_score_pairs_cache = {}   # game_pk -> score_pairs dict for SGP correlated prob (max 30 entries)
+_SCORE_PAIRS_MAXSIZE = 30
 
 N_SIMS_SINGLE =  50_000   # simulations for one-game view (50k ≈ same accuracy as 100k, 2x faster)
 N_SIMS_ALL    =  25_000   # simulations per game in simulate-all (faster)
@@ -684,6 +702,7 @@ def build_game_result(game, n_sims, use_splits=True):
 # ── Auth routes ───────────────────────────────────────────────────
 
 @app.route("/login", methods=["GET", "POST"])
+@limiter.limit("10 per minute")
 def login_page():
     if current_user.is_authenticated:
         return redirect(url_for("index"))
@@ -694,7 +713,11 @@ def login_page():
         user_data = check_password(username, password)
         if user_data:
             login_user(User(user_data), remember=True)
-            return redirect(request.args.get("next") or url_for("index"))
+            next_url = request.args.get("next", "")
+            from urllib.parse import urlparse
+            if next_url and urlparse(next_url).netloc == "":
+                return redirect(next_url)
+            return redirect(url_for("index"))
         error = "Invalid username or password."
     return render_template("login.html", error=error)
 
@@ -831,6 +854,7 @@ def index():
 
 
 @app.route("/simulate/<int:game_pk>")
+@login_required
 def simulate(game_pk):
     """Simulate a single game and show the detailed results page."""
     games = get_today_schedule()
@@ -860,6 +884,8 @@ def simulate(game_pk):
 
     # Cache score_pairs for SGP correlated probability calculations
     if "score_pairs" in result:
+        if len(_score_pairs_cache) >= _SCORE_PAIRS_MAXSIZE:
+            _score_pairs_cache.pop(next(iter(_score_pairs_cache)))
         _score_pairs_cache[game_pk] = result["score_pairs"]
 
     # Log this prediction for accuracy tracking
@@ -1127,7 +1153,7 @@ def api_save_note(game_pk):
         )
         return jsonify({"ok": True})
     except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
+        return jsonify({"ok": False, "error": "An error occurred"}), 500
 
 
 @app.route("/api/notes/<int:game_pk>", methods=["DELETE"])
@@ -1137,7 +1163,7 @@ def api_delete_note(game_pk):
         delete_game_note(current_user.id, game_pk)
         return jsonify({"ok": True})
     except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
+        return jsonify({"ok": False, "error": "An error occurred"}), 500
 
 
 _props_cache = {}  # game_pk → (timestamp, props dict)
@@ -1652,7 +1678,7 @@ def my_picks():
             )
             return jsonify({"status": "ok"})
         except Exception as e:
-            return jsonify({"status": "error", "error": str(e)}), 500
+            return jsonify({"status": "error", "error": "An error occurred"}), 500
     update_pick_results(user_id=_uid())
     games = get_today_schedule()
     stats = get_pick_stats(user_id=_uid())
@@ -1663,26 +1689,10 @@ def my_picks():
 @app.route("/my-picks/update", methods=["POST"])
 @login_required
 def update_my_picks():
-    uid = _uid()
-    debug_info = []
-    try:
-        from data.mlb_api import _get_nocache
-        from data.db import supa
-        rows = supa().table("picks").select("*").eq("user_id", int(uid)).is_("actual_winner", "null").execute().data or []
-        for row in rows:
-            gk = row.get("game_pk")
-            try:
-                live  = _get_nocache(f"/game/{gk}/feed/live")
-                state = live.get("gameData", {}).get("status", {}).get("abstractGameState", "unknown")
-                debug_info.append({"game_pk": gk, "state": state})
-            except Exception as e:
-                debug_info.append({"game_pk": gk, "error": str(e)})
-    except Exception as e:
-        debug_info.append({"error": str(e)})
-
+    uid     = _uid()
     updated = update_pick_results(user_id=uid)
     stats   = get_pick_stats(user_id=uid)
-    return jsonify({"updated": updated, "my_pct": stats["my_pct"], "sim_pct": stats["sim_pct"], "debug": debug_info})
+    return jsonify({"updated": updated, "my_pct": stats["my_pct"], "sim_pct": stats["sim_pct"]})
 
 
 @app.route("/odds-history")
@@ -1814,7 +1824,7 @@ def log_bet_route():
         )
         return jsonify({"status": "ok"})
     except Exception as e:
-        return jsonify({"status": "error", "msg": str(e)}), 400
+        return jsonify({"status": "error", "msg": "Invalid request"}), 400
 
 
 @app.route("/bets/settle", methods=["POST"])
@@ -1856,13 +1866,16 @@ def settings_page():
 # Protected by a shared secret so only the cron job can call it.
 
 @app.route("/send-daily-alerts", methods=["POST", "GET"])
+@csrf.exempt
 def send_daily_alerts_route():
     from data.email_alerts import send_daily_alerts
 
     # Simple secret check — set CRON_SECRET in Vercel env vars
-    secret = os.getenv("CRON_SECRET", "")
-    auth   = request.headers.get("Authorization", "") or request.args.get("secret", "")
-    if secret and auth != f"Bearer {secret}" and auth != secret:
+    secret = os.getenv("CRON_SECRET")
+    if not secret:
+        return jsonify({"error": "unauthorized"}), 401
+    auth = request.headers.get("Authorization", "") or request.args.get("secret", "")
+    if auth != f"Bearer {secret}" and auth != secret:
         return jsonify({"error": "unauthorized"}), 401
 
     # Run fast simulations on today's games to find top plays
@@ -1936,7 +1949,7 @@ def send_daily_alerts_route():
 
 if __name__ == "__main__":
     port  = int(os.environ.get("PORT", 5000))
-    debug = os.environ.get("FLASK_ENV") != "production"
+    debug = os.environ.get("FLASK_ENV") == "development"
     print("\n  ⚾ MLB Simulator is running!")
     if debug:
         print(f"  Open:  http://127.0.0.1:{port}\n")
