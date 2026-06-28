@@ -21,12 +21,16 @@ def test_register_page_loads(client):
 
 def test_login_wrong_password(client):
     """POSTing a bad username/password should not crash — should show error or redirect."""
-    response = client.post(
-        "/login",
-        data={"username": "nobody", "password": "wrongpassword"},
-        follow_redirects=True,
-    )
-    # Either stays on login page (200) or redirects — must not be a 500 server error
+    from unittest.mock import patch
+
+    # Mock the database so CI doesn't need a real Supabase connection
+    with patch("data.auth.supa") as mock_supa:
+        mock_supa.return_value.table.return_value.select.return_value.ilike.return_value.execute.return_value.data = []
+        response = client.post(
+            "/login",
+            data={"username": "nobody", "password": "wrongpassword"},
+            follow_redirects=True,
+        )
     assert response.status_code != 500
 
 
