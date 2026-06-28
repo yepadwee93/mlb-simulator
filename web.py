@@ -1680,6 +1680,7 @@ def my_picks():
             )
             return jsonify({"status": "ok"})
         except Exception as e:
+            import traceback; traceback.print_exc()
             return jsonify({"status": "error", "error": "An error occurred"}), 500
     update_pick_results(user_id=_uid())
     games = get_today_schedule()

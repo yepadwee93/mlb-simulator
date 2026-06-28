@@ -81,6 +81,7 @@ def update_pick_results(user_id=None):
         try:
             live  = _get_nocache(f"/game/{game_pk}/feed/live")
             state = live.get("gameData", {}).get("status", {}).get("abstractGameState", "")
+            print(f"[picks] game_pk={game_pk} state={state}")
             if state != "Final":
                 continue
 
@@ -106,7 +107,8 @@ def update_pick_results(user_id=None):
             supa().table("picks").update(update).eq("id", row["id"]).execute()
             updated += 1
 
-        except Exception:
+        except Exception as e:
+            print(f"[picks] game_pk={game_pk} error: {e}")
             continue
 
     return updated
@@ -116,10 +118,16 @@ def get_all_picks(user_id=None):
     """Returns all picks for this user, newest first."""
     if not user_id:
         return []
-    res = supa().table("picks").select("*") \
-        .eq("user_id", int(user_id)) \
-        .order("logged_at", desc=True).execute()
-    return res.data or []
+    try:
+        res = supa().table("picks").select("*") \
+            .eq("user_id", int(user_id)) \
+            .order("logged_at", desc=True).execute()
+        return res.data or []
+    except Exception:
+        # Fall back without ordering if logged_at column missing
+        res = supa().table("picks").select("*") \
+            .eq("user_id", int(user_id)).execute()
+        return res.data or []
 
 
 def get_pick_stats(user_id=None):
