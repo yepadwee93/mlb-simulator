@@ -1,6 +1,7 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
+<script>!function(){var t=localStorage.getItem("mlb_theme")||"dark",m={dark:{"--bg":"#0d1120","--bg2":"#1a1e2e","--bg3":"#252836","--border":"#252836","--text":"#e8eaf0","--text2":"#b0b8cc","--text3":"#9aa0b8","--accent":"#64b5f6","--card-bg":"#1a1e2e"},medium:{"--bg":"#1a1528","--bg2":"#241d38","--bg3":"#302848","--border":"#3a2f5a","--text":"#ede8f5","--text2":"#c0b8d8","--text3":"#a098c0","--accent":"#b39ddb","--card-bg":"#241d38"},light:{"--bg":"#f0f2f8","--bg2":"#ffffff","--bg3":"#e8eaf6","--border":"#d0d4e8","--text":"#1a1a2e","--text2":"#444466","--text3":"#6666aa","--accent":"#3949ab","--card-bg":"#ffffff"}}[t]||{};Object.entries(m).forEach(function(e){document.documentElement.style.setProperty(e[0],e[1])});document.addEventListener("DOMContentLoaded",function(){document.body.style.background=m["--bg"];document.body.style.color=m["--text"]})}();</script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>My Picks — MLB Simulator</title>
@@ -246,6 +247,15 @@
           <option value="">— Select game first —</option>
         </select>
       </div>
+      <div>
+        <label>Bet Type</label>
+        <select id="bet-type-select">
+          <option value="moneyline">Moneyline</option>
+          <option value="runline">Run Line (-1.5 / +1.5)</option>
+          <option value="over">Over</option>
+          <option value="under">Under</option>
+        </select>
+      </div>
       <div class="full-width">
         <label>Notes (optional — e.g. "bullpen edge", "starter is struggling")</label>
         <input type="text" id="my-notes" placeholder="Why are you picking this team?">
@@ -280,6 +290,7 @@
         <th>Date</th>
         <th>Matchup</th>
         <th>My Pick</th>
+        <th>Bet Type</th>
         <th>Sim Pick</th>
         <th>Sim Odds</th>
         <th>Pred Score</th>
@@ -293,6 +304,13 @@
         <td style="color:#b0b8cc; white-space:nowrap; font-size:0.78rem;">{{ r.game_date }}</td>
         <td style="font-size:0.8rem;">{{ r.away_team }} @ {{ r.home_team }}</td>
         <td style="font-weight:600; color:#ce93d8;">{{ r.my_pick }}</td>
+        <td style="font-size:0.75rem; color:#9aa0b8;">
+          {% set bt = r.bet_type or 'moneyline' %}
+          {% if bt == 'runline' %}Run Line
+          {% elif bt == 'over' %}Over
+          {% elif bt == 'under' %}Under
+          {% else %}Moneyline{% endif %}
+        </td>
         <td>
           {% if r.sim_pick %}
             <span class="badge {% if r.sim_pick == r.my_pick %}sim-win{% else %}sim-diff{% endif %}">
@@ -399,9 +417,10 @@ function submitPick() {
   var away    = opt.getAttribute('data-away') || '';
   var home    = opt.getAttribute('data-home') || '';
   var gameDate = opt.getAttribute('data-date') || new Date().toISOString().slice(0,10);
-  var myPick  = document.getElementById('my-pick-select').value;
-  var notes   = document.getElementById('my-notes').value;
-  var msg     = document.getElementById('form-msg');
+  var myPick   = document.getElementById('my-pick-select').value;
+  var notes    = document.getElementById('my-notes').value;
+  var betType  = document.getElementById('bet-type-select').value;
+  var msg      = document.getElementById('form-msg');
 
   if (!pk || !myPick) {
     msg.textContent = 'Please select a game and a team.';
@@ -421,6 +440,7 @@ function submitPick() {
       home_team:     home,
       my_pick:       myPick,
       my_notes:      notes,
+      bet_type:      betType,
       sim_away_pct:  cached.away_pct  || null,
       sim_home_pct:  cached.home_pct  || null,
       sim_away_runs: cached.away_runs || null,
@@ -470,3 +490,4 @@ function checkResults() {
 
 </body>
 </html>
+

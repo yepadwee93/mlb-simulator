@@ -1,0 +1,101 @@
+
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"></head>
+<body style="background:#0d1120; color:#e8eaf0; font-family:'Segoe UI',Arial,sans-serif;
+             margin:0; padding:0;">
+  <div style="max-width:560px; margin:32px auto; background:#1a1e2e;
+              border-radius:14px; overflow:hidden; border:1px solid #252836;">
+
+    <!-- Header -->
+    <div style="background:#1e2235; padding:24px 28px; border-bottom:1px solid #353a52;">
+      <div style="font-size:22px; font-weight:800; color:#ffffff;">
+        ⚾ MLB Simulator — Daily Top Plays
+      </div>
+      <div style="font-size:13px; color:#9aa0b8; margin-top:4px;">Thursday, June 26 2026</div>
+    </div>
+
+    <!-- Body -->
+    <div style="padding:24px 28px;">
+      <p style="font-size:14px; color:#b0b8cc; margin-bottom:20px;">
+        Today's best model edges — games where our 100k-simulation model
+        gives a team ≥65% win probability.
+      </p>
+
+      
+      <table style="width:100%; border-collapse:collapse; font-size:14px;">
+        <thead>
+          <tr style="color:#9aa0b8; font-size:11px; text-transform:uppercase; letter-spacing:.5px;">
+            <th style="padding:8px 16px; text-align:left; border-bottom:1px solid #353a52;">Team</th>
+            <th style="padding:8px 16px; text-align:center; border-bottom:1px solid #353a52;">Model %</th>
+            <th style="padding:8px 16px; text-align:center; border-bottom:1px solid #353a52;">ML Odds</th>
+            <th style="padding:8px 16px; text-align:center; border-bottom:1px solid #353a52;">EV</th>
+          </tr>
+        </thead>
+        <tbody>
+        <tr>
+          <td style="padding:12px 16px; border-bottom:1px solid #252836;">
+            <b style="color:#e8eaf0;">Los Angeles Dodgers</b>
+            <span style="color:#9aa0b8; font-size:12px;"> vs San Diego Padres</span>
+          </td>
+          <td style="padding:12px 16px; text-align:center; border-bottom:1px solid #252836;">
+            <span style="color:#ef5350; font-weight:700; font-size:16px;">72.4%</span>
+          </td>
+          <td style="padding:12px 16px; text-align:center; border-bottom:1px solid #252836;">
+            <span style="color:#ffd54f; font-weight:700;">-185</span>
+          </td>
+          <td style="padding:12px 16px; text-align:center; border-bottom:1px solid #252836;">
+            <span style="color:#81c784;">+$3.20 EV</span>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:12px 16px; border-bottom:1px solid #252836;">
+            <b style="color:#e8eaf0;">New York Yankees</b>
+            <span style="color:#9aa0b8; font-size:12px;"> vs Boston Red Sox</span>
+          </td>
+          <td style="padding:12px 16px; text-align:center; border-bottom:1px solid #252836;">
+            <span style="color:#4caf50; font-weight:700; font-size:16px;">68.1%</span>
+          </td>
+          <td style="padding:12px 16px; text-align:center; border-bottom:1px solid #252836;">
+            <span style="color:#ffd54f; font-weight:700;">-145</span>
+          </td>
+          <td style="padding:12px 16px; text-align:center; border-bottom:1px solid #252836;">
+            <span style="color:#81c784;">+$8.75 EV</span>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:12px 16px; border-bottom:1px solid #252836;">
+            <b style="color:#e8eaf0;">Atlanta Braves</b>
+            <span style="color:#9aa0b8; font-size:12px;"> vs Miami Marlins</span>
+          </td>
+          <td style="padding:12px 16px; text-align:center; border-bottom:1px solid #252836;">
+            <span style="color:#4caf50; font-weight:700; font-size:16px;">65.3%</span>
+          </td>
+          <td style="padding:12px 16px; text-align:center; border-bottom:1px solid #252836;">
+            <span style="color:#ffd54f; font-weight:700;">-130</span>
+          </td>
+          <td style="padding:12px 16px; text-align:center; border-bottom:1px solid #252836;">
+            <span style="color:#81c784;">+$2.10 EV</span>
+          </td>
+        </tr></tbody>
+      </table>
+
+      <div style="margin-top:24px; padding:16px; background:#0d1120;
+                  border-radius:10px; font-size:12px; color:#9aa0b8;">
+        <b style="color:#b0b8cc;">How to use:</b> These are model edges, not guarantees.
+        A 68% model win% means roughly 68 out of 100 sims say this team wins —
+        but the real world adds variance. Always size bets with Kelly or flat units.
+        <br><br>
+        <a href="https://mlb-simulator-vert.vercel.app" style="color:#64b5f6;">Open simulator →</a>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div style="padding:16px 28px; background:#0d1120; font-size:11px; color:#555870;
+                text-align:center; border-top:1px solid #252836;">
+      MLB Simulator · For entertainment only, not financial advice ·
+      <a href="https://mlb-simulator-vert.vercel.app/settings" style="color:#555870;">Unsubscribe</a>
+    </div>
+  </div>
+</body>
+</html>

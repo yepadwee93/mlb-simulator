@@ -246,5 +246,101 @@
   </div>
 </div>
 
+<!-- ── Theme chooser ── -->
+<div class="page">
+  <div class="card" style="margin-top:0;">
+    <h2>🎨 App Theme</h2>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
+
+      <button onclick="setTheme('dark')" id="theme-btn-dark"
+        style="border:2px solid transparent;border-radius:12px;padding:16px 10px;cursor:pointer;background:#0d1120;color:#e8eaf0;font-size:0.82rem;font-weight:600;transition:.2s;">
+        <div style="width:100%;height:36px;background:linear-gradient(135deg,#1a1e2e,#0d1120);border-radius:6px;margin-bottom:8px;"></div>
+        🌑 Dark
+        <div style="font-size:0.68rem;color:#9aa0b8;margin-top:4px;">Deep navy · current default</div>
+      </button>
+
+      <button onclick="setTheme('medium')" id="theme-btn-medium"
+        style="border:2px solid transparent;border-radius:12px;padding:16px 10px;cursor:pointer;background:#1e1a2e;color:#ede8f5;font-size:0.82rem;font-weight:600;transition:.2s;">
+        <div style="width:100%;height:36px;background:linear-gradient(135deg,#2a2040,#1e1a2e);border-radius:6px;margin-bottom:8px;"></div>
+        🌆 Medium
+        <div style="font-size:0.68rem;color:#b0a8c8;margin-top:4px;">Warm purple · easier on eyes</div>
+      </button>
+
+      <button onclick="setTheme('light')" id="theme-btn-light"
+        style="border:2px solid transparent;border-radius:12px;padding:16px 10px;cursor:pointer;background:#f5f5f5;color:#1a1a2e;font-size:0.82rem;font-weight:600;transition:.2s;">
+        <div style="width:100%;height:36px;background:linear-gradient(135deg,#e8eaf6,#f5f5f5);border-radius:6px;margin-bottom:8px;"></div>
+        ☀️ Light
+        <div style="font-size:0.68rem;color:#555;margin-top:4px;">White · soft &amp; bright</div>
+      </button>
+
+    </div>
+    <div id="theme-saved" style="font-size:0.78rem;color:#81c784;margin-top:14px;display:none;">✓ Theme saved</div>
+  </div>
+</div>
+
+<script>
+const THEMES = {
+  dark: {
+    '--bg':       '#0d1120',
+    '--bg2':      '#1a1e2e',
+    '--bg3':      '#252836',
+    '--border':   '#252836',
+    '--text':     '#e8eaf0',
+    '--text2':    '#b0b8cc',
+    '--text3':    '#9aa0b8',
+    '--accent':   '#64b5f6',
+    '--card-bg':  '#1a1e2e',
+  },
+  medium: {
+    '--bg':       '#1a1528',
+    '--bg2':      '#241d38',
+    '--bg3':      '#302848',
+    '--border':   '#3a2f5a',
+    '--text':     '#ede8f5',
+    '--text2':    '#c0b8d8',
+    '--text3':    '#a098c0',
+    '--accent':   '#b39ddb',
+    '--card-bg':  '#241d38',
+  },
+  light: {
+    '--bg':       '#f0f2f8',
+    '--bg2':      '#ffffff',
+    '--bg3':      '#e8eaf6',
+    '--border':   '#d0d4e8',
+    '--text':     '#1a1a2e',
+    '--text2':    '#444466',
+    '--text3':    '#6666aa',
+    '--accent':   '#3949ab',
+    '--card-bg':  '#ffffff',
+  },
+};
+
+function applyTheme(name) {
+  const t = THEMES[name] || THEMES.dark;
+  const root = document.documentElement;
+  Object.entries(t).forEach(([k, v]) => root.style.setProperty(k, v));
+  document.body.style.background = t['--bg'];
+  document.body.style.color = t['--text'];
+  // highlight active button
+  ['dark','medium','light'].forEach(n => {
+    const btn = document.getElementById('theme-btn-' + n);
+    if (btn) btn.style.borderColor = (n === name) ? '#64b5f6' : 'transparent';
+  });
+}
+
+function setTheme(name) {
+  localStorage.setItem('mlb_theme', name);
+  applyTheme(name);
+  const saved = document.getElementById('theme-saved');
+  if (saved) { saved.style.display = 'block'; setTimeout(() => saved.style.display='none', 2000); }
+}
+
+// Apply on load
+(function() {
+  const saved = localStorage.getItem('mlb_theme') || 'dark';
+  applyTheme(saved);
+})();
+</script>
+
 </body>
 </html>

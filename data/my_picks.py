@@ -13,7 +13,7 @@ def add_pick(game_pk, game_date, away_team, home_team,
              my_pick, my_notes="",
              sim_away_pct=None, sim_home_pct=None,
              sim_away_runs=None, sim_home_runs=None,
-             user_id=None, pick=None):
+             user_id=None, pick=None, bet_type="moneyline"):
     """
     Save (or update) the user's pick for a game.
     `pick` is an alias for `my_pick` kept for route compatibility.
@@ -35,6 +35,7 @@ def add_pick(game_pk, game_date, away_team, home_team,
         "home_team":  home_team,
         "my_pick":    my_pick,
         "my_notes":   my_notes or "",
+        "bet_type":   bet_type or "moneyline",
         "sim_pick":   sim_pick,
     }
     for key, val in [
