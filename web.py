@@ -703,6 +703,7 @@ def build_game_result(game, n_sims, use_splits=True):
 
 @app.route("/login", methods=["GET", "POST"])
 @limiter.limit("10 per minute")
+@csrf.exempt
 def login_page():
     if current_user.is_authenticated:
         return redirect(url_for("index"))
@@ -723,6 +724,7 @@ def login_page():
 
 
 @app.route("/register", methods=["GET", "POST"])
+@csrf.exempt
 def register_page():
     if current_user.is_authenticated:
         return redirect(url_for("index"))
