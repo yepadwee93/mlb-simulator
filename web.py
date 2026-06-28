@@ -347,12 +347,12 @@ def build_game_result(game, n_sims, use_splits=True):
     if use_splits:
         day_night = _get_day_night(game.get("game_time", ""))
 
-        def _fetch_all_batter_data(batter, opp_pitcher_id=None):
-            """Fetch recent form + all split types + matchup history + day/night for one batter.
-            Returns (recent, lhp, rhp, sp, rp, risp, vs_pitcher, day_night_stat)."""
+        def _fetch_all_batter_data(batter, opp_pitcher_id=None, is_home=False):
+            """Fetch recent form + all split types + matchup history + day/night + home/away for one batter.
+            Returns (recent, lhp, rhp, sp, rp, risp, vs_pitcher, day_night_stat, home_away_stat)."""
             pid = batter.get("id")
             if not pid:
-                return {}, {}, {}, {}, {}, {}, {}, {}
+                return {}, {}, {}, {}, {}, {}, {}, {}, {}
             try:
                 recent = get_player_recent_stats(pid, num_games=20)
             except Exception:
@@ -385,7 +385,12 @@ def build_game_result(game, n_sims, use_splits=True):
                 dn_stat = get_batter_sitcode_stats(pid, day_night)
             except Exception:
                 dn_stat = {}
-            return recent, vs_lhp, vs_rhp, vs_sp, vs_rp, risp, vs_pitcher, dn_stat
+            try:
+                ha_code = "h" if is_home else "a"
+                home_away_stat = get_batter_sitcode_stats(pid, ha_code)
+            except Exception:
+                home_away_stat = {}
+            return recent, vs_lhp, vs_rhp, vs_sp, vs_rp, risp, vs_pitcher, dn_stat, home_away_stat
 
         # Away batters face the HOME pitcher; home batters face the AWAY pitcher
         n_away = len(lineup["away_batters"])
@@ -394,10 +399,11 @@ def build_game_result(game, n_sims, use_splits=True):
 
         with ThreadPoolExecutor(max_workers=30) as ex:
             away_futures = [
-                ex.submit(_fetch_all_batter_data, b, home_pid) for b in lineup["away_batters"]
+                ex.submit(_fetch_all_batter_data, b, home_pid, False)
+                for b in lineup["away_batters"]
             ]
             home_futures = [
-                ex.submit(_fetch_all_batter_data, b, away_pid) for b in lineup["home_batters"]
+                ex.submit(_fetch_all_batter_data, b, away_pid, True) for b in lineup["home_batters"]
             ]
             all_results_data = [f.result() for f in away_futures + home_futures]
 
@@ -416,6 +422,7 @@ def build_game_result(game, n_sims, use_splits=True):
                 "risp": d[5],
                 "vs_pitcher": d[6],
                 "day_night": d[7],
+                "home_away": d[8],
             }
             for d in away_data
         ]
@@ -428,6 +435,7 @@ def build_game_result(game, n_sims, use_splits=True):
                 "risp": d[5],
                 "vs_pitcher": d[6],
                 "day_night": d[7],
+                "home_away": d[8],
             }
             for d in home_data
         ]
@@ -566,6 +574,14 @@ def build_game_result(game, n_sims, use_splits=True):
         [ex.get("day_night", {}) for ex in home_display_extra] if home_display_extra else None
     )
 
+    # Extract home/away splits (away batters playing on the road, home batters at their park)
+    away_homeaway_stats = (
+        [ex.get("home_away", {}) for ex in away_display_extra] if away_display_extra else None
+    )
+    home_homeaway_stats = (
+        [ex.get("home_away", {}) for ex in home_display_extra] if home_display_extra else None
+    )
+
     # Run the simulation — all factors now wired in:
     #   - L/R pitcher splits (base stats)
     #   - Recent form blend (last 20 games)
@@ -597,6 +613,8 @@ def build_game_result(game, n_sims, use_splits=True):
         home_matchup_stats=home_matchup_stats if use_splits else None,
         away_daynight_stats=away_daynight_stats if use_splits else None,
         home_daynight_stats=home_daynight_stats if use_splits else None,
+        away_homeaway_stats=away_homeaway_stats if use_splits else None,
+        home_homeaway_stats=home_homeaway_stats if use_splits else None,
         away_batter_rest=away_batter_rest,
         home_batter_rest=home_batter_rest,
         away_savant=away_savant,
