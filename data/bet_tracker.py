@@ -87,6 +87,9 @@ def settle_bets(user_id=None, csv_path=None):
                 f"https://statsapi.mlb.com/api/v1.1/game/{game_pk}/feed/live", timeout=10
             ).json()
             state = live.get("gameData", {}).get("status", {}).get("abstractGameState", "")
+            print(
+                f"[settle_bets] game_pk={game_pk} state={state} bet_type={bet.get('bet_type')} bet_on={bet.get('bet_on')}"
+            )
             if state != "Final":
                 continue
 

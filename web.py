@@ -1895,7 +1895,7 @@ def parlay_builder():
     """Interactive parlay builder — pick legs from today's games."""
     from datetime import date as _date
 
-    today_str = __today_est().strftime("%A, %B %d %Y")
+    today_str = _today_est().strftime("%A, %B %d %Y")
 
     # Load today's schedule so the user can pick from real matchups
     try:
@@ -2017,7 +2017,7 @@ def api_live_scores():
     """Public JSON endpoint — live/final/scheduled scores."""
     from datetime import date as _date
 
-    game_date = request.args.get("date", __today_est().isoformat())
+    game_date = request.args.get("date", _today_est().isoformat())
     try:
         scores = get_live_scores(game_date)
     except Exception:
