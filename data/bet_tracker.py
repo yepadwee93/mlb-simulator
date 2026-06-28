@@ -76,9 +76,12 @@ def settle_bets(user_id=None, csv_path=None):
     pending = res.data or []
     settled = 0
 
+    print(f"[settle_bets] found {len(pending)} pending bets")
     for bet in pending:
         game_pk = bet.get("game_pk")
+        print(f"[settle_bets] checking game_pk={game_pk!r} bet_type={bet.get('bet_type')!r}")
         if not game_pk:
+            print("[settle_bets] skipping — no game_pk")
             continue
         try:
             import requests as _req
@@ -159,7 +162,8 @@ def settle_bets(user_id=None, csv_path=None):
             ).eq("id", bet["id"]).execute()
             settled += 1
 
-        except Exception:
+        except Exception as e:
+            print(f"[settle_bets] game_pk={game_pk} ERROR: {e}")
             continue
 
     return settled
