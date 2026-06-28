@@ -131,6 +131,7 @@
   {% endif %}
 
   <form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="form-group">
       <label>Username</label>
       <input type="text" name="username" autocomplete="username" autofocus required minlength="3">
@@ -208,6 +209,7 @@
 </div>
 </body>
 </html>
+
 
 
 
