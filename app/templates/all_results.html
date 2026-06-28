@@ -1665,8 +1665,12 @@ function toggleMode() {
 
 <!-- close the padding wrapper opened after scoreboard strip -->
 </div>
-</body>
+<script>
+function getCsrfToken(){return document.cookie.split(';').map(function(c){return c.trim();}).find(function(c){return c.startsWith('csrf_token=');})?.split('=')[1]||'';}
+function csrfFetch(url,opts){opts=opts||{};opts.headers=Object.assign({'X-CSRFToken':getCsrfToken()},opts.headers||{});return fetch(url,opts);}
+</script></body>
 </html>
+
 
 
 
