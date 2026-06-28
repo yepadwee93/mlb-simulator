@@ -35,10 +35,10 @@ OUTCOME_ORDER = [WALK, STRIKEOUT, SINGLE, DOUBLE, TRIPLE, HR, OUT]
 # League average benchmarks (2025 MLB season approximations)
 LEAGUE_AVG_ERA = 4.00
 LEAGUE_AVG_WHIP = 1.28
-LEAGUE_AVG_FIP = 4.00   # FIP constant ~3.10 bakes in; league FIP ≈ ERA by construction
+LEAGUE_AVG_FIP = 4.00  # FIP constant ~3.10 bakes in; league FIP ≈ ERA by construction
 LEAGUE_AVG_K_PCT = 22.5  # % of PA ending in strikeout
 LEAGUE_AVG_BB_PCT = 8.5  # % of PA ending in walk
-LEAGUE_AVG_HR9 = 1.30   # home runs per 9 innings
+LEAGUE_AVG_HR9 = 1.30  # home runs per 9 innings
 
 # ── Ballpark factors ─────────────────────────────────────────────
 #
@@ -343,8 +343,8 @@ def apply_pitcher_modifier(probs: list, pitcher_stats: dict) -> list:
 
     # ── Apply all adjustments ──────────────────────────────────────────────
     adjusted = list(probs)
-    adjusted[0] *= bb_scale   # walk — driven by BB%
-    adjusted[1] *= k_scale    # strikeout — driven by K%
+    adjusted[0] *= bb_scale  # walk — driven by BB%
+    adjusted[1] *= k_scale  # strikeout — driven by K%
     adjusted[2] *= hit_scale  # single
     adjusted[3] *= hit_scale  # double
     adjusted[4] *= hit_scale  # triple
@@ -409,9 +409,9 @@ def apply_rest_modifier(pitcher_stats: dict, rest_days: int) -> dict:
         "era": round(era * era_factor, 2),
         "fip": round(fip * era_factor, 2),
         "whip": round(whip * whip_factor, 2),
-        "k_pct": round(k_pct * (2.0 - era_factor), 1),   # K% drops on short rest
-        "bb_pct": round(bb_pct * whip_factor, 1),          # BB% rises
-        "hr9": round(hr9 * era_factor, 2),                  # HR rate rises
+        "k_pct": round(k_pct * (2.0 - era_factor), 1),  # K% drops on short rest
+        "bb_pct": round(bb_pct * whip_factor, 1),  # BB% rises
+        "hr9": round(hr9 * era_factor, 2),  # HR rate rises
     }
 
 
@@ -566,10 +566,10 @@ def build_fatigued_pitcher_stats(base_stats: dict, fatigue_factor: float) -> dic
         "era": round(era * fatigue_factor, 2),
         "fip": round(fip * fatigue_factor, 2),
         "whip": round(whip * (1 + fade * 0.75), 2),
-        "k_pct": round(k_pct * (1 - fade * 0.50), 1),   # K rate drops with fatigue
-        "bb_pct": round(bb_pct * (1 + fade * 0.80), 1), # walk rate rises
-        "hr9": round(hr9 * (1 + fade * 0.60), 2),        # more HRs allowed when tired
-        "gb_pct": gb_pct,                                 # groundball rate is stable
+        "k_pct": round(k_pct * (1 - fade * 0.50), 1),  # K rate drops with fatigue
+        "bb_pct": round(bb_pct * (1 + fade * 0.80), 1),  # walk rate rises
+        "hr9": round(hr9 * (1 + fade * 0.60), 2),  # more HRs allowed when tired
+        "gb_pct": gb_pct,  # groundball rate is stable
     }
 
 
@@ -638,7 +638,7 @@ def blend_probs(season_probs: list, recent_probs: list, recent_weight: float = 0
     Blend season-long probabilities with recent form probabilities.
 
     recent_weight=0.4 means:
-      40% of the prediction comes from last 20 games
+      40% of the prediction comes from recent games
       60% comes from the full season
 
     This way a player on a hot streak gets a meaningful boost,
@@ -649,6 +649,37 @@ def blend_probs(season_probs: list, recent_probs: list, recent_weight: float = 0
     blended = [season_weight * s + recent_weight * r for s, r in zip(season_probs, recent_probs)]
     total = sum(blended)
     return [p / total for p in blended]
+
+
+def adaptive_recent_weight(
+    season_probs: list, recent_probs: list, base_weight: float = 0.35
+) -> float:
+    """
+    Scale the recent-form blend weight based on how much the recent stats
+    actually deviate from the season average.
+
+    If a player is performing very close to their season norm recently,
+    there's little signal in the recent data — use a lower weight.
+    If they're on a big hot or cold streak (large deviation), trust the
+    recent data more because something real is happening.
+
+    Deviation is measured as the sum of absolute differences across all
+    outcome probabilities (hit rate, HR rate, K rate, etc.).
+
+    Examples:
+      - Player hitting near his season average recently → weight stays ~0.25
+      - Player 2-for-30 cold streak (K% way up, hit% way down) → weight → 0.45
+      - Player 18-for-40 hot streak → weight → 0.45
+
+    Caps: minimum 0.20 (always some recent signal), maximum 0.50
+    (season sample of 400+ PA always outweighs ~20-game window).
+    """
+    total_deviation = sum(abs(r - s) for r, s in zip(recent_probs, season_probs))
+    # total_deviation ranges roughly 0.0 (identical) to ~0.30+ (massive streak)
+    # Scale: each 0.05 of deviation adds ~0.05 to the weight
+    deviation_boost = min(total_deviation * 1.0, 0.15)
+    weight = base_weight + deviation_boost
+    return min(max(weight, 0.20), 0.50)
 
 
 def precompute_lineup(
@@ -678,15 +709,24 @@ def precompute_lineup(
     """
     result = []
     for i, stats in enumerate(lineup_stats):
-        # Start with season stats
-        probs = build_batter_probs(stats)
+        # Start with season stats — use pre-blended split probs if already computed
+        if stats.get("_split_blended") and stats.get("_blended_probs"):
+            probs = list(stats["_blended_probs"])
+        else:
+            probs = build_batter_probs(stats)
 
-        # Blend in recent form if available (last 20 games)
+        # Blend in recent form if available (last 20 games).
+        # Use adaptive weighting: bigger hot/cold streaks get more weight.
+        # Lower PA threshold to 10 — even a week of data is a signal.
         if recent_stats_list and i < len(recent_stats_list):
             recent = recent_stats_list[i]
-            if recent and recent.get("plateAppearances", 0) >= 20:
+            recent_pa = recent.get("plateAppearances", 0) if recent else 0
+            if recent and recent_pa >= 10:
                 recent_probs = build_batter_probs(recent)
-                probs = blend_probs(probs, recent_probs, recent_weight=0.4)
+                # Scale weight by sample size: 10 PA → 60% of full weight, 20+ PA → 100%
+                pa_scale = min(recent_pa / 20.0, 1.0)
+                weight = adaptive_recent_weight(probs, recent_probs, base_weight=0.35) * pa_scale
+                probs = blend_probs(probs, recent_probs, recent_weight=weight)
 
         # Blend in day/night split — some batters are dramatically better in day or night games.
         # Require 50+ PA in this game type to keep the sample meaningful.
