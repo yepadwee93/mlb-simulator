@@ -11,6 +11,15 @@ Then open:  http://127.0.0.1:5000
 from datetime import date
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+def _today_est():
+    """Return today's date in US/Eastern time (avoids UTC midnight drift on Vercel)."""
+    import datetime as _dt
+    try:
+        from zoneinfo import ZoneInfo
+        return _dt.datetime.now(ZoneInfo("America/New_York")).date()
+    except Exception:
+        return (_dt.datetime.utcnow() - _dt.timedelta(hours=5)).date()
+
 from dotenv import load_dotenv
 load_dotenv()   # loads ODDS_API_KEY from .env file
 
@@ -215,7 +224,7 @@ def build_game_result(game, n_sims, use_splits=True):
         try:
             from datetime import datetime as dt
             last_date = dt.strptime(last_date_str[:10], "%Y-%m-%d").date()
-            return (date.today() - last_date).days
+            return (_today_est() - last_date).days
         except Exception:
             return None
 
@@ -731,24 +740,24 @@ def logout():
 @app.route("/")
 def index():
     # Allow browsing any date via ?date=2026-06-28
-    selected = request.args.get("date", date.today().isoformat())
+    selected = request.args.get("date", _today_est().isoformat())
     try:
         from datetime import datetime
         selected_date = datetime.strptime(selected, "%Y-%m-%d").date()
     except ValueError:
-        selected_date = date.today()
+        selected_date = _today_est()
 
     from datetime import timedelta
     prev_date = (selected_date - timedelta(days=1)).isoformat()
     next_date = (selected_date + timedelta(days=1)).isoformat()
-    is_today  = (selected_date == date.today())
+    is_today  = (selected_date == _today_est())
 
     games = get_today_schedule(game_date=selected_date.isoformat())
     label = selected_date.strftime("%A, %B %d %Y")
 
     # Multi-day strip: today + next 6 days (fetched lightweight — just game count)
     from datetime import timedelta as _td
-    today = date.today()
+    today = _today_est()
     multi_day = []
     for offset in range(7):
         d = today + _td(days=offset)
@@ -857,7 +866,7 @@ def simulate(game_pk):
     try:
         log_prediction(
             game_pk       = game_pk,
-            game_date     = date.today().isoformat(),
+            game_date     = _today_est().isoformat(),
             away_team     = result["away_team"],
             home_team     = result["home_team"],
             away_win_pct  = result["away_win_pct"],
@@ -911,7 +920,7 @@ def simulate(game_pk):
             ou_snap = all_totals_snap.get(odds_key, {})
             log_odds(
                 game_pk          = game_pk,
-                game_date        = date.today().isoformat(),
+                game_date        = _today_est().isoformat(),
                 away_team        = result["away_team"],
                 home_team        = result["home_team"],
                 away_ml          = game_odds.get("away_avg_odds"),
@@ -1111,7 +1120,7 @@ def api_save_note(game_pk):
         save_game_note(
             user_id    = current_user.id,
             game_pk    = game_pk,
-            game_date  = data.get("game_date", date.today().isoformat()),
+            game_date  = data.get("game_date", _today_est().isoformat()),
             away_team  = data.get("away_team", ""),
             home_team  = data.get("home_team", ""),
             note       = note,
@@ -1181,11 +1190,11 @@ def simulate_all():
     """
     # Use date from query param (passed by index.html button) so UTC clock drift doesn't shift the date
     from datetime import datetime as _dt
-    _date_str = request.args.get("date", date.today().isoformat())
+    _date_str = request.args.get("date", _today_est().isoformat())
     try:
         _sim_date = _dt.strptime(_date_str, "%Y-%m-%d").date()
     except ValueError:
-        _sim_date = date.today()
+        _sim_date = _today_est()
 
     all_games = get_today_schedule(game_date=_sim_date.isoformat())
 
@@ -1323,7 +1332,7 @@ def simulate_all():
             predicted_total   = r.get("avg_away_runs", 0) + r.get("avg_home_runs", 0)
             log_prediction(
                 game_pk          = r["gamePk"],
-                game_date        = date.today().isoformat(),
+                game_date        = _today_est().isoformat(),
                 away_team        = r["away_team"],
                 home_team        = r["home_team"],
                 away_win_pct     = r["away_win_pct"],
@@ -1502,7 +1511,7 @@ def simulate_all():
         b["odds_str"]    = r_match.get("away_avg_odds"    if is_away else "home_avg_odds")
         b["edge"]        = r_match.get("away_edge"        if is_away else "home_edge")
 
-    today = date.today().strftime("%A, %B %d %Y")
+    today = _today_est().strftime("%A, %B %d %Y")
     return render_template(
         "all_results.html",
         results       = results,
@@ -1581,7 +1590,7 @@ def sgp_calc(game_pk):
 def parlay_builder():
     """Interactive parlay builder — pick legs from today's games."""
     from datetime import date as _date
-    today_str = _date.today().strftime("%A, %B %d %Y")
+    today_str = __today_est().strftime("%A, %B %d %Y")
 
     # Load today's schedule so the user can pick from real matchups
     try:
@@ -1629,7 +1638,7 @@ def my_picks():
         try:
             add_pick(
                 game_pk      = data.get("game_pk"),
-                game_date    = data.get("game_date", date.today().isoformat()),
+                game_date    = data.get("game_date", _today_est().isoformat()),
                 away_team    = data.get("away_team", ""),
                 home_team    = data.get("home_team", ""),
                 my_pick      = data.get("my_pick") or data.get("pick", ""),
@@ -1707,7 +1716,7 @@ def trigger_update():
 def api_live_scores():
     """Public JSON endpoint — live/final/scheduled scores."""
     from datetime import date as _date
-    game_date = request.args.get("date", _date.today().isoformat())
+    game_date = request.args.get("date", __today_est().isoformat())
     try:
         scores = get_live_scores(game_date)
     except Exception:
@@ -1774,7 +1783,7 @@ def bets_dashboard():
             "total_wagered": 0, "total_profit": 0, "roi": 0,
             "avg_clv": None, "by_type": {},
         }
-    stats["today"] = date.today().isoformat()
+    stats["today"] = _today_est().isoformat()
     stats["total_pl"] = stats.get("total_profit", 0)
     stats["profit_loss"] = stats.get("total_profit", 0)
     stats["win_rate"] = stats.get("win_pct", None)
