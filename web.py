@@ -1643,6 +1643,7 @@ def my_picks():
                 home_team    = data.get("home_team", ""),
                 my_pick      = data.get("my_pick") or data.get("pick", ""),
                 my_notes     = data.get("my_notes", ""),
+                bet_type     = data.get("bet_type", "moneyline"),
                 sim_away_pct = data.get("sim_away_pct"),
                 sim_home_pct = data.get("sim_home_pct"),
                 sim_away_runs= data.get("sim_away_runs"),
