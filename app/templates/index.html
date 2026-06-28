@@ -350,6 +350,11 @@ if (localStorage.getItem('email_nudge_dismissed') === '1') {
   {% if error %}
     <p class="error-msg">⚠ {{ error }}</p>
   {% endif %}
+  {% with messages = get_flashed_messages() %}
+    {% for msg in messages %}
+      <p class="error-msg">⚠ {{ msg }}</p>
+    {% endfor %}
+  {% endwith %}
 
   <!-- Odds API quota tracker -->
   {% if api_remaining is not none %}

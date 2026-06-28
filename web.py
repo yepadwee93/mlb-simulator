@@ -1186,12 +1186,9 @@ def simulate_all():
              and "game over" not in g["status"].lower()]
 
     if not games:
-        return render_template("index.html",
-                               games=all_games,
-                               date=date.today().strftime("%A, %B %d %Y"),
-                               is_today=True,
-                               api_remaining=get_requests_remaining(),
-                               error="No active or upcoming games to simulate right now.")
+        from flask import redirect, url_for, flash
+        flash("No active or upcoming games to simulate right now.")
+        return redirect(url_for("index"))
 
     # ── Step 1: Fetch all lineups in parallel ─────────────────────
     lineups = {}
@@ -1307,12 +1304,9 @@ def simulate_all():
     results.sort(key=lambda r: r["gamePk"])
 
     if not results:
-        return render_template("index.html",
-                               games=all_games,
-                               date=date.today().strftime("%A, %B %d %Y"),
-                               is_today=True,
-                               api_remaining=get_requests_remaining(),
-                               error="Lineups not posted yet for remaining games — check back closer to game time.")
+        from flask import redirect, url_for, flash
+        flash("Lineups not posted yet for remaining games — check back closer to game time.")
+        return redirect(url_for("index"))
 
     # ── Log predictions for accuracy tracking ─────────────────
     try:
