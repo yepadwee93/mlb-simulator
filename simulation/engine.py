@@ -1719,6 +1719,13 @@ def simulate_game(
             elif run_diff <= -5:
                 # Home team has big lead → away batters face home mop-up arm
                 away_cur = _mopup(away_cur)
+            elif abs(run_diff) <= 2:
+                # High-leverage: close game in late innings → manager deploys
+                # best available arm. We model this as the inverse of mop-up:
+                # blend probs AWAY from league average (pitcher is more dominant).
+                # Factor -0.10 means 10% better than normal bullpen quality.
+                away_cur = _mopup(away_cur, factor=-0.10)
+                home_cur = _mopup(home_cur, factor=-0.10)
 
         # Away team bats (facing home pitching staff)
         # Apply TTO + pitch-count fatigue while home starter is still in.
@@ -1857,6 +1864,8 @@ def run_simulation(
     series_game_number: int = 1,  # game number in current series (1=opener, 2/3/4=familiarity boost)
     away_catcher_cs: float = 0.28,  # opposing (home) catcher caught-stealing rate
     home_catcher_cs: float = 0.28,  # opposing (away) catcher caught-stealing rate
+    away_bp_depth: dict = None,  # bullpen depth score for away team
+    home_bp_depth: dict = None,  # bullpen depth score for home team
     n: int = 100_000,
 ) -> dict:
     """
@@ -2035,6 +2044,30 @@ def run_simulation(
     home_bp_pitcher_raw = home_bullpen if home_bullpen else LEAGUE_AVG_PITCHER
     away_bp_pitcher = _apply_bp_fatigue(away_bp_pitcher_raw, away_bp_fatigue)
     home_bp_pitcher = _apply_bp_fatigue(home_bp_pitcher_raw, home_bp_fatigue)
+
+    # ── Bullpen depth adjustment ───────────────────────────────────────────
+    # Teams with more elite arms (ERA < 3.00) can better navigate high-leverage
+    # situations. We adjust the bullpen ERA used for the 8th-9th innings based
+    # on how many elite arms the team has available.
+    #
+    # elite_arms: 0 → no adjustment, 1 → -0.15 ERA, 2 → -0.28 ERA, 3+ → -0.38 ERA
+    # This stacks on top of the closer/setup tier adjustment from bullpen tiers.
+    def _apply_depth_adjustment(bp_stats, depth_dict):
+        if not depth_dict or not bp_stats:
+            return bp_stats
+        elite = depth_dict.get("elite_arms", 0)
+        if elite == 0:
+            return bp_stats
+        era_reduction = min(0.38, elite * 0.15 - (elite - 1) * 0.02)
+        result = dict(bp_stats)
+        try:
+            result["era"] = str(round(max(1.50, float(result.get("era", 4.20)) - era_reduction), 2))
+        except (ValueError, TypeError):
+            pass
+        return result
+
+    away_bp_pitcher = _apply_depth_adjustment(away_bp_pitcher, away_bp_depth)
+    home_bp_pitcher = _apply_depth_adjustment(home_bp_pitcher, home_bp_depth)
 
     # ── Bullpen quality tiers ──────────────────────────────────────────────
     # A team's bullpen ERA is the average across all relievers. But in reality:
