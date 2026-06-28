@@ -2407,6 +2407,9 @@ def predict_batter_props(
     weather: dict = None,
     venue: str = None,
     batting_slots: int = 9,
+    recent_stats_list: list = None,
+    umpire_name: str = None,
+    opp_catcher_cs: float = None,
 ) -> list:
     """
     Project per-batter prop lines (hits, HR, RBI, total bases) for one team.
@@ -2416,46 +2419,85 @@ def predict_batter_props(
 
     Returns a list of dicts (one per batter slot, in batting order):
       {
-        "slot":        int,    # 1-9
-        "avg_hits":    float,  # expected hits per game
-        "avg_hr":      float,  # expected HR per game
-        "avg_rbi":     float,  # expected RBI per game (approximated)
-        "avg_tb":      float,  # expected total bases per game
-        "hit_pct":     float,  # P(at least 1 hit)
-        "hr_pct":      float,  # P(at least 1 HR)
+        "slot":          int,
+        "avg_hits":      float,  # expected hits per game
+        "avg_hr":        float,  # expected HR per game
+        "avg_rbi":       float,  # expected RBI per game
+        "avg_tb":        float,  # expected total bases per game
+        "avg_walks":     float,  # expected walks per game
+        "hit_pct":       float,  # P(at least 1 hit)
+        "hr_pct":        float,  # P(at least 1 HR)
         "multi_hit_pct": float,  # P(2+ hits)
+        "tb_pct_2plus":  float,  # P(2+ total bases)
       }
     """
-    # Expected plate appearances per slot (leadoff sees more PAs)
-    # Rough MLB average: team gets ~38 PAs/game, distributed across 9 slots
+    import math
+
+    # Expected PAs per slot — leadoff gets most, 9-hole gets fewest.
+    # TTO-adjusted: early order batters face the starter more (worse ERA);
+    # later batters may catch the bullpen. We apply a TTO boost to slots 1-3
+    # since they're most likely to face the starter a 2nd+ time.
     PA_BY_SLOT = [4.8, 4.4, 4.3, 4.2, 4.1, 4.0, 3.9, 3.8, 3.6]
+    # Slots 1-3 will see TTO 2 by inning 5-6 — apply small PA-weighted boost
+    TTO_PA_BOOST = [0.06, 0.05, 0.04, 0.02, 0.01, 0.0, 0.0, 0.0, 0.0]
 
     park = BALLPARK_FACTORS.get(venue, {}) if venue else {}
     hr_park = park.get("hr", 1.0)
     hit_park = park.get("hit", 1.0)
 
+    # RBI model using RE24-derived runner-on-base rates by slot.
+    # Slots behind good OBP hitters see more runners on base.
+    # Approximated from MLB lineup simulation data:
+    #   Slot 1 (leadoff):  fewest runners on (hits leadoff), ~20% ROB
+    #   Slot 3-5 (heart):  most runners on, ~35-38% ROB
+    #   Slot 8-9:          fewer runners, ~25% ROB
+    ROB_BY_SLOT = [0.20, 0.28, 0.35, 0.38, 0.37, 0.33, 0.30, 0.27, 0.24]
+
     results = []
     for i, stats in enumerate(lineup_stats[:9]):
         slot = i + 1
-        pa_expected = PA_BY_SLOT[i] if i < len(PA_BY_SLOT) else 3.8
+        pa_base = PA_BY_SLOT[i] if i < len(PA_BY_SLOT) else 3.8
+        tto_boost = TTO_PA_BOOST[i] if i < len(TTO_PA_BOOST) else 0.0
+        pa_expected = pa_base + tto_boost
+        rob_rate = ROB_BY_SLOT[i] if i < len(ROB_BY_SLOT) else 0.30
 
-        # Build base outcome probs from batter stats
+        # Build base outcome probs with same pipeline as the sim engine
         probs = build_batter_probs(stats)
+
+        # Blend recent form if available
+        if recent_stats_list and i < len(recent_stats_list):
+            recent = recent_stats_list[i]
+            if recent and recent.get("plateAppearances", 0) >= 10:
+                recent_probs = build_batter_probs(recent)
+                pa_scale = min(recent.get("plateAppearances", 0) / 20.0, 1.0)
+                weight = adaptive_recent_weight(probs, recent_probs) * pa_scale
+                probs = blend_probs(probs, recent_probs, recent_weight=weight)
 
         # Apply pitcher modifier
         probs = apply_pitcher_modifier(probs, pitcher_stats)
+
+        # Umpire zone shift
+        if umpire_name:
+            probs = apply_umpire_modifier(probs, umpire_name)
+
+        # Catcher framing
+        if opp_catcher_cs is not None:
+            probs = apply_catcher_framing(probs, opp_catcher_cs)
 
         # Apply weather
         if weather:
             probs = apply_weather_modifier(probs, weather)
 
-        # Apply park factor to HR and hits
+        # Apply park factor
         adj = list(probs)
-        adj[5] *= hr_park  # HR
-        adj[2] *= hit_park  # single
-        adj[3] *= hit_park  # double
+        adj[5] *= hr_park
+        adj[2] *= hit_park
+        adj[3] *= hit_park
         total = sum(adj)
         probs = [p / total for p in adj]
+
+        # wOBA clamp — keep within realistic range
+        probs = clamp_woba(probs)
 
         # OUTCOME_ORDER = [WALK, K, 1B, 2B, 3B, HR, OUT]
         p_walk = probs[0]
@@ -2469,31 +2511,53 @@ def predict_batter_props(
         exp_hits_pa = p_hit
         exp_hr_pa = p_hr
         exp_tb_pa = p_1b * 1 + p_2b * 2 + p_3b * 3 + p_hr * 4
+        exp_walk_pa = p_walk
 
         # Scale to expected PAs
         avg_hits = exp_hits_pa * pa_expected
         avg_hr = exp_hr_pa * pa_expected
         avg_tb = exp_tb_pa * pa_expected
+        avg_walks = exp_walk_pa * pa_expected
 
-        # RBI approximation: ~30% of hits drive in a run (runners on base ~30% of time)
-        # HRs always score at least 1 run
-        avg_rbi = avg_hr * 1.3 + (avg_hits - avg_hr) * 0.28
+        # RBI model using slot-specific runner-on-base rate.
+        # Expected RBI = HR * (1 + runners_on_at_HR) + non-HR hits * P(runner scores)
+        # runners_on_at_HR ≈ rob_rate * 2.3 (avg runners on per base-occupied)
+        # non-HR RBI: hit with runner on → runner scores ~62% on single, ~87% on double
+        avg_runners_on = rob_rate * 2.1  # avg runners on base (weighted by occupancy)
+        rbi_from_hr = avg_hr * (1.0 + avg_runners_on * 0.90)  # 90% of runners score on HR
+        rbi_from_1b = (p_1b * pa_expected) * rob_rate * 0.35   # single scores ~35% of ROB
+        rbi_from_2b = (p_2b * pa_expected) * rob_rate * 0.65   # double scores ~65% of ROB
+        rbi_from_3b = (p_3b * pa_expected) * rob_rate * 0.90   # triple scores ~90% of ROB
+        avg_rbi = rbi_from_hr + rbi_from_1b + rbi_from_2b + rbi_from_3b
 
-        # P(at least 1 hit) = 1 - P(no hits in all PAs)
-        p_no_hit_pa = 1 - p_hit
-        hit_pct = round((1 - p_no_hit_pa**pa_expected) * 100, 1)
+        # P(at least 1 hit)
+        hit_pct = round((1 - (1 - p_hit) ** pa_expected) * 100, 1)
 
         # P(at least 1 HR)
-        p_no_hr_pa = 1 - p_hr
-        hr_pct = round((1 - p_no_hr_pa**pa_expected) * 100, 1)
+        hr_pct = round((1 - (1 - p_hr) ** pa_expected) * 100, 1)
 
         # P(2+ hits) using Poisson approximation
-        import math
-
         lam = avg_hits
         p_0 = math.exp(-lam)
         p_1 = lam * math.exp(-lam)
-        multi_hit_pct = round((1 - p_0 - p_1) * 100, 1)
+        multi_hit_pct = round(max(0.0, 1 - p_0 - p_1) * 100, 1)
+
+        # P(2+ total bases) — useful for TB props
+        lam_tb = avg_tb
+        p_tb0 = math.exp(-lam_tb)
+        p_tb1 = lam_tb * math.exp(-lam_tb)
+        tb_pct_2plus = round(max(0.0, 1 - p_tb0 - p_tb1) * 100, 1)
+
+        # Runs scored model — how often does this batter cross home plate?
+        # A batter scores by: getting on base AND being driven home by someone else.
+        # Simplified: P(score | reach base) × P(reach base per PA) × PAs
+        # P(reach base) = p_hit + p_walk
+        # P(score | reach base) depends on slot — leadoff has most subsequent batters
+        # and more innings, cleanup has fewer but more dangerous lineup behind them.
+        SCORE_RATE_BY_SLOT = [0.42, 0.40, 0.38, 0.36, 0.34, 0.30, 0.27, 0.24, 0.22]
+        score_rate = SCORE_RATE_BY_SLOT[i] if i < len(SCORE_RATE_BY_SLOT) else 0.30
+        p_reach = p_hit + p_walk
+        avg_runs = p_reach * pa_expected * score_rate
 
         results.append(
             {
@@ -2502,9 +2566,12 @@ def predict_batter_props(
                 "avg_hr": round(avg_hr, 3),
                 "avg_rbi": round(avg_rbi, 2),
                 "avg_tb": round(avg_tb, 2),
+                "avg_walks": round(avg_walks, 2),
+                "avg_runs": round(avg_runs, 2),
                 "hit_pct": hit_pct,
                 "hr_pct": hr_pct,
                 "multi_hit_pct": multi_hit_pct,
+                "tb_pct_2plus": tb_pct_2plus,
             }
         )
 
