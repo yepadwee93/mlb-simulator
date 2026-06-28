@@ -35,6 +35,10 @@ OUTCOME_ORDER = [WALK, STRIKEOUT, SINGLE, DOUBLE, TRIPLE, HR, OUT]
 # League average benchmarks (2025 MLB season approximations)
 LEAGUE_AVG_ERA = 4.00
 LEAGUE_AVG_WHIP = 1.28
+LEAGUE_AVG_FIP = 4.00   # FIP constant ~3.10 bakes in; league FIP ≈ ERA by construction
+LEAGUE_AVG_K_PCT = 22.5  # % of PA ending in strikeout
+LEAGUE_AVG_BB_PCT = 8.5  # % of PA ending in walk
+LEAGUE_AVG_HR9 = 1.30   # home runs per 9 innings
 
 # ── Ballpark factors ─────────────────────────────────────────────
 #
@@ -259,35 +263,92 @@ def apply_pitcher_modifier(probs: list, pitcher_stats: dict) -> list:
     """
     Adjust batter probabilities for the quality of the pitcher they're facing.
 
-    Logic:
-    - A pitcher with ERA below the league average (4.00) is better → fewer hits
-    - A pitcher with ERA above average → more hits
-    - We scale hit probabilities up/down, then re-normalize to 1.0
+    Upgraded to use FIP-based quality signal plus per-pitch-type rates:
 
-    We also adjust walk probability based on WHIP.
+    OLD approach: ERA/WHIP ratio scales all hits uniformly.
+    NEW approach:
+      1. FIP (Fielding Independent Pitching) replaces ERA as the quality baseline.
+         FIP strips out luck and defense — it only counts strikeouts, walks, and
+         home runs allowed. A pitcher with a 4.50 ERA but 3.20 FIP is being
+         unlucky; his true skill is closer to the FIP number.
+         We blend FIP 70% / ERA 30% so we don't completely ignore recent results.
+
+      2. K% adjusts strikeout probability directly from the pitcher's actual
+         strikeout rate, not inferred from ERA. A high-K pitcher (DeGrom, Cole)
+         gets more Ks simulated regardless of his ERA.
+
+      3. BB% adjusts walk probability directly from the pitcher's actual walk rate.
+
+      4. HR/9 adjusts home run probability. A fly-ball pitcher with high HR/9
+         gives up more HRs even if his ERA looks decent. A groundball pitcher
+         with low HR/9 suppresses HRs even on hard contact.
+
+      5. GB% (groundball %) further modulates HR: groundball pitchers convert
+         would-be HRs/doubles into groundouts at a higher rate.
+
+    OUTCOME_ORDER = [WALK, K, 1B, 2B, 3B, HR, OUT]
+                       0   1   2   3   4   5   6
     """
-    # Get pitcher ERA and WHIP (they come from the API as strings like "3.31")
+    # ── 1. FIP-blended quality signal ──────────────────────────────────────
     try:
-        era = float(pitcher_stats.get("era", LEAGUE_AVG_ERA))
+        era = float(pitcher_stats.get("era") or LEAGUE_AVG_ERA)
     except (ValueError, TypeError):
         era = LEAGUE_AVG_ERA
 
     try:
-        whip = float(pitcher_stats.get("whip", LEAGUE_AVG_WHIP))
+        fip = float(pitcher_stats.get("fip") or era)  # fall back to ERA if no FIP
+    except (ValueError, TypeError):
+        fip = era
+
+    try:
+        whip = float(pitcher_stats.get("whip") or LEAGUE_AVG_WHIP)
     except (ValueError, TypeError):
         whip = LEAGUE_AVG_WHIP
 
-    # Hit scale: ERA 2.00 → hits × 0.50, ERA 4.00 → hits × 1.00, ERA 6.00 → hits × 1.50
-    hit_scale = min(max(era / LEAGUE_AVG_ERA, 0.50), 1.50)
-    walk_scale = min(max(whip / LEAGUE_AVG_WHIP, 0.50), 1.50)
+    # Blend: 70% FIP, 30% ERA — trust skill over luck, but don't ignore results
+    blended_era = 0.70 * fip + 0.30 * era
 
-    # Indices in OUTCOME_ORDER: WALK=0, K=1, 1B=2, 2B=3, 3B=4, HR=5, OUT=6
+    # Overall hit scale: blended ERA 2.00 → 0.55 (fewer hits), 4.00 → 1.00, 6.00 → 1.45
+    hit_scale = min(max(blended_era / LEAGUE_AVG_FIP, 0.55), 1.45)
+
+    # ── 2. K% — adjust strikeout probability directly ──────────────────────
+    try:
+        k_pct = float(pitcher_stats.get("k_pct") or LEAGUE_AVG_K_PCT)
+    except (ValueError, TypeError):
+        k_pct = LEAGUE_AVG_K_PCT
+    # Scale relative to league average; cap at ±50%
+    k_scale = min(max(k_pct / LEAGUE_AVG_K_PCT, 0.50), 1.50)
+
+    # ── 3. BB% — adjust walk probability directly ──────────────────────────
+    try:
+        bb_pct = float(pitcher_stats.get("bb_pct") or LEAGUE_AVG_BB_PCT)
+    except (ValueError, TypeError):
+        bb_pct = LEAGUE_AVG_BB_PCT
+    bb_scale = min(max(bb_pct / LEAGUE_AVG_BB_PCT, 0.50), 1.75)
+
+    # ── 4. HR/9 — adjust home run probability ──────────────────────────────
+    try:
+        hr9 = float(pitcher_stats.get("hr9") or LEAGUE_AVG_HR9)
+    except (ValueError, TypeError):
+        hr9 = LEAGUE_AVG_HR9
+    hr_scale = min(max(hr9 / LEAGUE_AVG_HR9, 0.40), 1.80)
+
+    # ── 5. GB% — groundball pitchers suppress HRs further ─────────────────
+    try:
+        gb_pct = float(pitcher_stats.get("gb_pct") or 44.0)
+    except (ValueError, TypeError):
+        gb_pct = 44.0
+    # High GB% (52%+) = fewer HRs; Low GB% (35%-) = more HRs
+    gb_hr_modifier = min(max(1.0 - (gb_pct - 44.0) * 0.008, 0.75), 1.25)
+
+    # ── Apply all adjustments ──────────────────────────────────────────────
     adjusted = list(probs)
-    adjusted[0] *= walk_scale  # walk
+    adjusted[0] *= bb_scale   # walk — driven by BB%
+    adjusted[1] *= k_scale    # strikeout — driven by K%
     adjusted[2] *= hit_scale  # single
     adjusted[3] *= hit_scale  # double
     adjusted[4] *= hit_scale  # triple
-    adjusted[5] *= hit_scale  # home run
+    adjusted[5] *= hit_scale * hr_scale * gb_hr_modifier  # HR — three-factor adjustment
 
     # Normalize so probabilities still sum to 1.0
     total = sum(adjusted)
@@ -329,19 +390,28 @@ def apply_rest_modifier(pitcher_stats: dict, rest_days: int) -> dict:
         era_factor = 1.10  # Extended break — possible injury return / rustiness
         whip_factor = 1.06
 
-    try:
-        era = float(pitcher_stats.get("era", LEAGUE_AVG_ERA))
-    except (ValueError, TypeError):
-        era = LEAGUE_AVG_ERA
-    try:
-        whip = float(pitcher_stats.get("whip", LEAGUE_AVG_WHIP))
-    except (ValueError, TypeError):
-        whip = LEAGUE_AVG_WHIP
+    def _f(key, default):
+        try:
+            return float(pitcher_stats.get(key) or default)
+        except (ValueError, TypeError):
+            return default
 
+    era = _f("era", LEAGUE_AVG_ERA)
+    fip = _f("fip", era)
+    whip = _f("whip", LEAGUE_AVG_WHIP)
+    k_pct = _f("k_pct", LEAGUE_AVG_K_PCT)
+    bb_pct = _f("bb_pct", LEAGUE_AVG_BB_PCT)
+    hr9 = _f("hr9", LEAGUE_AVG_HR9)
+
+    # Short rest / rust affects all quality signals proportionally
     return {
-        **pitcher_stats,  # keep wins, losses, etc.
-        "era": str(round(era * era_factor, 2)),
-        "whip": str(round(whip * whip_factor, 2)),
+        **pitcher_stats,
+        "era": round(era * era_factor, 2),
+        "fip": round(fip * era_factor, 2),
+        "whip": round(whip * whip_factor, 2),
+        "k_pct": round(k_pct * (2.0 - era_factor), 1),   # K% drops on short rest
+        "bb_pct": round(bb_pct * whip_factor, 1),          # BB% rises
+        "hr9": round(hr9 * era_factor, 2),                  # HR rate rises
     }
 
 
@@ -460,28 +530,46 @@ def build_fatigue_curve(pitcher_game_log: list) -> dict:
 
 def build_fatigued_pitcher_stats(base_stats: dict, fatigue_factor: float) -> dict:
     """
-    Scale a pitcher's ERA and WHIP up by the fatigue factor.
+    Scale a pitcher's stats by the fatigue factor as innings accumulate.
 
-    fatigue_factor = 1.0  → no change (fresh pitcher, innings 1-2)
-    fatigue_factor = 1.12 → ERA and WHIP 12% worse (innings 3-4)
-    fatigue_factor = 1.28 → 28% worse (inning 5 for a struggling pitcher)
+    fatigue_factor = 1.0  → no change (innings 1-2, pitcher is fresh)
+    fatigue_factor = 1.12 → 12% worse (innings 3-4)
+    fatigue_factor = 1.28 → 28% worse (inning 5+ for a struggling pitcher)
 
-    We scale WHIP slightly less aggressively than ERA because walks/hits
-    don't degrade as quickly as run-prevention in late innings.
+    Degradation rates by stat (research-backed: K rate drops most as pitch
+    count rises; walk rate and HR rate rise; hit rate rises modestly):
+      ERA/FIP: full fatigue factor (run prevention degrades fastest)
+      WHIP:    75% of factor (walks/hits degrade somewhat slower)
+      K%:      K rate falls as pitch count rises — pitchers lose velo/movement
+      BB%:     walk rate rises as command fades with fatigue
+      HR/9:    pitchers leave more pitches up in zone when tired
+      GB%:     groundball rate stays fairly stable (mechanics don't change much)
     """
-    try:
-        era = float(base_stats.get("era", LEAGUE_AVG_ERA))
-    except (ValueError, TypeError):
-        era = LEAGUE_AVG_ERA
-    try:
-        whip = float(base_stats.get("whip", LEAGUE_AVG_WHIP))
-    except (ValueError, TypeError):
-        whip = LEAGUE_AVG_WHIP
+    fade = fatigue_factor - 1.0  # how much worse, as a fraction (e.g. 0.12 for 12%)
+
+    def _f(key, default):
+        try:
+            return float(base_stats.get(key) or default)
+        except (ValueError, TypeError):
+            return default
+
+    era = _f("era", LEAGUE_AVG_ERA)
+    fip = _f("fip", era)
+    whip = _f("whip", LEAGUE_AVG_WHIP)
+    k_pct = _f("k_pct", LEAGUE_AVG_K_PCT)
+    bb_pct = _f("bb_pct", LEAGUE_AVG_BB_PCT)
+    hr9 = _f("hr9", LEAGUE_AVG_HR9)
+    gb_pct = _f("gb_pct", 44.0)
 
     return {
-        "era": str(round(era * fatigue_factor, 2)),
-        # WHIP degrades at ~75% the rate of ERA
-        "whip": str(round(whip * (1 + (fatigue_factor - 1) * 0.75), 2)),
+        **base_stats,
+        "era": round(era * fatigue_factor, 2),
+        "fip": round(fip * fatigue_factor, 2),
+        "whip": round(whip * (1 + fade * 0.75), 2),
+        "k_pct": round(k_pct * (1 - fade * 0.50), 1),   # K rate drops with fatigue
+        "bb_pct": round(bb_pct * (1 + fade * 0.80), 1), # walk rate rises
+        "hr9": round(hr9 * (1 + fade * 0.60), 2),        # more HRs allowed when tired
+        "gb_pct": gb_pct,                                 # groundball rate is stable
     }
 
 
