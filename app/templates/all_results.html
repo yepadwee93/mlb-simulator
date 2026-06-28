@@ -1061,8 +1061,10 @@
 
       <!-- Run line + O/U quick summary -->
       <div class="market-row" style="padding:6px 0 4px;border-top:1px solid #2a2d3e;margin-top:6px;">
-        {%- set away_margin = r.away_avg_runs - r.home_avg_runs %}
-        {%- set proj_total  = r.away_avg_runs + r.home_avg_runs %}
+        {%- set away_avg = (r.away_avg_runs or r.avg_away_runs or 0)|float %}
+        {%- set home_avg = (r.home_avg_runs or r.avg_home_runs or 0)|float %}
+        {%- set away_margin = away_avg - home_avg %}
+        {%- set proj_total  = away_avg + home_avg %}
 
         <!-- Run line pick -->
         <div>
@@ -1089,9 +1091,7 @@
             {%- endif %}
           {%- else %}
             <div class="market-val">
-              {%- if away_margin > 1.5 %}{{ r.away_team }} -1.5
-              {%- elif -away_margin > 1.5 %}{{ r.home_team }} -1.5
-              {%- else %}Too close — skip RL{%- endif %}
+              {%- if away_margin >= 0 %}{{ r.away_team }}{%- else %}{{ r.home_team }}{%- endif %} -1.5
               <span style="color:#9aa0b8;font-size:.65rem;">(proj {{ "%.1f"|format(away_margin|abs) }} run margin)</span>
             </div>
           {%- endif %}

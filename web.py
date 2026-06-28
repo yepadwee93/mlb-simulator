@@ -1189,6 +1189,7 @@ def simulate_all():
         return render_template("index.html",
                                games=all_games,
                                date=date.today().strftime("%A, %B %d %Y"),
+                               is_today=True,
                                error="No active or upcoming games to simulate right now.")
 
     # ── Step 1: Fetch all lineups in parallel ─────────────────────
@@ -1303,6 +1304,13 @@ def simulate_all():
         results.append(result)
 
     results.sort(key=lambda r: r["gamePk"])
+
+    if not results:
+        return render_template("index.html",
+                               games=all_games,
+                               date=date.today().strftime("%A, %B %d %Y"),
+                               is_today=True,
+                               error="Lineups not posted yet for remaining games — check back closer to game time.")
 
     # ── Log predictions for accuracy tracking ─────────────────
     try:
