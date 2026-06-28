@@ -342,14 +342,10 @@ if (localStorage.getItem('email_nudge_dismissed') === '1') {
     {% endif %}
   </div>
 
-  <!-- Simulate all (only makes sense on today or past dates with real lineups) -->
-  {% if is_today %}
-    <a class="simulate-all-btn" href="/simulate-all">
-      ⚡ Simulate All Games + Best Parlay
-    </a>
-  {% else %}
-    <span class="simulate-all-btn disabled">⚡ Simulate All (today only)</span>
-  {% endif %}
+  <!-- Simulate all -->
+  <a class="simulate-all-btn" href="/simulate-all">
+    ⚡ Simulate All Games + Best Parlay
+  </a>
 
   {% if error %}
     <p class="error-msg">⚠ {{ error }}</p>
