@@ -176,15 +176,15 @@ LEAGUE_AVG_PROBS = [0.082, 0.224, 0.148, 0.048, 0.004, 0.033, 0.461]
 # wOBA linear weights (2024 MLB run values per outcome, per Tango/FanGraphs)
 # These reflect how many runs each outcome is worth on average.
 # OUTCOME_ORDER = [WALK,  K,     1B,    2B,    3B,    HR,    OUT]
-WOBA_WEIGHTS =   [0.690, 0.000, 0.888, 1.271, 1.616, 2.101, 0.000]
+WOBA_WEIGHTS = [0.690, 0.000, 0.888, 1.271, 1.616, 2.101, 0.000]
 
 # League-average wOBA (2024 MLB)
 LEAGUE_AVG_WOBA = 0.315
 
 # Realistic wOBA bounds: below/above these → compounding factors have
 # pushed probs to an implausible extreme; clamp back toward league avg.
-WOBA_MIN = 0.200   # ~replacement level hitter
-WOBA_MAX = 0.450   # ~peak Barry Bonds / outlier season
+WOBA_MIN = 0.200  # ~replacement level hitter
+WOBA_MAX = 0.450  # ~peak Barry Bonds / outlier season
 
 
 def compute_implied_woba(probs: list) -> float:
@@ -1336,8 +1336,8 @@ def simulate_game(
     home_precomp_late2: list = None,
     innings: int = 9,
     bullpen_start: int = 5,  # 0-indexed: inning 6 in human terms
-    closer_start: int = 7,   # 0-indexed: inning 8 in human terms
-    mid_start: int = 2,      # 0-indexed: inning 3 in human terms
+    closer_start: int = 7,  # 0-indexed: inning 8 in human terms
+    mid_start: int = 2,  # 0-indexed: inning 3 in human terms
     resolve_ties: bool = True,  # False = return tied score as-is (for F3/F5/F7 push calc)
 ) -> tuple:
     """
@@ -1425,7 +1425,7 @@ def simulate_game(
             if inning >= closer_start and away_precomp_late2:
                 away_cur = away_precomp_late2  # innings 8-9: closer/setup tier
             elif away_precomp_late:
-                away_cur = away_precomp_late   # innings 6-7: middle relievers
+                away_cur = away_precomp_late  # innings 6-7: middle relievers
             else:
                 away_cur = away_precomp_early
         elif inning >= mid_start and away_precomp_mid:
@@ -1438,7 +1438,7 @@ def simulate_game(
             if inning >= closer_start and home_precomp_late2:
                 home_cur = home_precomp_late2  # innings 8-9: closer/setup tier
             elif home_precomp_late:
-                home_cur = home_precomp_late   # innings 6-7: middle relievers
+                home_cur = home_precomp_late  # innings 6-7: middle relievers
             else:
                 home_cur = home_precomp_early
         elif inning >= mid_start and home_precomp_mid:
@@ -1467,13 +1467,11 @@ def simulate_game(
                 return cur
             # Build league-avg cumulative weights once
             from itertools import accumulate as _acc
+
             lg_cum = list(_acc(LEAGUE_AVG_PROBS))
             result = []
             for batter_cum in cur:
-                blended = [
-                    c * (1 - factor) + lg * factor
-                    for c, lg in zip(batter_cum, lg_cum)
-                ]
+                blended = [c * (1 - factor) + lg * factor for c, lg in zip(batter_cum, lg_cum)]
                 result.append(blended)
             return result
 
@@ -1740,13 +1738,13 @@ def run_simulation(
             pass
         return result
 
-    away_bp_early = _tier_bullpen(away_bp_pitcher, +0.40)   # middle relievers
-    away_bp_late  = _tier_bullpen(away_bp_pitcher, -0.35)   # closer/setup
+    away_bp_early = _tier_bullpen(away_bp_pitcher, +0.40)  # middle relievers
+    away_bp_late = _tier_bullpen(away_bp_pitcher, -0.35)  # closer/setup
     home_bp_early = _tier_bullpen(home_bp_pitcher, +0.40)
-    home_bp_late  = _tier_bullpen(home_bp_pitcher, -0.35)
+    home_bp_late = _tier_bullpen(home_bp_pitcher, -0.35)
 
     away_precomp_late = None
-    away_precomp_late2 = None   # innings 8-9: closer/setup tier
+    away_precomp_late2 = None  # innings 8-9: closer/setup tier
     home_precomp_late = None
     home_precomp_late2 = None
 
