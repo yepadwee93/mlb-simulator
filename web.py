@@ -817,7 +817,8 @@ def index():
                            multi_day=multi_day,
                            game_notes=get_game_notes(current_user.id) if current_user.is_authenticated else {},
                            api_remaining=get_requests_remaining(),
-                           show_email_nudge=show_email_nudge)
+                           show_email_nudge=show_email_nudge,
+                           error=request.args.get("error"))
 
 
 @app.route("/simulate/<int:game_pk>")
@@ -1178,7 +1179,15 @@ def simulate_all():
     This way we make the minimum number of API calls and run them
     all at the same time, cutting total time from 3+ minutes to ~20-30s.
     """
-    all_games = get_today_schedule()
+    # Use date from query param (passed by index.html button) so UTC clock drift doesn't shift the date
+    from datetime import datetime as _dt
+    _date_str = request.args.get("date", date.today().isoformat())
+    try:
+        _sim_date = _dt.strptime(_date_str, "%Y-%m-%d").date()
+    except ValueError:
+        _sim_date = date.today()
+
+    all_games = get_today_schedule(game_date=_sim_date.isoformat())
 
     # Skip finished games
     games = [g for g in all_games
@@ -1186,9 +1195,8 @@ def simulate_all():
              and "game over" not in g["status"].lower()]
 
     if not games:
-        from flask import redirect, url_for, flash
-        flash("No active or upcoming games to simulate right now.")
-        return redirect(url_for("index"))
+        from flask import redirect, url_for
+        return redirect(url_for("index", date=_sim_date.isoformat(), error="No active or upcoming games to simulate right now."))
 
     # ── Step 1: Fetch all lineups in parallel ─────────────────────
     lineups = {}
@@ -1304,9 +1312,8 @@ def simulate_all():
     results.sort(key=lambda r: r["gamePk"])
 
     if not results:
-        from flask import redirect, url_for, flash
-        flash("Lineups not posted yet for remaining games — check back closer to game time.")
-        return redirect(url_for("index"))
+        from flask import redirect, url_for
+        return redirect(url_for("index", date=_sim_date.isoformat(), error="Lineups not posted yet for remaining games — check back closer to game time."))
 
     # ── Log predictions for accuracy tracking ─────────────────
     try:
