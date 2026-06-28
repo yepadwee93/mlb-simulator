@@ -792,6 +792,7 @@ def precompute_lineup(
     savant_list: list = None,
     umpire_name: str = None,
     homeaway_stats_list: list = None,
+    opp_catcher_cs: float = None,
 ) -> list:
     """
     Pre-calculate cumulative probability arrays for every batter in a lineup.
@@ -911,6 +912,10 @@ def precompute_lineup(
         # Umpire tendencies: wide/tight zone shifts K and BB rates
         if umpire_name:
             probs = apply_umpire_modifier(probs, umpire_name)
+
+        # Catcher framing: elite framers expand zone → more Ks, fewer BBs
+        if opp_catcher_cs is not None:
+            probs = apply_catcher_framing(probs, opp_catcher_cs)
 
         # wOBA sanity clamp: if compounding factors pushed the implied wOBA
         # outside the realistic MLB range [0.200, 0.450], scale it back.
@@ -1206,6 +1211,155 @@ def apply_umpire_modifier(probs: list, umpire_name: str) -> list:
 ERROR_RATE = 0.005
 WILD_PITCH_RATE = 0.004
 
+# ── Times-through-order (TTO) penalty ────────────────────────────────────────
+# Batters see the starter better each time through the order. Research from
+# Tango/MGL shows:
+#   1st time through (PA 1-9):   baseline — starter has the info advantage
+#   2nd time through (PA 10-18): +6% wOBA boost to batters (~batters learning)
+#   3rd time through (PA 19+):   +12% wOBA boost — why managers pull at 6 innings
+#
+# We apply this as a multiplier on cumulative probs (blended toward offense):
+#   TTO_FACTORS[n] = factor to blend probs toward league-avg offense (hitter-friendly)
+# 0 = no change, 0.06 = 6% blend toward league-average batters
+TTO_FACTORS = {1: 0.0, 2: 0.06, 3: 0.12}
+
+
+def apply_tto(precomp: list, tto: int) -> list:
+    """
+    Adjust cumulative weight arrays for the times-through-order effect.
+    tto=1: no change. tto=2: 6% blend toward league-avg. tto=3: 12%.
+    """
+    factor = TTO_FACTORS.get(tto, 0.12)
+    if factor == 0 or not precomp:
+        return precomp
+    from itertools import accumulate as _acc
+
+    lg_cum = list(_acc(LEAGUE_AVG_PROBS))
+    return [
+        [c * (1 - factor) + lg * factor for c, lg in zip(batter_cum, lg_cum)]
+        for batter_cum in precomp
+    ]
+
+
+# ── Catcher framing modifier ──────────────────────────────────────────────────
+# Elite framers (CS% >> 28%) effectively expand the strike zone, generating
+# more called strikes → higher K rate and lower BB rate for their pitchers.
+# We model this from CS% as a proxy for overall receiving quality, since
+# framing and blocking ability correlate strongly with arm strength.
+#
+# Effect size: ±0.03 K modifier and ∓0.03 BB modifier per 10pp above/below avg.
+# Capped at ±12% to avoid overcorrecting on small samples.
+LEAGUE_AVG_CS_PCT = 0.28
+
+
+def apply_catcher_framing(probs: list, catcher_cs_pct: float) -> list:
+    """
+    Adjust K and BB probabilities based on the opposing catcher's CS%.
+    Elite catchers (high CS%) frame pitches better → more Ks, fewer BBs.
+
+    OUTCOME_ORDER = [WALK, K, 1B, 2B, 3B, HR, OUT]
+                       0   1   2   3   4   5   6
+    """
+    if catcher_cs_pct is None:
+        return probs
+    delta = catcher_cs_pct - LEAGUE_AVG_CS_PCT  # e.g. +0.08 for elite framer
+    k_mod = 1.0 + min(0.12, max(-0.12, delta * 0.30))
+    bb_mod = 1.0 + min(0.12, max(-0.12, -delta * 0.30))
+    adjusted = list(probs)
+    adjusted[0] *= bb_mod  # walk
+    adjusted[1] *= k_mod  # strikeout
+    total = sum(adjusted)
+    return [p / total for p in adjusted]
+
+
+# ── Run expectancy (RE24) base-out state table ────────────────────────────────
+# Expected runs from each base-out state (2020-2024 MLB average).
+# Used to weight strategic decisions like sac fly and stolen base thresholds.
+# Format: (runners_tuple, outs) → expected_runs
+# runners_tuple: (b1, b2, b3) booleans
+RE24 = {
+    # 0 outs
+    (False, False, False, 0): 0.50,
+    (True, False, False, 0): 0.87,
+    (False, True, False, 0): 1.10,
+    (True, True, False, 0): 1.45,
+    (False, False, True, 0): 1.35,
+    (True, False, True, 0): 1.78,
+    (False, True, True, 0): 1.97,
+    (True, True, True, 0): 2.28,
+    # 1 out
+    (False, False, False, 1): 0.27,
+    (True, False, False, 1): 0.53,
+    (False, True, False, 1): 0.67,
+    (True, True, False, 1): 0.92,
+    (False, False, True, 1): 0.92,
+    (True, False, True, 1): 1.12,
+    (False, True, True, 1): 1.38,
+    (True, True, True, 1): 1.55,
+    # 2 outs
+    (False, False, False, 2): 0.10,
+    (True, False, False, 2): 0.22,
+    (False, True, False, 2): 0.32,
+    (True, True, False, 2): 0.44,
+    (False, False, True, 2): 0.36,
+    (True, False, True, 2): 0.49,
+    (False, True, True, 2): 0.57,
+    (True, True, True, 2): 0.75,
+}
+
+
+def get_run_expectancy(b1: bool, b2: bool, b3: bool, outs: int) -> float:
+    """Return expected runs for this base-out state."""
+    return RE24.get((b1, b2, b3, outs), 0.50)
+
+
+# ── Pitch-count fatigue within a game ────────────────────────────────────────
+# As a starter's pitch count climbs, velocity drops and command fades.
+# Observed MLB thresholds (from pitch-by-pitch Statcast data):
+#   < 60 pitches:  fresh — no penalty
+#   60-79:  mild fatigue — slight contact quality increase
+#   80-99:  meaningful fade — K% drops, walks tick up
+#   100+:   clearly laboring — managers usually pull here
+#
+# We model pitch count based on estimated pitches per plate appearance (~3.8)
+# and apply a cumulative multiplier to the starter's probs each half-inning.
+PITCHES_PER_PA = 3.8  # MLB average pitches per plate appearance
+
+# pitch_count → (k_mod, bb_mod, hit_mod)
+# hit_mod boosts all hit outcomes; k_mod reduces Ks; bb_mod increases BBs
+PITCH_COUNT_FATIGUE = [
+    (0, 1.00, 1.00, 1.00),  # 0-59: fresh
+    (60, 0.97, 1.03, 1.02),  # 60-79: mild fade
+    (80, 0.93, 1.07, 1.05),  # 80-99: real fade
+    (100, 0.88, 1.12, 1.09),  # 100+: clearly laboring
+]
+
+
+def apply_pitch_count_fatigue(probs: list, estimated_pitches: float) -> list:
+    """
+    Degrade starter quality as estimated pitch count rises.
+    Returns adjusted probs with more contact/walks, fewer Ks.
+
+    OUTCOME_ORDER = [WALK, K, 1B, 2B, 3B, HR, OUT]
+                       0   1   2   3   4   5   6
+    """
+    k_mod = bb_mod = hit_mod = 1.0
+    for threshold, km, bm, hm in reversed(PITCH_COUNT_FATIGUE):
+        if estimated_pitches >= threshold:
+            k_mod, bb_mod, hit_mod = km, bm, hm
+            break
+    if k_mod == 1.0 and bb_mod == 1.0:
+        return probs
+    adjusted = list(probs)
+    adjusted[0] *= bb_mod  # walk
+    adjusted[1] *= k_mod  # strikeout
+    adjusted[2] *= hit_mod  # single
+    adjusted[3] *= hit_mod  # double
+    adjusted[4] *= hit_mod  # triple
+    adjusted[5] *= hit_mod  # HR
+    total = sum(adjusted)
+    return [p / total for p in adjusted]
+
 
 def simulate_half_inning(
     precomp_lineup: list, lineup_pos: int, risp_precomp: list = None, batter_rates: list = None
@@ -1374,6 +1528,16 @@ def simulate_game(
     away_starter_pulled = False  # away team's SP removed → home_cur switches to late
     home_starter_pulled = False  # home team's SP removed → away_cur switches to late
 
+    # TTO tracking: count batters faced by each starter.
+    # away_starter faces HOME batters → home_batters_faced
+    # home_starter faces AWAY batters → away_batters_faced
+    away_batters_faced = 0  # batters HOME lineup has sent up vs away starter
+    home_batters_faced = 0  # batters AWAY lineup has sent up vs home starter
+
+    # Estimated pitch counts for each starter (used for in-game fatigue)
+    away_pitch_count = 0.0  # pitches thrown by away starter to home batters
+    home_pitch_count = 0.0  # pitches thrown by home starter to away batters
+
     def _should_pull_starter(runs_allowed: int, inning: int) -> bool:
         """
         Probabilistic starter removal based on runs allowed and game situation.
@@ -1484,11 +1648,37 @@ def simulate_game(
                 away_cur = _mopup(away_cur)
 
         # Away team bats (facing home pitching staff)
-        runs, away_pos = simulate_half_inning(
-            away_cur, away_pos, away_precomp_risp, away_batter_rates
-        )
+        # Apply TTO + pitch-count fatigue while home starter is still in.
+        # home_batters_faced tracks AWAY batters seen by the home starter.
         if not home_starter_pulled:
-            home_starter_runs += runs  # track only while home starter is still in
+            away_tto = 1 + home_batters_faced // 9
+            tto_away_cur = apply_tto(away_cur, away_tto)
+            # Pitch-count fatigue: apply per-batter to each slot
+            if home_pitch_count >= 60:
+                from itertools import accumulate as _acc2
+
+                tto_away_cur = [
+                    list(
+                        _acc2(
+                            apply_pitch_count_fatigue(
+                                [c - p for c, p in zip(bslot, [0] + list(bslot[:-1]))],
+                                home_pitch_count,
+                            )
+                        )
+                    )
+                    for bslot in tto_away_cur
+                ]
+        else:
+            tto_away_cur = away_cur  # bullpen resets TTO and pitch-count fatigue
+        runs, new_away_pos = simulate_half_inning(
+            tto_away_cur, away_pos, away_precomp_risp, away_batter_rates
+        )
+        batters_this_half = (new_away_pos - away_pos) % len(away_cur) or len(away_cur)
+        if not home_starter_pulled:
+            home_starter_runs += runs
+            home_batters_faced += batters_this_half
+            home_pitch_count += batters_this_half * PITCHES_PER_PA
+        away_pos = new_away_pos
         away_runs += runs
 
         # Walk-off rule: home team wins in 9th without finishing if already ahead
@@ -1496,11 +1686,36 @@ def simulate_game(
             break
 
         # Home team bats (facing away pitching staff)
-        runs, home_pos = simulate_half_inning(
-            home_cur, home_pos, home_precomp_risp, home_batter_rates
-        )
+        # Apply TTO + pitch-count fatigue while away starter is still in.
+        # away_batters_faced tracks HOME batters seen by the away starter.
         if not away_starter_pulled:
-            away_starter_runs += runs  # track only while away starter is still in
+            home_tto = 1 + away_batters_faced // 9
+            tto_home_cur = apply_tto(home_cur, home_tto)
+            if away_pitch_count >= 60:
+                from itertools import accumulate as _acc2
+
+                tto_home_cur = [
+                    list(
+                        _acc2(
+                            apply_pitch_count_fatigue(
+                                [c - p for c, p in zip(bslot, [0] + list(bslot[:-1]))],
+                                away_pitch_count,
+                            )
+                        )
+                    )
+                    for bslot in tto_home_cur
+                ]
+        else:
+            tto_home_cur = home_cur  # bullpen resets TTO and pitch-count fatigue
+        runs, new_home_pos = simulate_half_inning(
+            tto_home_cur, home_pos, home_precomp_risp, home_batter_rates
+        )
+        batters_this_half = (new_home_pos - home_pos) % len(home_cur) or len(home_cur)
+        if not away_starter_pulled:
+            away_starter_runs += runs
+            away_batters_faced += batters_this_half
+            away_pitch_count += batters_this_half * PITCHES_PER_PA
+        home_pos = new_home_pos
         home_runs += runs
 
     # Extra innings if tied (up to 3 extra) — use bullpen probs
@@ -1599,6 +1814,8 @@ def run_simulation(
     home_fatigue = build_fatigue_curve(home_pitcher_log)
 
     # ── Phase 1: innings 1-2 (starter is fresh) ───────────────────────
+    # away batters face home pitcher → opp catcher is home team's catcher (home_catcher_cs)
+    # home batters face away pitcher → opp catcher is away team's catcher (away_catcher_cs)
     away_precomp_early = precompute_lineup(
         away_lineup,
         home_pitcher,
@@ -1611,6 +1828,7 @@ def run_simulation(
         away_savant,
         umpire_name,
         away_homeaway_stats,
+        opp_catcher_cs=home_catcher_cs,
     )
     home_precomp_early = precompute_lineup(
         home_lineup,
@@ -1624,6 +1842,7 @@ def run_simulation(
         home_savant,
         umpire_name,
         home_homeaway_stats,
+        opp_catcher_cs=away_catcher_cs,
     )
 
     # ── Phase 2: innings 3-5 (starter showing fatigue) ───────────────
@@ -1641,6 +1860,7 @@ def run_simulation(
         away_savant,
         umpire_name,
         away_homeaway_stats,
+        opp_catcher_cs=home_catcher_cs,
     )
     home_precomp_mid = precompute_lineup(
         home_lineup,
@@ -1654,6 +1874,7 @@ def run_simulation(
         home_savant,
         umpire_name,
         home_homeaway_stats,
+        opp_catcher_cs=away_catcher_cs,
     )
 
     # ── RISP: clutch stats when runner on 2nd or 3rd ─────────────────
@@ -1675,6 +1896,7 @@ def run_simulation(
             away_savant,
             umpire_name,
             away_homeaway_stats,
+            opp_catcher_cs=home_catcher_cs,
         )
     if home_risp_stats and any(
         s for s in home_risp_stats if s and s.get("plateAppearances", 0) >= 20
@@ -1691,6 +1913,7 @@ def run_simulation(
             home_savant,
             umpire_name,
             home_homeaway_stats,
+            opp_catcher_cs=away_catcher_cs,
         )
 
     # ── Late game: batters vs the bullpen (innings 6+) ───────────────
