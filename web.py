@@ -172,26 +172,59 @@ BET_THRESHOLD = 62.0  # min win % to show in best bets section
 def fetch_batter_stats_with_splits(batters, pitcher_hand):
     """
     For each batter, fetch their split stats vs the starting pitcher's hand
-    (L or R). Falls back to season totals if split data is unavailable.
+    (L or R) and blend them with season totals weighted by sample size.
 
-    This is more accurate than season totals because it accounts for
-    platoon advantage — e.g. a righty batter who crushes lefty pitchers
-    but struggles against righties.
+    OLD approach: use split stats if 20+ PA, otherwise ignore entirely.
+    NEW approach: always blend split stats into season totals, with the
+    split weight scaling up as the sample size grows:
+      <10 PA  → 15% split weight (tiny sample, mostly noise)
+      20 PA   → 35% split weight (meaningful platoon signal)
+      50+ PA  → 60% split weight (strong platoon data, trust it heavily)
+
+    This means even a small platoon sample adds useful signal rather than
+    being thrown away, while large samples drive the prediction more.
     """
+    from simulation.engine import blend_probs, build_batter_probs
+
     stats_list = []
     for b in batters:
         if not b.get("id"):
             stats_list.append({})
             continue
-        # Try split stats first; fall back to season totals on any error
         try:
+            season = get_player_season_stats(b["id"], group="hitting")
             split = get_batter_split_stats(b["id"], pitcher_hand)
-            if split and split.get("plateAppearances", 0) >= 20:
-                stats_list.append(split)
+            split_pa = split.get("plateAppearances", 0) if split else 0
+
+            if not split or split_pa < 5:
+                # No useful split data — use season totals only
+                stats_list.append(season)
+                continue
+
+            # Scale weight: 5 PA → ~0.12, 20 PA → 0.35, 50+ PA → 0.60
+            split_weight = min(0.12 + (split_pa / 50.0) * 0.48, 0.60)
+
+            # Blend at probability level for accuracy
+            season_pa = season.get("plateAppearances", 1) or 1
+            if season_pa >= 10:
+                s_probs = build_batter_probs(season)
+                r_probs = build_batter_probs(split)
+                blended = blend_probs(s_probs, r_probs, recent_weight=split_weight)
+                # Return split stats dict with blended PA-weighted rates baked in
+                # We do this by returning the higher-PA season stats as base
+                # and marking it as pre-blended so engine doesn't double-count
+                merged = dict(season)
+                merged["_split_blended"] = True
+                merged["_blended_probs"] = blended
+                stats_list.append(merged)
             else:
-                stats_list.append(get_player_season_stats(b["id"], group="hitting"))
+                stats_list.append(split if split_pa >= 20 else season)
+
         except Exception:
-            stats_list.append(get_player_season_stats(b["id"], group="hitting"))
+            try:
+                stats_list.append(get_player_season_stats(b["id"], group="hitting"))
+            except Exception:
+                stats_list.append({})
     return stats_list
 
 
