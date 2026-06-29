@@ -970,11 +970,35 @@ def precompute_lineup(
         if opp_catcher_cs is not None:
             probs = apply_catcher_framing(probs, opp_catcher_cs)
 
+        # Spray angle / defensive positioning BABIP modifier
+        sv = savant_list[i] if (savant_list and i < len(savant_list)) else None
+        spray_mod = compute_spray_babip_mod(stats, sv)
+        if spray_mod != 1.0:
+            probs = apply_spray_modifier(probs, spray_mod)
+
+        # Count-based PA model: patient hitters get more favorable counts
+        count_prof = compute_count_profile(stats)
+        probs = apply_count_model(probs, count_prof)
+
+        # Pitcher arsenal contact profile modifiers
+        # Build batter's contact profile and adjust for pitcher archetype
+        contact_prof = build_contact_profile(stats, sv)
+        contact_prof = apply_arsenal_to_contact(contact_prof, pitcher_stats)
+        # Use contact profile to refine HR and XBH probabilities
+        barrel_rate = contact_prof.get("barrel", 0.07)
+        topped_rate = contact_prof.get("topped", 0.315)
+        # Barrel rate above average boosts HR; high topped suppresses HR
+        barrel_effect = (barrel_rate / 0.07) ** 0.20
+        topped_effect = (0.315 / max(topped_rate, 0.15)) ** 0.10
+        combined_contact = barrel_effect * topped_effect
+        if abs(combined_contact - 1.0) > 0.005:
+            probs[5] *= combined_contact  # HR
+            probs[3] *= 1.0 + (combined_contact - 1.0) * 0.2  # 2B partial effect
+            total = sum(probs)
+            probs = [p / total for p in probs]
+
         # wOBA sanity clamp: if compounding factors pushed the implied wOBA
         # outside the realistic MLB range [0.200, 0.450], scale it back.
-        # This prevents extreme edge cases (e.g. hot streak + hitter's park +
-        # weak pitcher + strong home split all stacking) from producing
-        # absurd per-PA run values that skew O/U and win% predictions.
         probs = clamp_woba(probs)
 
         cum_weights = list(accumulate(probs))
@@ -1334,6 +1358,545 @@ def apply_catcher_framing(probs: list, catcher_cs_pct: float) -> list:
     return [p / total for p in adjusted]
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# ADVANCED MATH MODULE: Batted Ball Physics, Pitcher Repertoire, Situational
+# Hitting, Spray Angle, and Count-Based Plate Appearances
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+# ── 1. BATTED BALL PHYSICS MODEL ─────────────────────────────────────────────
+#
+# Instead of flat outcome probabilities, this models what happens when bat
+# meets ball using launch angle (LA) and exit velocity (EV) distributions.
+#
+# The key insight: a barrel (LA 25-30°, EV 98+ mph) is a HR ~70% of the time.
+# A topped ball (LA < 0°, any EV) is a grounder. The distribution of LA × EV
+# a batter produces determines their TRUE power profile better than HR/FB%.
+#
+# Statcast buckets (2022-2024 MLB averages):
+#   Barrel:      LA 26-30°, EV 98+ → .822 xBA, .534 HR rate
+#   Solid:       LA 10-25°, EV 95+ → .672 xBA, .086 HR rate
+#   Flare/Burner: LA 20-40°, EV <95 → .581 xBA, .014 HR rate
+#   Topped:      LA < 10°, any EV   → .234 xBA, .001 HR rate (grounders)
+#   Under:       LA > 40°, any EV   → .132 xBA, .023 HR rate (popups/weak fly)
+#   Weak:        EV < 85            → .219 xBA, .002 HR rate
+
+# Contact quality distribution (fraction of batted balls in each bucket)
+# These are MLB-wide averages; individual batters deviate significantly.
+CONTACT_QUALITY_LEAGUE_AVG = {
+    "barrel": 0.070,  # 7% of batted balls
+    "solid": 0.180,  # 18%
+    "flare": 0.215,  # 21.5%
+    "topped": 0.315,  # 31.5% (most common — grounders)
+    "under": 0.135,  # 13.5% (popups)
+    "weak": 0.085,  # 8.5%
+}
+
+# Outcome probability given contact type: [1B, 2B, 3B, HR, OUT]
+CONTACT_OUTCOMES = {
+    "barrel": [0.178, 0.228, 0.016, 0.534, 0.044],
+    "solid": [0.375, 0.186, 0.025, 0.086, 0.328],
+    "flare": [0.438, 0.112, 0.017, 0.014, 0.419],
+    "topped": [0.216, 0.012, 0.005, 0.001, 0.766],
+    "under": [0.058, 0.028, 0.023, 0.023, 0.868],
+    "weak": [0.182, 0.024, 0.011, 0.002, 0.781],
+}
+
+
+def build_contact_profile(stats: dict, savant: dict = None) -> dict:
+    """
+    Build a batter's contact quality distribution from Statcast data.
+
+    If Statcast data is available (barrel_pct, hard_hit_pct, gb_pct),
+    we reconstruct the full contact profile. Otherwise fall back to
+    league average modified by the batter's power indicators.
+
+    Returns a dict with the same keys as CONTACT_QUALITY_LEAGUE_AVG.
+    """
+    profile = dict(CONTACT_QUALITY_LEAGUE_AVG)
+
+    if savant:
+        barrel_pct = savant.get("barrel_pct", 0) or 0
+        hard_hit_pct = savant.get("hard_hit_pct", 0) or 0
+        gb_pct_sv = savant.get("gb_pct", 0) or 0
+
+        if barrel_pct > 0:
+            # Scale barrel rate relative to league avg
+            barrel_ratio = barrel_pct / 7.0
+            profile["barrel"] = min(0.18, 0.070 * barrel_ratio)
+
+            # Hard hit drives solid contact
+            if hard_hit_pct > 0:
+                solid_ratio = hard_hit_pct / 38.0
+                profile["solid"] = min(0.30, 0.180 * solid_ratio)
+
+            # GB% drives topped ball rate
+            if gb_pct_sv > 0:
+                gb_ratio = gb_pct_sv / 44.0
+                profile["topped"] = min(0.50, 0.315 * gb_ratio)
+                # Fly ball hitters trade topped for under/flare
+                profile["under"] = max(0.05, 0.135 * (2.0 - gb_ratio) * 0.5 + 0.135 * 0.5)
+
+    elif stats:
+        # Infer from traditional stats
+        go = int(stats.get("groundOuts", 0) or 0)
+        fo = int(stats.get("flyOuts", 0) or 0)
+        hr = int(stats.get("homeRuns", 0) or 0)
+        pa = int(stats.get("plateAppearances", 0) or 0)
+
+        if pa >= 100 and go + fo >= 50:
+            gb_pct = go / (go + fo)
+            hr_rate = hr / pa if pa > 0 else 0.033
+
+            # Power hitters have more barrels
+            barrel_est = min(0.16, hr_rate * 2.5)
+            profile["barrel"] = max(0.02, barrel_est)
+            profile["topped"] = min(0.45, 0.315 * (gb_pct / 0.44))
+
+    # Normalize so all buckets sum to 1.0
+    total = sum(profile.values())
+    return {k: v / total for k, v in profile.items()}
+
+
+def batted_ball_outcome(contact_profile: dict, park_hr_factor: float = 1.0) -> tuple:
+    """
+    Given a batter's contact profile, simulate one batted ball event.
+
+    Returns (outcome_type, is_hard_hit) where outcome_type is one of
+    SINGLE, DOUBLE, TRIPLE, HR, OUT and is_hard_hit indicates quality.
+    """
+    r = random.random()
+    cumulative = 0.0
+    contact_type = "topped"  # default
+    for ctype, prob in contact_profile.items():
+        cumulative += prob
+        if r < cumulative:
+            contact_type = ctype
+            break
+
+    # Now determine outcome within that contact type
+    outcomes = CONTACT_OUTCOMES[contact_type]
+    # Apply park HR factor to the HR probability within this contact type
+    adj_outcomes = list(outcomes)
+    adj_outcomes[3] *= park_hr_factor  # HR boosted/suppressed by park
+    # Normalize
+    total = sum(adj_outcomes)
+    adj_outcomes = [p / total for p in adj_outcomes]
+
+    r2 = random.random()
+    cum = 0.0
+    # outcomes order: [1B, 2B, 3B, HR, OUT]
+    outcome_map = [SINGLE, DOUBLE, TRIPLE, HR, OUT]
+    for idx, p in enumerate(adj_outcomes):
+        cum += p
+        if r2 < cum:
+            is_hard = contact_type in ("barrel", "solid")
+            return outcome_map[idx], is_hard
+
+    return OUT, False
+
+
+# ── 2. PITCHER STUFF+ / REPERTOIRE MODEL ─────────────────────────────────────
+#
+# Different pitch types produce different contact quality distributions.
+# A pitcher's arsenal composition determines what batters can do against them.
+#
+# Pitch archetypes and their effects on contact:
+#   Power fastball (95+ mph): high K rate, but when hit → barrel-prone
+#   Sinker/2-seam: induces grounders (topped), suppresses barrels
+#   Slider: induces weak contact (whiffs + weak), good 2-strike pitch
+#   Curveball: induces under/popup contact, low EV
+#   Changeup: induces topped + flare, keeps hitters off-balance
+#   Cutter: hybrid — some GB induction, moderate K rate
+#
+# We classify pitchers into archetypes and modify the batter's contact
+# profile accordingly.
+
+PITCH_ARSENAL_EFFECTS = {
+    "power": {
+        # Power arms: higher K rate offset by harder contact when batters connect
+        "barrel": 1.15,
+        "solid": 1.08,
+        "flare": 0.90,
+        "topped": 0.88,
+        "under": 1.05,
+        "weak": 0.92,
+    },
+    "sinker": {
+        # Sinker/GB pitchers: tons of grounders, suppress barrels
+        "barrel": 0.72,
+        "solid": 0.85,
+        "flare": 0.90,
+        "topped": 1.40,
+        "under": 0.78,
+        "weak": 1.10,
+    },
+    "breaking": {
+        # Slider/curveball dominant: weak contact + whiffs
+        "barrel": 0.82,
+        "solid": 0.88,
+        "flare": 1.05,
+        "topped": 0.95,
+        "under": 1.25,
+        "weak": 1.20,
+    },
+    "offspeed": {
+        # Changeup/splitter dominant: induces topped + foul
+        "barrel": 0.85,
+        "solid": 0.92,
+        "flare": 1.15,
+        "topped": 1.18,
+        "under": 0.90,
+        "weak": 1.05,
+    },
+    "balanced": {
+        # No dominant pitch type — league average contact profile
+        "barrel": 1.00,
+        "solid": 1.00,
+        "flare": 1.00,
+        "topped": 1.00,
+        "under": 1.00,
+        "weak": 1.00,
+    },
+}
+
+
+def classify_pitcher_arsenal(pitcher_stats: dict) -> str:
+    """
+    Classify a pitcher's archetype from their stat profile.
+
+    Uses GB%, K%, and pitch velocity indicators to determine which
+    contact-quality modifiers to apply.
+
+    Returns one of: "power", "sinker", "breaking", "offspeed", "balanced"
+    """
+    try:
+        k_pct = float(pitcher_stats.get("k_pct") or 22.5)
+    except (ValueError, TypeError):
+        k_pct = 22.5
+    try:
+        gb_pct = float(pitcher_stats.get("gb_pct") or 44.0)
+    except (ValueError, TypeError):
+        gb_pct = 44.0
+    try:
+        bb_pct = float(pitcher_stats.get("bb_pct") or 8.5)
+    except (ValueError, TypeError):
+        bb_pct = 8.5
+
+    # High K + low GB = power (throws hard, gets whiffs)
+    if k_pct >= 28.0 and gb_pct < 42.0:
+        return "power"
+    # High GB + moderate/low K = sinker type
+    if gb_pct >= 50.0:
+        return "sinker"
+    # High K + high GB = breaking ball specialist
+    if k_pct >= 26.0 and gb_pct >= 44.0:
+        return "breaking"
+    # Low K + low BB + moderate GB = offspeed/finesse
+    if k_pct < 20.0 and bb_pct < 7.0:
+        return "offspeed"
+    return "balanced"
+
+
+def apply_arsenal_to_contact(contact_profile: dict, pitcher_stats: dict) -> dict:
+    """
+    Modify a batter's contact quality distribution based on pitcher archetype.
+
+    A sinker-baller produces more topped balls (grounders) from any batter.
+    A power pitcher produces more barrels when contact is made.
+    """
+    archetype = classify_pitcher_arsenal(pitcher_stats)
+    effects = PITCH_ARSENAL_EFFECTS[archetype]
+
+    modified = {}
+    for ctype, base_prob in contact_profile.items():
+        modified[ctype] = base_prob * effects.get(ctype, 1.0)
+
+    # Normalize
+    total = sum(modified.values())
+    return {k: v / total for k, v in modified.items()}
+
+
+# ── 3. SITUATIONAL HITTING (LEVERAGE / 2-OUT / RISP) ─────────────────────────
+#
+# Batters change approach in high-leverage situations. Research shows:
+#   - With RISP and 2 outs: K rate +8%, contact quality drops (pressing)
+#   - With runners on, <2 outs: more topped balls (trying to drive, goes GB)
+#   - Late & close (innings 7+, within 2 runs): K rate +4% (adrenaline)
+#   - Blowout (5+ runs lead): lower effort → more topped/flare contact
+#
+# These are applied dynamically DURING the half-inning simulation based on
+# the current game state.
+
+SITUATIONAL_MODS = {
+    "risp_2out": {
+        # Pressing with 2 outs, runner in scoring position
+        "k_mult": 1.08,
+        "contact_shift": {"barrel": 0.88, "topped": 1.15, "weak": 1.10},
+    },
+    "risp_0out": {
+        # Runner on 3rd, no outs — batter tries to lift ball (sac fly approach)
+        "k_mult": 0.94,
+        "contact_shift": {"under": 1.30, "topped": 0.85, "flare": 1.15},
+    },
+    "late_close": {
+        # High leverage: innings 7+, game within 2 runs
+        "k_mult": 1.04,
+        "contact_shift": {"barrel": 1.06, "weak": 1.08},
+    },
+    "blowout_leading": {
+        # Up 5+: lower adrenaline, less aggressive swings
+        "k_mult": 0.97,
+        "contact_shift": {"barrel": 0.90, "flare": 1.12, "topped": 1.05},
+    },
+}
+
+
+def get_situation_key(outs: int, b2: bool, b3: bool, inning: int, run_diff: int) -> str:
+    """Determine the situational modifier key from current game state."""
+    if abs(run_diff) >= 5 and inning >= 5:
+        return "blowout_leading" if run_diff > 0 else ""
+    if inning >= 6 and abs(run_diff) <= 2:
+        return "late_close"
+    if (b2 or b3) and outs == 2:
+        return "risp_2out"
+    if b3 and outs == 0:
+        return "risp_0out"
+    return ""
+
+
+def apply_situational_mod(probs: list, situation: str) -> list:
+    """
+    Apply situational K-rate modifier to outcome probabilities.
+
+    OUTCOME_ORDER = [WALK, K, 1B, 2B, 3B, HR, OUT]
+                       0   1   2   3   4   5   6
+    """
+    if not situation or situation not in SITUATIONAL_MODS:
+        return probs
+    mod = SITUATIONAL_MODS[situation]
+    adjusted = list(probs)
+    adjusted[1] *= mod["k_mult"]
+    total = sum(adjusted)
+    return [p / total for p in adjusted]
+
+
+# ── 4. SPRAY ANGLE + DEFENSIVE POSITIONING ──────────────────────────────────
+#
+# Batters have directional tendencies (pull, center, opposite field) that
+# interact with defensive alignment. A dead-pull hitter facing a shift has
+# lower BABIP on grounders; a spray hitter beats shifts easily.
+#
+# Pull%/Center%/Oppo% distributions from Statcast (2022-2024):
+#   MLB average: Pull 40%, Center 34%, Oppo 26%
+#   Extreme pull hitter (Judge, Alonso): Pull 52%+, Oppo 18%
+#   Spray hitter (Arraez, Betts): Pull 32%, Center 38%, Oppo 30%
+#
+# Defensive shift effect on BABIP:
+#   Standard alignment: BABIP = batter's natural rate
+#   Pull-heavy vs shift: BABIP -0.020 on grounders (2022 shift ban helped, but
+#     teams still position optimally within traditional rules)
+#   Oppo/spray hitter: BABIP +0.010 (naturally avoids defensive clustering)
+
+LEAGUE_AVG_PULL = 0.40
+LEAGUE_AVG_CENTER = 0.34
+LEAGUE_AVG_OPPO = 0.26
+
+
+def compute_spray_babip_mod(stats: dict, savant: dict = None) -> float:
+    """
+    Compute a BABIP modifier based on spray angle tendency vs defense.
+
+    Returns a multiplier on hit probability (1B, 2B, 3B):
+      > 1.0 = spray hitter, beats positioning
+      < 1.0 = extreme pull hitter, loses hits to positioning
+      = 1.0 = league average directional profile
+    """
+    pull_pct = None
+
+    if savant:
+        pull_pct = savant.get("pull_pct")
+
+    if pull_pct is None and stats:
+        # Estimate from GB/FB ratio: high GB% hitters tend to pull more
+        go = int(stats.get("groundOuts", 0) or 0)
+        fo = int(stats.get("flyOuts", 0) or 0)
+        if go + fo >= 80:
+            gb_ratio = go / (go + fo)
+            # Empirical: each 5pp GB% above average → +2pp pull tendency
+            pull_pct = 0.40 + (gb_ratio - 0.44) * 0.40
+            pull_pct = max(0.28, min(0.58, pull_pct))
+
+    if pull_pct is None:
+        return 1.0
+
+    # Extreme pull hitters lose BABIP to positioning
+    # Spray hitters gain BABIP from beating alignment
+    deviation = pull_pct - LEAGUE_AVG_PULL
+    # Each 1pp above average pull = -0.15% BABIP; below = +0.10% BABIP
+    if deviation > 0:
+        modifier = 1.0 - deviation * 0.15
+    else:
+        modifier = 1.0 - deviation * 0.10  # negative * negative = positive
+
+    return max(0.92, min(1.08, modifier))
+
+
+def apply_spray_modifier(probs: list, spray_mod: float) -> list:
+    """
+    Apply spray angle BABIP modifier to singles, doubles, triples.
+
+    OUTCOME_ORDER = [WALK, K, 1B, 2B, 3B, HR, OUT]
+                       0   1   2   3   4   5   6
+    """
+    if spray_mod == 1.0:
+        return probs
+    adjusted = list(probs)
+    adjusted[2] *= spray_mod  # singles most affected
+    adjusted[3] *= 1.0 + (spray_mod - 1.0) * 0.6  # doubles 60% effect
+    adjusted[4] *= 1.0 + (spray_mod - 1.0) * 0.4  # triples 40% effect
+    total = sum(adjusted)
+    return [p / total for p in adjusted]
+
+
+# ── 5. COUNT-BASED PLATE APPEARANCE MODEL ────────────────────────────────────
+#
+# The current sim draws ONE outcome per PA. Reality: each PA is a sequence of
+# pitches where the count shifts outcome probabilities dramatically.
+#
+# Key research (Tango/MGL, 2020-2024 Statcast):
+#   0-0: Batter sees fastball 62% of the time, swings 28%, BA .340 on contact
+#   0-2: Pitcher throws offspeed 55%, batter chases 33%, K rate 33%
+#   3-0: Batter takes 95%, walk rate 52% (on next pitches)
+#   3-1: Hitter's count — fastball 72%, HR rate 2.5x average
+#   3-2: Full count — walk 22%, K 22%, HR rate 1.4x
+#
+# Rather than simulating pitch-by-pitch (too slow for 100K games), we model
+# the COUNT DISTRIBUTION a batter reaches and weight outcomes accordingly.
+#
+# Each batter has a "count profile" — how often they reach each count state.
+# Then we apply count-specific outcome multipliers to the base probabilities.
+
+# Count-specific outcome multipliers relative to PA average
+# Format: (K_mult, BB_mult, HR_mult, hit_mult)
+COUNT_MULTIPLIERS = {
+    "ahead": (0.62, 1.45, 0.85, 1.12),  # 1-0, 2-0, 2-1, 3-1 (hitter's counts)
+    "behind": (1.55, 0.40, 1.25, 0.78),  # 0-1, 0-2, 1-2 (pitcher's counts)
+    "even": (1.00, 1.00, 1.00, 1.00),  # 0-0, 1-1, 2-2 (neutral)
+    "full": (1.10, 1.80, 1.40, 0.95),  # 3-2 (high variance)
+    "deep_behind": (1.90, 0.20, 1.50, 0.65),  # 0-2 specifically
+}
+
+# How often an average batter reaches each count state (% of PAs that pass
+# through this state before resolution). Derived from pitch-level data.
+LEAGUE_COUNT_DIST = {
+    "ahead": 0.32,  # ~32% of PA time is in hitter-favorable counts
+    "behind": 0.35,  # ~35% in pitcher-favorable counts
+    "even": 0.22,  # ~22% in neutral counts (0-0 start + even)
+    "full": 0.11,  # ~11% reach full count
+}
+
+
+def compute_count_profile(stats: dict) -> dict:
+    """
+    Estimate how a batter's PA count distribution differs from average.
+
+    Patient hitters (high BB%, low chase rate) spend more time in
+    hitter's counts. Free swingers (high K%, low BB%) spend more
+    time in pitcher's counts.
+
+    Returns a dict with same keys as LEAGUE_COUNT_DIST.
+    """
+    pa = int(stats.get("plateAppearances", 0) or 0)
+    if pa < 50:
+        return dict(LEAGUE_COUNT_DIST)
+
+    bb = int(stats.get("baseOnBalls", 0) or 0)
+    k = int(stats.get("strikeOuts", 0) or 0)
+
+    bb_rate = bb / pa
+    k_rate = k / pa
+
+    # Discipline score: high BB + low K = patient, works counts
+    # Low BB + high K = free swinger, falls behind
+    discipline = (bb_rate - 0.085) * 2.0 - (k_rate - 0.224) * 1.5
+    # discipline > 0 = patient; < 0 = aggressive
+
+    profile = dict(LEAGUE_COUNT_DIST)
+
+    # Patient hitters shift time from "behind" to "ahead"
+    shift = min(0.08, max(-0.08, discipline * 0.15))
+    profile["ahead"] += shift
+    profile["behind"] -= shift
+
+    # Very patient hitters see more full counts
+    if bb_rate > 0.10:
+        fc_boost = min(0.04, (bb_rate - 0.10) * 0.5)
+        profile["full"] += fc_boost
+        profile["even"] -= fc_boost
+
+    # Normalize
+    total = sum(profile.values())
+    return {k: v / total for k, v in profile.items()}
+
+
+def apply_count_model(probs: list, count_profile: dict) -> list:
+    """
+    Weight outcome probabilities by the batter's count distribution.
+
+    Instead of a single set of probs, we compute a weighted average of
+    count-specific outcomes based on how often this batter reaches each state.
+
+    This naturally produces:
+    - Higher K rates for free swingers (more time in 0-2, 1-2)
+    - Higher BB rates for patient hitters (more time in 3-1, 3-2)
+    - Higher HR rates for patient power hitters (3-1 fastball hunting)
+    - Lower HR rates for aggressive hitters who expand the zone
+
+    OUTCOME_ORDER = [WALK, K, 1B, 2B, 3B, HR, OUT]
+                       0   1   2   3   4   5   6
+    """
+    # Compute weighted multipliers across all count states
+    k_mult_w = 0.0
+    bb_mult_w = 0.0
+    hr_mult_w = 0.0
+    hit_mult_w = 0.0
+
+    for state, weight in count_profile.items():
+        k_m, bb_m, hr_m, hit_m = COUNT_MULTIPLIERS.get(state, (1.0, 1.0, 1.0, 1.0))
+        k_mult_w += k_m * weight
+        bb_mult_w += bb_m * weight
+        hr_mult_w += hr_m * weight
+        hit_mult_w += hit_m * weight
+
+    # Compute the league-average baseline so the model is ZERO-centered:
+    # a league-average batter with league-average count profile produces mult=1.0
+    k_base = bb_base = hr_base = hit_base = 0.0
+    for state, weight in LEAGUE_COUNT_DIST.items():
+        k_m, bb_m, hr_m, hit_m = COUNT_MULTIPLIERS.get(state, (1.0, 1.0, 1.0, 1.0))
+        k_base += k_m * weight
+        bb_base += bb_m * weight
+        hr_base += hr_m * weight
+        hit_base += hit_m * weight
+
+    # Relative to baseline: only the DIFFERENCE from league average matters
+    DAMPEN = 0.35
+    k_adj = 1.0 + (k_mult_w - k_base) * DAMPEN
+    bb_adj = 1.0 + (bb_mult_w - bb_base) * DAMPEN
+    hr_adj = 1.0 + (hr_mult_w - hr_base) * DAMPEN
+    hit_adj = 1.0 + (hit_mult_w - hit_base) * DAMPEN
+
+    adjusted = list(probs)
+    adjusted[0] *= bb_adj  # walk
+    adjusted[1] *= k_adj  # strikeout
+    adjusted[2] *= hit_adj  # single
+    adjusted[3] *= hit_adj  # double
+    adjusted[4] *= hit_adj  # triple
+    adjusted[5] *= hr_adj  # HR (separate from generic hits)
+    total = sum(adjusted)
+    return [p / total for p in adjusted]
+
+
 # ── Run expectancy (RE24) base-out state table ────────────────────────────────
 # Expected runs from each base-out state (2020-2024 MLB average).
 # Used to weight strategic decisions like sac fly and stolen base thresholds.
@@ -1424,7 +1987,12 @@ def apply_pitch_count_fatigue(probs: list, estimated_pitches: float) -> list:
 
 
 def simulate_half_inning(
-    precomp_lineup: list, lineup_pos: int, risp_precomp: list = None, batter_rates: list = None
+    precomp_lineup: list,
+    lineup_pos: int,
+    risp_precomp: list = None,
+    batter_rates: list = None,
+    inning: int = 4,
+    run_diff: int = 0,
 ) -> tuple:
     """
     Simulate one half-inning (3 outs) for one team.
@@ -1440,6 +2008,8 @@ def simulate_half_inning(
                       • GIDP  — runner on 1st, <2 outs, non-K out → double play
                       • SF    — runner on 3rd, <2 outs, non-K out → run scores
                       • SB    — runner on 1st only → steal attempt before each AB
+    inning:         0-indexed inning number (for leverage calculations)
+    run_diff:       score difference from batting team's perspective (+ = leading)
 
     Returns: (runs_scored, new_lineup_pos)
     The lineup_pos return value lets the next inning pick up where this one left off.
@@ -1482,6 +2052,15 @@ def simulate_half_inning(
             cum_weights = risp_precomp[pos % 9]
         else:
             cum_weights = precomp_lineup[pos % 9]
+
+        # ── Situational hitting modifier (dynamic, per-PA) ───────────────────
+        sit_key = get_situation_key(outs, b2, b3, inning, run_diff)
+        if sit_key:
+            # Convert cumulative weights back to probs, apply mod, reconvert
+            cw = cum_weights
+            raw = [cw[0]] + [cw[j] - cw[j - 1] for j in range(1, len(cw))]
+            raw = apply_situational_mod(raw, sit_key)
+            cum_weights = list(accumulate(raw))
 
         outcome = simulate_at_bat(cum_weights)
 
@@ -1750,8 +2329,15 @@ def simulate_game(
                 ]
         else:
             tto_away_cur = away_cur  # bullpen resets TTO and pitch-count fatigue
+        # run_diff from away team's perspective (batting team)
+        away_rdiff = away_runs - home_runs
         runs, new_away_pos = simulate_half_inning(
-            tto_away_cur, away_pos, away_precomp_risp, away_batter_rates
+            tto_away_cur,
+            away_pos,
+            away_precomp_risp,
+            away_batter_rates,
+            inning=inning,
+            run_diff=away_rdiff,
         )
         batters_this_half = (new_away_pos - away_pos) % len(away_cur) or len(away_cur)
         if not home_starter_pulled:
@@ -1787,8 +2373,15 @@ def simulate_game(
                 ]
         else:
             tto_home_cur = home_cur  # bullpen resets TTO and pitch-count fatigue
+        # run_diff from home team's perspective (batting team)
+        home_rdiff = home_runs - away_runs
         runs, new_home_pos = simulate_half_inning(
-            tto_home_cur, home_pos, home_precomp_risp, home_batter_rates
+            tto_home_cur,
+            home_pos,
+            home_precomp_risp,
+            home_batter_rates,
+            inning=inning,
+            run_diff=home_rdiff,
         )
         batters_this_half = (new_home_pos - home_pos) % len(home_cur) or len(home_cur)
         if not away_starter_pulled:
