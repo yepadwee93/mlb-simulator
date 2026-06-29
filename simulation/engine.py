@@ -4113,7 +4113,7 @@ def apply_causal_effects(probs: list, effects: dict) -> list:
 # This tells the user: "We predict 58% win probability, but the true
 # value is likely between 55.2% and 60.8% given simulation variance."
 
-BOOTSTRAP_N_RESAMPLES = 500
+BOOTSTRAP_N_RESAMPLES = 200
 
 
 def bootstrap_confidence_interval(
@@ -4448,6 +4448,7 @@ def simulate_half_inning(
     run_diff: int = 0,
     copula: "GaussianCopula | None" = None,
     pitcher_hmm: "PitcherHMM | None" = None,
+    extra_mults: dict = None,
 ) -> tuple:
     """
     Simulate one half-inning (3 outs) for one team.
@@ -4515,36 +4516,77 @@ def simulate_half_inning(
         else:
             cum_weights = precomp_lineup[pos % 9]
 
-        # ── Situational hitting modifier (dynamic, per-PA) ───────────────────
+        # ── Collect all per-PA modifiers and apply in ONE pass ────────────────
+        # Instead of decomposing cum→raw→modify→cum 6 separate times,
+        # we accumulate compound multipliers for each outcome slot and
+        # apply them all at once. This is the critical hot-path optimization.
+        needs_modify = False
+
+        # Compound multipliers: [BB, K, 1B, 2B, 3B, HR, OUT]
+        cm = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+
+        # Situational hitting
         sit_key = get_situation_key(outs, b2, b3, inning, run_diff)
         if sit_key:
-            cw = cum_weights
-            raw = [cw[0]] + [cw[j] - cw[j - 1] for j in range(1, len(cw))]
-            raw = apply_situational_mod(raw, sit_key)
-            cum_weights = list(accumulate(raw))
+            sm = SITUATIONAL_MODS.get(sit_key)
+            if sm:
+                cm[0] *= sm.get("bb", 1.0)
+                cm[1] *= sm.get("k", 1.0)
+                cm[2] *= sm.get("hit", 1.0)
+                cm[3] *= sm.get("hit", 1.0)
+                cm[5] *= sm.get("hr", 1.0)
+                needs_modify = True
 
-        # ── Leverage index modifier (dynamic, per-PA) ────────────────────────
+        # Leverage index
         li = compute_leverage_index(outs, b1, b2, inning, run_diff)
         if li < 0.9 or li > 1.1:
-            cw = cum_weights
-            raw = [cw[0]] + [cw[j] - cw[j - 1] for j in range(1, len(cw))]
-            raw = apply_leverage_modifier(raw, li)
-            cum_weights = list(accumulate(raw))
+            li_dampen = 1.0 + (li - 1.0) * 0.30
+            cm[0] *= 1.0 + (li_dampen - 1.0) * 0.5
+            cm[1] *= li_dampen
+            cm[2] *= 1.0 + (li_dampen - 1.0) * 0.3
+            cm[5] *= 1.0 + (li_dampen - 1.0) * 0.4
+            needs_modify = True
 
-        # ── HMM pitcher state adjustment (dynamic, per-PA) ───────────────────
+        # HMM pitcher state
         if pitcher_hmm:
             hmm_adj = pitcher_hmm.get_state_adjustment()
             if any(abs(v - 1.0) > 0.005 for v in hmm_adj.values()):
-                cw = cum_weights
-                raw = [cw[0]] + [cw[j] - cw[j - 1] for j in range(1, len(cw))]
-                raw = apply_hmm_adjustment(raw, hmm_adj)
-                cum_weights = list(accumulate(raw))
+                cm[0] *= hmm_adj["bb_mult"]
+                cm[1] *= hmm_adj["k_mult"]
+                cm[2] *= hmm_adj["hit_mult"]
+                cm[3] *= hmm_adj["hit_mult"]
+                cm[4] *= hmm_adj["hit_mult"]
+                cm[5] *= hmm_adj["hr_mult"]
+                needs_modify = True
 
-        # ── GPD extreme scoring modifier (4+ runs this inning) ───────────────
+        # Extra multipliers (stamina + Bayesian + OU + entropy + momentum combined)
+        if extra_mults and any(abs(v - 1.0) > 0.005 for v in extra_mults.values()):
+            cm[0] *= extra_mults["bb"]
+            cm[1] *= extra_mults["k"]
+            cm[2] *= extra_mults["hit"]
+            cm[3] *= extra_mults["hit"]
+            cm[4] *= extra_mults["hit"]
+            cm[5] *= extra_mults["hr"]
+            needs_modify = True
+
+        # GPD extreme scoring
         if runs >= GPD_THRESHOLD:
+            gpd_mod = gpd_extreme_inning_modifier(runs)
+            if gpd_mod < 0.99 or gpd_mod > 1.01:
+                cm[2] *= gpd_mod
+                cm[3] *= gpd_mod
+                cm[4] *= gpd_mod
+                cm[5] *= gpd_mod
+                cm[6] *= 1.0 / max(gpd_mod, 0.5)
+                needs_modify = True
+
+        # Single decompose → multiply → recompose pass
+        if needs_modify:
             cw = cum_weights
             raw = [cw[0]] + [cw[j] - cw[j - 1] for j in range(1, len(cw))]
-            raw = apply_extreme_scoring_mod(raw, runs)
+            raw = [r * m for r, m in zip(raw, cm)]
+            total = sum(raw)
+            raw = [r / total for r in raw]
             cum_weights = list(accumulate(raw))
 
         # ── Copula correlation: set rho based on runners ─────────────────────
@@ -4845,89 +4887,52 @@ def simulate_game(
                 home_cur = _mopup(home_cur, factor=-0.10)
 
         # Away team bats (facing home pitching staff)
-        # Apply TTO + pitch-count fatigue while home starter is still in.
-        # home_batters_faced tracks AWAY batters seen by the home starter.
+        # Apply TTO only (other modifiers moved to per-PA single pass)
         if not home_starter_pulled:
             away_tto = 1 + home_batters_faced // 9
             tto_away_cur = apply_tto(away_cur, away_tto)
-            # Continuous stamina decay based on pitch count + pitcher durability
+        else:
+            tto_away_cur = away_cur
+
+        # Collect all per-half-inning modifiers into a single dict for per-PA application
+        _away_extra_mults = {"bb": 1.0, "k": 1.0, "hit": 1.0, "hr": 1.0}
+
+        if not home_starter_pulled:
+            # Stamina decay
             if home_pitch_count >= 30:
                 decay = compute_stamina_decay(home_pitch_count, home_pitcher_stats)
-                from itertools import accumulate as _acc2
+                _away_extra_mults["k"] *= decay.get("k_mult", 1.0)
+                _away_extra_mults["bb"] *= decay.get("bb_mult", 1.0)
+                _away_extra_mults["hr"] *= decay.get("hr_mult", 1.0)
+                _away_extra_mults["hit"] *= decay.get("hit_mult", 1.0)
 
-                tto_away_cur = [
-                    list(
-                        _acc2(
-                            apply_stamina_decay(
-                                [c - p for c, p in zip(bslot, [0] + list(bslot[:-1]))],
-                                decay,
-                            )
-                        )
-                    )
-                    for bslot in tto_away_cur
-                ]
-        else:
-            tto_away_cur = away_cur  # bullpen resets TTO and stamina decay
+            # Bayesian in-game pitcher
+            p_adj = home_pitcher_state.get_adjustment()
+            _away_extra_mults["k"] *= p_adj.get("k_mult", 1.0)
+            _away_extra_mults["bb"] *= p_adj.get("bb_mult", 1.0)
+            _away_extra_mults["hr"] *= p_adj.get("hr_mult", 1.0)
+            _away_extra_mults["hit"] *= p_adj.get("hit_mult", 1.0)
 
-        # Apply momentum (hot-inning carry-over)
+            # OU fatigue
+            ou_mod = home_ou.get_fatigue_modifier()
+            _away_extra_mults["k"] *= ou_mod["k_mult"]
+            _away_extra_mults["bb"] *= ou_mod["bb_mult"]
+            _away_extra_mults["hr"] *= ou_mod["hr_mult"]
+            _away_extra_mults["hit"] *= ou_mod["hit_mult"]
+
+            # Entropy TTO
+            _away_tto_ent = 1 + home_batters_faced // 9
+            ent_mod = entropy_tto_modifier(home_entropy, _away_tto_ent)
+            _away_extra_mults["k"] *= ent_mod["k_mult"]
+            _away_extra_mults["bb"] *= ent_mod["bb_mult"]
+            _away_extra_mults["hr"] *= ent_mod["hr_mult"]
+            _away_extra_mults["hit"] *= ent_mod["hit_mult"]
+
+        # Momentum
         away_mom = momentum.get_momentum(is_away=True)
         if away_mom > 0.005:
-            tto_away_cur = apply_momentum(tto_away_cur, away_mom)
-
-        # Apply Bayesian in-game pitcher adjustment (home starter quality)
-        if not home_starter_pulled:
-            p_adj = home_pitcher_state.get_adjustment()
-            if abs(p_adj["k_mult"] - 1.0) > 0.005:
-                from itertools import accumulate as _acc3
-
-                tto_away_cur = [
-                    list(
-                        _acc3(
-                            apply_ingame_pitcher_adj(
-                                [c - p for c, p in zip(bs, [0] + list(bs[:-1]))],
-                                p_adj,
-                            )
-                        )
-                    )
-                    for bs in tto_away_cur
-                ]
-
-        # OU stochastic fatigue: step the home starter's energy process
-        if not home_starter_pulled:
-            ou_mod = home_ou.get_fatigue_modifier()
-            if any(abs(v - 1.0) > 0.005 for v in ou_mod.values()):
-                from itertools import accumulate as _acc_ou
-
-                tto_away_cur = [
-                    list(
-                        _acc_ou(
-                            apply_ou_fatigue(
-                                [c - p for c, p in zip(bs, [0] + list(bs[:-1]))],
-                                ou_mod,
-                            )
-                        )
-                    )
-                    for bs in tto_away_cur
-                ]
-
-        # Pitch entropy TTO modifier: home starter's predictability
-        if not home_starter_pulled:
-            away_tto_for_entropy = 1 + home_batters_faced // 9
-            ent_mod = entropy_tto_modifier(home_entropy, away_tto_for_entropy)
-            if any(abs(v - 1.0) > 0.005 for v in ent_mod.values()):
-                from itertools import accumulate as _acc_ent
-
-                tto_away_cur = [
-                    list(
-                        _acc_ent(
-                            apply_entropy_modifier(
-                                [c - p for c, p in zip(bs, [0] + list(bs[:-1]))],
-                                ent_mod,
-                            )
-                        )
-                    )
-                    for bs in tto_away_cur
-                ]
+            _away_extra_mults["hit"] *= 1.0 + away_mom
+            _away_extra_mults["hr"] *= 1.0 + away_mom * 0.5
 
         # run_diff from away team's perspective (batting team)
         away_rdiff = away_runs - home_runs
@@ -4941,6 +4946,7 @@ def simulate_game(
             run_diff=away_rdiff,
             copula=away_copula,
             pitcher_hmm=home_hmm if not home_starter_pulled else None,
+            extra_mults=_away_extra_mults,
         )
         batters_this_half = (new_away_pos - away_pos) % len(away_cur) or len(away_cur)
         if not home_starter_pulled:
@@ -4967,88 +4973,51 @@ def simulate_game(
             break
 
         # Home team bats (facing away pitching staff)
-        # Apply TTO + pitch-count fatigue while away starter is still in.
-        # away_batters_faced tracks HOME batters seen by the away starter.
         if not away_starter_pulled:
             home_tto = 1 + away_batters_faced // 9
             tto_home_cur = apply_tto(home_cur, home_tto)
+        else:
+            tto_home_cur = home_cur
+
+        # Collect all per-half-inning modifiers for home batters
+        _home_extra_mults = {"bb": 1.0, "k": 1.0, "hit": 1.0, "hr": 1.0}
+
+        if not away_starter_pulled:
+            # Stamina decay
             if away_pitch_count >= 30:
                 decay = compute_stamina_decay(away_pitch_count, away_pitcher_stats)
-                from itertools import accumulate as _acc2
+                _home_extra_mults["k"] *= decay.get("k_mult", 1.0)
+                _home_extra_mults["bb"] *= decay.get("bb_mult", 1.0)
+                _home_extra_mults["hr"] *= decay.get("hr_mult", 1.0)
+                _home_extra_mults["hit"] *= decay.get("hit_mult", 1.0)
 
-                tto_home_cur = [
-                    list(
-                        _acc2(
-                            apply_stamina_decay(
-                                [c - p for c, p in zip(bslot, [0] + list(bslot[:-1]))],
-                                decay,
-                            )
-                        )
-                    )
-                    for bslot in tto_home_cur
-                ]
-        else:
-            tto_home_cur = home_cur  # bullpen resets TTO and stamina decay
+            # Bayesian in-game pitcher
+            p_adj = away_pitcher_state.get_adjustment()
+            _home_extra_mults["k"] *= p_adj.get("k_mult", 1.0)
+            _home_extra_mults["bb"] *= p_adj.get("bb_mult", 1.0)
+            _home_extra_mults["hr"] *= p_adj.get("hr_mult", 1.0)
+            _home_extra_mults["hit"] *= p_adj.get("hit_mult", 1.0)
 
-        # Apply momentum (hot-inning carry-over)
+            # OU fatigue
+            ou_mod = away_ou.get_fatigue_modifier()
+            _home_extra_mults["k"] *= ou_mod["k_mult"]
+            _home_extra_mults["bb"] *= ou_mod["bb_mult"]
+            _home_extra_mults["hr"] *= ou_mod["hr_mult"]
+            _home_extra_mults["hit"] *= ou_mod["hit_mult"]
+
+            # Entropy TTO
+            _home_tto_ent = 1 + away_batters_faced // 9
+            ent_mod = entropy_tto_modifier(away_entropy, _home_tto_ent)
+            _home_extra_mults["k"] *= ent_mod["k_mult"]
+            _home_extra_mults["bb"] *= ent_mod["bb_mult"]
+            _home_extra_mults["hr"] *= ent_mod["hr_mult"]
+            _home_extra_mults["hit"] *= ent_mod["hit_mult"]
+
+        # Momentum
         home_mom = momentum.get_momentum(is_away=False)
         if home_mom > 0.005:
-            tto_home_cur = apply_momentum(tto_home_cur, home_mom)
-
-        # Apply Bayesian in-game pitcher adjustment (away starter quality)
-        if not away_starter_pulled:
-            p_adj = away_pitcher_state.get_adjustment()
-            if abs(p_adj["k_mult"] - 1.0) > 0.005:
-                from itertools import accumulate as _acc3
-
-                tto_home_cur = [
-                    list(
-                        _acc3(
-                            apply_ingame_pitcher_adj(
-                                [c - p for c, p in zip(bs, [0] + list(bs[:-1]))],
-                                p_adj,
-                            )
-                        )
-                    )
-                    for bs in tto_home_cur
-                ]
-
-        # OU stochastic fatigue: step the away starter's energy process
-        if not away_starter_pulled:
-            ou_mod = away_ou.get_fatigue_modifier()
-            if any(abs(v - 1.0) > 0.005 for v in ou_mod.values()):
-                from itertools import accumulate as _acc_ou2
-
-                tto_home_cur = [
-                    list(
-                        _acc_ou2(
-                            apply_ou_fatigue(
-                                [c - p for c, p in zip(bs, [0] + list(bs[:-1]))],
-                                ou_mod,
-                            )
-                        )
-                    )
-                    for bs in tto_home_cur
-                ]
-
-        # Pitch entropy TTO modifier: away starter's predictability
-        if not away_starter_pulled:
-            home_tto_for_entropy = 1 + away_batters_faced // 9
-            ent_mod = entropy_tto_modifier(away_entropy, home_tto_for_entropy)
-            if any(abs(v - 1.0) > 0.005 for v in ent_mod.values()):
-                from itertools import accumulate as _acc_ent2
-
-                tto_home_cur = [
-                    list(
-                        _acc_ent2(
-                            apply_entropy_modifier(
-                                [c - p for c, p in zip(bs, [0] + list(bs[:-1]))],
-                                ent_mod,
-                            )
-                        )
-                    )
-                    for bs in tto_home_cur
-                ]
+            _home_extra_mults["hit"] *= 1.0 + home_mom
+            _home_extra_mults["hr"] *= 1.0 + home_mom * 0.5
 
         # run_diff from home team's perspective (batting team)
         home_rdiff = home_runs - away_runs
@@ -5062,6 +5031,7 @@ def simulate_game(
             run_diff=home_rdiff,
             copula=home_copula,
             pitcher_hmm=away_hmm if not away_starter_pulled else None,
+            extra_mults=_home_extra_mults,
         )
         batters_this_half = (new_home_pos - home_pos) % len(home_cur) or len(home_cur)
         if not away_starter_pulled:
@@ -5150,7 +5120,7 @@ def run_simulation(
     home_catcher_cs: float = 0.28,  # opposing (away) catcher caught-stealing rate
     away_bp_depth: dict = None,  # bullpen depth score for away team
     home_bp_depth: dict = None,  # bullpen depth score for home team
-    n: int = 100_000,
+    n: int = 50_000,
 ) -> dict:
     """
     Run N Monte Carlo simulations and return aggregated results.
@@ -5422,38 +5392,46 @@ def run_simulation(
     total_runs_hist = Counter()  # {total_runs: count} for O/U model
     score_pairs = Counter()  # {(away_runs, home_runs): count} for SGP correlated probs
 
-    # Gaussian Mixture Model: compute game script mixing weights
+    # Gaussian Mixture Model: pre-build ALL game script variants ONCE
+    # instead of rebuilding per-sim (was the main performance bottleneck)
     script_weights = compute_script_weights(away_pitcher, home_pitcher, venue)
+    _all_precomps = [
+        away_precomp_early,
+        home_precomp_early,
+        away_precomp_mid,
+        home_precomp_mid,
+        away_precomp_late,
+        home_precomp_late,
+        away_precomp_risp,
+        home_precomp_risp,
+        away_precomp_late2,
+        home_precomp_late2,
+    ]
+    _script_cache = {}
+    for script_name in GAME_SCRIPTS:
+        if script_name == "normal":
+            _script_cache[script_name] = _all_precomps
+        else:
+            _script_cache[script_name] = [
+                apply_game_script(p, script_name) if p else None for p in _all_precomps
+            ]
 
     def _sim(**kw):
-        # Select game script archetype for this simulation
         script = select_game_script(script_weights)
-
-        # Apply game script modifiers to all precomputed lineups
-        a_early = apply_game_script(away_precomp_early, script)
-        h_early = apply_game_script(home_precomp_early, script)
-        a_mid = apply_game_script(away_precomp_mid, script) if away_precomp_mid else None
-        h_mid = apply_game_script(home_precomp_mid, script) if home_precomp_mid else None
-        a_late = apply_game_script(away_precomp_late, script) if away_precomp_late else None
-        h_late = apply_game_script(home_precomp_late, script) if home_precomp_late else None
-        a_risp = apply_game_script(away_precomp_risp, script) if away_precomp_risp else None
-        h_risp = apply_game_script(home_precomp_risp, script) if home_precomp_risp else None
-        a_late2 = apply_game_script(away_precomp_late2, script) if away_precomp_late2 else None
-        h_late2 = apply_game_script(home_precomp_late2, script) if home_precomp_late2 else None
-
+        sc = _script_cache[script]
         return simulate_game(
-            a_early,
-            h_early,
-            a_mid,
-            h_mid,
-            a_late,
-            h_late,
-            a_risp,
-            h_risp,
+            sc[0],
+            sc[1],
+            sc[2],
+            sc[3],
+            sc[4],
+            sc[5],
+            sc[6],
+            sc[7],
             away_batter_rates,
             home_batter_rates,
-            a_late2,
-            h_late2,
+            sc[8],
+            sc[9],
             **kw,
         )
 
