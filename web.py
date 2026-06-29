@@ -162,8 +162,8 @@ _score_pairs_cache = {}  # game_pk -> score_pairs dict for SGP correlated prob (
 _batter_props_cache = {}  # game_pk -> {away: [...], home: [...], away_team, home_team, ...}
 _SCORE_PAIRS_MAXSIZE = 30
 
-N_SIMS_SINGLE = 10_000  # simulations for one-game view (25 math models make each sim richer)
-N_SIMS_ALL = 5_000  # simulations per game in simulate-all (faster)
+N_SIMS_SINGLE = 5_000  # simulations for one-game view (25 math models make each sim richer)
+N_SIMS_ALL = 2_000  # simulations per game in simulate-all (faster)
 PARLAY_THRESHOLD = 65.0  # min win % to include in best parlay
 BET_THRESHOLD = 62.0  # min win % to show in best bets section
 
@@ -1079,7 +1079,7 @@ def simulate(game_pk):
         abort(404)
 
     # Read sim count from URL e.g. /simulate/822961?sims=500000
-    allowed = {10_000, 20_000, 50_000, 100_000}
+    allowed = {5_000, 10_000, 20_000, 50_000}
     try:
         n_sims = int(request.args.get("sims", N_SIMS_SINGLE))
         if n_sims not in allowed:
