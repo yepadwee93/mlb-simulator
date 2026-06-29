@@ -116,14 +116,17 @@ def log_odds(
     away_implied_pct,
     home_implied_pct,
     over_under=None,
+    model_away_pct=None,
+    model_home_pct=None,
+    model_away_runs=None,
+    model_home_runs=None,
 ):
     """Save a snapshot of Vegas odds for this game to odds_history."""
     try:
-        # Only insert if we don't already have a row for this game today
         existing = (
             supa()
             .table("odds_history")
-            .select("id")
+            .select("id, away_ml_open")
             .eq("game_pk", str(game_pk))
             .eq("game_date", str(game_date))
             .execute()
@@ -139,28 +142,81 @@ def log_odds(
             "home_implied_pct": round(float(home_implied_pct), 2) if home_implied_pct else None,
             "over_under": float(over_under) if over_under else None,
         }
+        if model_away_pct is not None:
+            row["model_away_pct"] = round(float(model_away_pct), 2)
+        if model_home_pct is not None:
+            row["model_home_pct"] = round(float(model_home_pct), 2)
+        if model_away_runs is not None:
+            row["model_away_runs"] = round(float(model_away_runs), 2)
+        if model_home_runs is not None:
+            row["model_home_runs"] = round(float(model_home_runs), 2)
         if existing.data:
+            has_open = existing.data[0].get("away_ml_open") is not None
+            if not has_open and away_ml:
+                row["away_ml_open"] = int(away_ml)
+                row["home_ml_open"] = int(home_ml) if home_ml else None
             supa().table("odds_history").update(row).eq("game_pk", str(game_pk)).eq(
                 "game_date", str(game_date)
             ).execute()
         else:
+            if away_ml:
+                row["away_ml_open"] = int(away_ml)
+            if home_ml:
+                row["home_ml_open"] = int(home_ml)
             supa().table("odds_history").insert(row).execute()
     except Exception:
         pass
 
 
-def get_odds_history(limit=100):
+def get_odds_history(limit=200, date_from=None, date_to=None):
     """Returns recent odds history rows, newest first."""
-    res = (
-        supa()
-        .table("odds_history")
-        .select("*")
-        .order("game_date", desc=True)
-        .order("logged_at", desc=True)
-        .limit(limit)
-        .execute()
-    )
+    q = supa().table("odds_history").select("*")
+    if date_from:
+        q = q.gte("game_date", str(date_from))
+    if date_to:
+        q = q.lte("game_date", str(date_to))
+    res = q.order("game_date", desc=True).order("logged_at", desc=True).limit(limit).execute()
     return res.data or []
+
+
+def settle_odds_history():
+    """Fill in actual results for unsettled odds_history rows using predictions table."""
+    try:
+        unsettled = (
+            supa()
+            .table("odds_history")
+            .select("game_pk, game_date")
+            .is_("actual_winner", "null")
+            .limit(100)
+            .execute()
+        )
+        if not unsettled.data:
+            return 0
+
+        game_pks = [r["game_pk"] for r in unsettled.data]
+        settled = (
+            supa()
+            .table("predictions")
+            .select("game_pk, actual_winner, actual_away_runs, actual_home_runs")
+            .in_("game_pk", game_pks)
+            .not_.is_("actual_winner", "null")
+            .execute()
+        )
+        count = 0
+        for pred in settled.data or []:
+            gpk = pred["game_pk"]
+            winner = pred["actual_winner"]
+            supa().table("odds_history").update(
+                {
+                    "actual_winner": winner,
+                    "actual_away_runs": pred.get("actual_away_runs"),
+                    "actual_home_runs": pred.get("actual_home_runs"),
+                }
+            ).eq("game_pk", gpk).execute()
+            count += 1
+        return count
+    except Exception:
+        return 0
 
 
 def save_game_note(user_id, game_pk, game_date, away_team, home_team, note):

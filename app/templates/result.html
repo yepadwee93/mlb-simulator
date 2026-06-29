@@ -1442,13 +1442,12 @@ document.querySelectorAll('[data-prop-player]').forEach(function(wrapper) {
   <div id="sgp-body" style="padding:20px 24px;">
 
     <p style="font-size:0.82rem;color:#b0b8cc;margin-bottom:16px;">
-      Add legs from <b>{{ away_team }}</b> vs <b>{{ home_team }}</b>. Probabilities are computed from the actual score distribution in your {{ "{:,}".format(n_sims) }} simulations — fully correlated (e.g. if one team wins big, the over is more likely too).
+      Combine game outcomes + player props from <b>{{ away_team }}</b> vs <b>{{ home_team }}</b>. Probabilities account for correlations — e.g. if a team wins, their batters likely had more hits.
     </p>
 
-    <!-- Leg builder -->
+    <!-- ── Game-Level Legs ── -->
+    <div style="font-size:0.68rem;text-transform:uppercase;letter-spacing:.6px;color:#9aa0b8;font-weight:700;margin-bottom:8px;">Game Outcomes</div>
     <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:18px;">
-
-      <!-- ML legs -->
       <button class="sgp-leg-btn" data-type="ml_away" data-line="0" data-label="ML: {{ away_team }}"
               onclick="sgpToggle(this)" style="background:#1e2235;border:1px solid #353a52;color:#e8eaf0;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.82rem;">
         ML: {{ away_team }}
@@ -1457,8 +1456,6 @@ document.querySelectorAll('[data-prop-player]').forEach(function(wrapper) {
               onclick="sgpToggle(this)" style="background:#1e2235;border:1px solid #353a52;color:#e8eaf0;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.82rem;">
         ML: {{ home_team }}
       </button>
-
-      <!-- Run line -->
       <button class="sgp-leg-btn" data-type="rl_away" data-line="-1.5" data-label="{{ away_team }} -1.5"
               onclick="sgpToggle(this)" style="background:#1e2235;border:1px solid #353a52;color:#e8eaf0;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.82rem;">
         {{ away_team }} -1.5
@@ -1467,8 +1464,6 @@ document.querySelectorAll('[data-prop-player]').forEach(function(wrapper) {
               onclick="sgpToggle(this)" style="background:#1e2235;border:1px solid #353a52;color:#e8eaf0;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.82rem;">
         {{ home_team }} -1.5
       </button>
-
-      <!-- Totals — auto-populate from avg_total_runs if available -->
       {% set ou_line = ((away_avg_runs + home_avg_runs) | round(0) | int) %}
       <button class="sgp-leg-btn" data-type="over" data-line="{{ ou_line - 0.5 }}" data-label="Over {{ ou_line - 0.5 }}"
               onclick="sgpToggle(this)" style="background:#1e2235;border:1px solid #353a52;color:#e8eaf0;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.82rem;">
@@ -1478,8 +1473,6 @@ document.querySelectorAll('[data-prop-player]').forEach(function(wrapper) {
               onclick="sgpToggle(this)" style="background:#1e2235;border:1px solid #353a52;color:#e8eaf0;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.82rem;">
         Under {{ ou_line - 0.5 }}
       </button>
-
-      <!-- Custom total line input -->
       <div style="display:flex;align-items:center;gap:6px;">
         <input id="sgp-custom-line" type="number" step="0.5" min="1" max="25" value="{{ ou_line - 0.5 }}"
                style="width:70px;background:#0d1120;border:1px solid #333650;color:#e8eaf0;padding:6px 10px;border-radius:7px;font-size:0.82rem;">
@@ -1488,9 +1481,107 @@ document.querySelectorAll('[data-prop-player]').forEach(function(wrapper) {
       </div>
     </div>
 
+    <!-- ── Pitcher K Props ── -->
+    {% if (away_k_pred and away_k_pred.model_k) or (home_k_pred and home_k_pred.model_k) %}
+    <div style="border-top:1px solid #252836;margin-top:4px;padding-top:16px;">
+      <div style="font-size:0.68rem;text-transform:uppercase;letter-spacing:.6px;color:#b39ddb;font-weight:700;margin-bottom:10px;">Pitcher Strikeouts</div>
+      {% if away_k_pred and away_k_pred.model_k %}
+      <div style="margin-bottom:10px;">
+        <span style="font-size:0.78rem;color:#e8eaf0;font-weight:600;margin-right:10px;">{{ away_pitcher_name }} <span style="color:#555870;font-weight:400;">({{ away_team }})</span> — Proj {{ away_k_pred.model_k }} K</span>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">
+          {% for line, pct in away_k_lines.items() %}
+          {% if pct >= 10 and pct <= 90 %}
+          <button class="sgp-prop-btn" data-player="{{ away_pitcher_name }}" data-team="away" data-market="k"
+                  data-line="{{ line }}" data-ou="over" data-base-prob="{{ (pct / 100) | round(3) }}"
+                  data-label="{{ away_pitcher_name }} O{{ line }}K" onclick="sgpToggleProp(this)"
+                  style="background:#1e2235;border:1px solid #353a52;color:#e8eaf0;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:0.78rem;transition:all 0.15s;">
+            O{{ line }} <span style="color:#b39ddb;">{{ pct }}%</span>
+          </button>
+          {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+      {% if home_k_pred and home_k_pred.model_k %}
+      <div style="margin-bottom:10px;">
+        <span style="font-size:0.78rem;color:#e8eaf0;font-weight:600;margin-right:10px;">{{ home_pitcher_name }} <span style="color:#555870;font-weight:400;">({{ home_team }})</span> — Proj {{ home_k_pred.model_k }} K</span>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">
+          {% for line, pct in home_k_lines.items() %}
+          {% if pct >= 10 and pct <= 90 %}
+          <button class="sgp-prop-btn" data-player="{{ home_pitcher_name }}" data-team="home" data-market="k"
+                  data-line="{{ line }}" data-ou="over" data-base-prob="{{ (pct / 100) | round(3) }}"
+                  data-label="{{ home_pitcher_name }} O{{ line }}K" onclick="sgpToggleProp(this)"
+                  style="background:#1e2235;border:1px solid #353a52;color:#e8eaf0;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:0.78rem;transition:all 0.15s;">
+            O{{ line }} <span style="color:#b39ddb;">{{ pct }}%</span>
+          </button>
+          {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- ── Batter Prop Legs ── -->
+    {% if away_batter_props or home_batter_props %}
+    <div style="border-top:1px solid #252836;margin-top:4px;padding-top:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <div style="font-size:0.68rem;text-transform:uppercase;letter-spacing:.6px;color:#b39ddb;font-weight:700;">Player Props</div>
+        <button id="sgp-toggle-props-btn" onclick="document.getElementById('sgp-props-grid').style.display=document.getElementById('sgp-props-grid').style.display==='none'?'block':'none';this.textContent=this.textContent==='Show ▾'?'Hide ▴':'Show ▾';"
+                style="background:none;border:1px solid #353a52;color:#b0b8cc;padding:4px 12px;border-radius:6px;cursor:pointer;font-size:0.72rem;">Show ▾</button>
+      </div>
+      <div id="sgp-props-grid" style="display:none;">
+        {% macro sgp_batter_section(team_name, team_side, batter_props) %}
+        {% if batter_props %}
+        <div style="margin-bottom:16px;">
+          <div style="font-weight:700;font-size:0.82rem;color:#64b5f6;margin-bottom:8px;">{{ team_name }}</div>
+          {% for p in batter_props %}
+          <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:5px;align-items:center;">
+            <span style="width:130px;font-size:0.75rem;color:#e8eaf0;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ p.name }}</span>
+            <button class="sgp-prop-btn" data-player="{{ p.name }}" data-team="{{ team_side }}" data-market="hits"
+                    data-line="0.5" data-ou="over" data-base-prob="{{ (p.hit_pct / 100) | round(3) }}"
+                    data-label="{{ p.name }} Hit" onclick="sgpToggleProp(this)"
+                    style="background:#1e2235;border:1px solid #353a52;color:#e8eaf0;padding:5px 10px;border-radius:7px;cursor:pointer;font-size:0.72rem;transition:all 0.15s;">
+              Hit <span style="color:#b39ddb;">{{ p.hit_pct }}%</span>
+            </button>
+            {% if p.multi_hit_pct >= 5 %}
+            <button class="sgp-prop-btn" data-player="{{ p.name }}" data-team="{{ team_side }}" data-market="hits"
+                    data-line="1.5" data-ou="over" data-base-prob="{{ (p.multi_hit_pct / 100) | round(3) }}"
+                    data-label="{{ p.name }} 2+H" onclick="sgpToggleProp(this)"
+                    style="background:#1e2235;border:1px solid #353a52;color:#e8eaf0;padding:5px 10px;border-radius:7px;cursor:pointer;font-size:0.72rem;transition:all 0.15s;">
+              2+H <span style="color:#b39ddb;">{{ p.multi_hit_pct }}%</span>
+            </button>
+            {% endif %}
+            {% if p.hr_pct >= 3 %}
+            <button class="sgp-prop-btn" data-player="{{ p.name }}" data-team="{{ team_side }}" data-market="hr"
+                    data-line="0.5" data-ou="over" data-base-prob="{{ (p.hr_pct / 100) | round(3) }}"
+                    data-label="{{ p.name }} HR" onclick="sgpToggleProp(this)"
+                    style="background:#1e2235;border:1px solid #353a52;color:#e8eaf0;padding:5px 10px;border-radius:7px;cursor:pointer;font-size:0.72rem;transition:all 0.15s;">
+              HR <span style="color:#b39ddb;">{{ p.hr_pct }}%</span>
+            </button>
+            {% endif %}
+            <button class="sgp-prop-btn" data-player="{{ p.name }}" data-team="{{ team_side }}" data-market="tb"
+                    data-line="1.5" data-ou="over" data-base-prob="{{ (p.tb_pct_2plus / 100) | round(3) }}"
+                    data-label="{{ p.name }} 2+TB" onclick="sgpToggleProp(this)"
+                    style="background:#1e2235;border:1px solid #353a52;color:#e8eaf0;padding:5px 10px;border-radius:7px;cursor:pointer;font-size:0.72rem;transition:all 0.15s;">
+              2+TB <span style="color:#b39ddb;">{{ p.tb_pct_2plus }}%</span>
+            </button>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% endmacro %}
+        {{ sgp_batter_section(away_team, "away", away_batter_props) }}
+        {{ sgp_batter_section(home_team, "home", home_batter_props) }}
+      </div>
+    </div>
+    {% endif %}
+
     <!-- Active legs display -->
-    <div id="sgp-legs-list" style="min-height:36px;margin-bottom:14px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
-      <span style="color:#555870;font-size:0.8rem;font-style:italic;" id="sgp-empty-msg">No legs selected — click buttons above</span>
+    <div style="margin-top:16px;">
+      <div id="sgp-legs-list" style="min-height:36px;margin-bottom:14px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+        <span style="color:#555870;font-size:0.8rem;font-style:italic;" id="sgp-empty-msg">No legs selected — click buttons above</span>
+      </div>
     </div>
 
     <!-- Result -->
@@ -1508,9 +1599,33 @@ document.querySelectorAll('[data-prop-player]').forEach(function(wrapper) {
           <div style="font-size:0.72rem;color:#9aa0b8;text-transform:uppercase;letter-spacing:.4px;">Legs</div>
           <div id="sgp-legs-count" style="font-size:1.8rem;font-weight:800;color:#b0b8cc;"></div>
         </div>
+        <div>
+          <div style="font-size:0.72rem;color:#9aa0b8;text-transform:uppercase;letter-spacing:.4px;">If Independent</div>
+          <div id="sgp-uncorr" style="font-size:1.4rem;font-weight:700;color:#555870;"></div>
+        </div>
       </div>
-      <div style="margin-top:10px;font-size:0.75rem;color:#555870;">
-        Correlated probability — accounts for the natural relationship between legs (e.g. team wins → higher scoring game is slightly more likely).
+
+      <!-- Stake / Payout -->
+      <div style="margin-top:16px;border-top:1px solid #252836;padding-top:14px;">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <label style="font-size:0.72rem;color:#9aa0b8;white-space:nowrap;">Stake $</label>
+            <input id="sgp-stake" type="number" value="10" min="1" oninput="sgpRecalcPayout()"
+                   style="width:80px;background:#0d1120;border:1px solid #333650;border-radius:8px;color:#e8eaf0;padding:7px 10px;font-size:0.88rem;text-align:right;">
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <label style="font-size:0.72rem;color:#9aa0b8;white-space:nowrap;">Book Odds</label>
+            <input id="sgp-book-odds" type="text" placeholder="e.g. +450" oninput="sgpRecalcPayout()"
+                   style="width:90px;background:#0d1120;border:1px solid #333650;border-radius:8px;color:#e8eaf0;padding:7px 10px;font-size:0.88rem;text-align:right;">
+          </div>
+        </div>
+        <div id="sgp-payout" style="font-size:1.6rem;font-weight:900;color:#ffd54f;text-align:center;margin-top:10px;">$0.00</div>
+        <div style="font-size:0.7rem;color:#9aa0b8;text-align:center;">Potential payout at fair odds</div>
+        <div id="sgp-ev-badge" style="margin-top:10px;"></div>
+      </div>
+
+      <div style="margin-top:10px;font-size:0.72rem;color:#555870;">
+        Correlated probability — game legs use {{ "{:,}".format(n_sims) }} simulation outcomes; prop legs are adjusted for correlation with game outcomes.
       </div>
     </div>
 
@@ -1520,7 +1635,9 @@ document.querySelectorAll('[data-prop-player]').forEach(function(wrapper) {
 
 <script>
 (function() {
-  var sgpLegs = {};  // label -> {type, line}
+  var sgpLegs = {};      // label -> {type, line}
+  var sgpPropLegs = {};  // label -> {player, team, market, line, base_prob}
+  var lastSgpData = null;
 
   window.sgpToggle = function(btn) {
     var label = btn.dataset.label;
@@ -1534,6 +1651,28 @@ document.querySelectorAll('[data-prop-player]').forEach(function(wrapper) {
       btn.style.borderColor = '#64b5f6';
       btn.style.color = '#64b5f6';
       btn.style.background = '#0d2040';
+    }
+    sgpRefresh();
+  };
+
+  window.sgpToggleProp = function(btn) {
+    var label = btn.dataset.label;
+    if (sgpPropLegs[label]) {
+      delete sgpPropLegs[label];
+      btn.style.borderColor = '#353a52';
+      btn.style.color = '#e8eaf0';
+      btn.style.background = '#1e2235';
+    } else {
+      sgpPropLegs[label] = {
+        player: btn.dataset.player,
+        team: btn.dataset.team,
+        market: btn.dataset.market,
+        line: parseFloat(btn.dataset.line),
+        base_prob: parseFloat(btn.dataset.baseProb)
+      };
+      btn.style.borderColor = '#b39ddb';
+      btn.style.color = '#b39ddb';
+      btn.style.background = '#1a1530';
     }
     sgpRefresh();
   };
@@ -1552,30 +1691,59 @@ document.querySelectorAll('[data-prop-player]').forEach(function(wrapper) {
     sgpRefresh();
   };
 
+  window.sgpRecalcPayout = function() {
+    if (!lastSgpData) return;
+    var stake = parseFloat(document.getElementById('sgp-stake').value) || 10;
+    var prob = lastSgpData.prob / 100;
+    if (prob <= 0) return;
+    var fairDecimal = 1 / prob;
+    var payout = stake * fairDecimal;
+    document.getElementById('sgp-payout').textContent = '$' + payout.toFixed(2);
+
+    var bookInput = document.getElementById('sgp-book-odds').value.trim();
+    var badgeWrap = document.getElementById('sgp-ev-badge');
+    if (bookInput) {
+      var bookAmerican = parseFloat(bookInput.replace('+', ''));
+      if (!isNaN(bookAmerican) && bookAmerican !== 0) {
+        var bookDecimal = bookAmerican > 0 ? bookAmerican / 100 + 1 : 100 / Math.abs(bookAmerican) + 1;
+        var ev = (prob * (bookDecimal - 1) - (1 - prob)) * 100;
+        var evStr = (ev >= 0 ? '+' : '') + '$' + ev.toFixed(2);
+        if (ev > 0) {
+          badgeWrap.innerHTML = '<div style="display:inline-block;padding:4px 14px;border-radius:20px;font-size:0.78rem;font-weight:700;width:100%;text-align:center;background:#1b4332;color:#4caf50;border:1px solid #2e7d32;">✅ +EV vs Book · ' + evStr + ' per $100</div>';
+        } else {
+          badgeWrap.innerHTML = '<div style="display:inline-block;padding:4px 14px;border-radius:20px;font-size:0.78rem;font-weight:700;width:100%;text-align:center;background:#3a1a1a;color:#ef5350;border:1px solid #c62828;">❌ −EV vs Book · ' + evStr + ' per $100</div>';
+        }
+        var bookPayout = stake * bookDecimal;
+        document.getElementById('sgp-payout').textContent = '$' + bookPayout.toFixed(2);
+        return;
+      }
+    }
+    badgeWrap.innerHTML = '';
+  };
+
   function sgpRefresh() {
     var list = document.getElementById('sgp-legs-list');
-    var emptyMsg = document.getElementById('sgp-empty-msg');
-    var keys = Object.keys(sgpLegs);
+    var gameKeys = Object.keys(sgpLegs);
+    var propKeys = Object.keys(sgpPropLegs);
+    var allCount = gameKeys.length + propKeys.length;
 
-    // Render pills
     list.innerHTML = '';
-    if (keys.length === 0) {
-      list.appendChild(emptyMsg);
+    if (allCount === 0) {
+      list.innerHTML = '<span style="color:#555870;font-size:0.8rem;font-style:italic;">No legs selected — click buttons above</span>';
       document.getElementById('sgp-result').style.display = 'none';
       return;
     }
-    keys.forEach(function(label) {
+
+    // Render game leg pills (blue)
+    gameKeys.forEach(function(label) {
       var pill = document.createElement('span');
       pill.style.cssText = 'background:#1e2a40;border:1px solid #64b5f6;color:#64b5f6;padding:5px 12px;border-radius:20px;font-size:0.78rem;cursor:pointer;';
       pill.textContent = label + ' ✕';
       pill.onclick = function() {
         delete sgpLegs[label];
-        // deselect matching preset btn
         document.querySelectorAll('.sgp-leg-btn').forEach(function(b) {
           if (b.dataset.label === label) {
-            b.style.borderColor = '#353a52';
-            b.style.color = '#e8eaf0';
-            b.style.background = '#1e2235';
+            b.style.borderColor = '#353a52'; b.style.color = '#e8eaf0'; b.style.background = '#1e2235';
           }
         });
         sgpRefresh();
@@ -1583,16 +1751,37 @@ document.querySelectorAll('[data-prop-player]').forEach(function(wrapper) {
       list.appendChild(pill);
     });
 
-    // Call API
+    // Render prop leg pills (purple)
+    propKeys.forEach(function(label) {
+      var pill = document.createElement('span');
+      pill.style.cssText = 'background:#1a1530;border:1px solid #b39ddb;color:#b39ddb;padding:5px 12px;border-radius:20px;font-size:0.78rem;cursor:pointer;';
+      pill.textContent = label + ' ✕';
+      pill.onclick = function() {
+        delete sgpPropLegs[label];
+        document.querySelectorAll('.sgp-prop-btn').forEach(function(b) {
+          if (b.dataset.label === label) {
+            b.style.borderColor = '#353a52'; b.style.color = '#e8eaf0'; b.style.background = '#1e2235';
+          }
+        });
+        sgpRefresh();
+      };
+      list.appendChild(pill);
+    });
+
+    // Build payloads
     var gamePk = {{ game_pk }};
-    var legs = keys.map(function(k) {
+    var legs = gameKeys.map(function(k) {
       return {type: sgpLegs[k].type, line: sgpLegs[k].line};
+    });
+    var prop_legs = propKeys.map(function(k) {
+      var p = sgpPropLegs[k];
+      return {player: p.player, team: p.team, market: p.market, line: p.line, base_prob: p.base_prob};
     });
 
     csrfFetch('/sgp/' + gamePk, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({legs: legs})
+      body: JSON.stringify({legs: legs, prop_legs: prop_legs})
     })
     .then(function(r) { return r.json(); })
     .then(function(d) {
@@ -1603,10 +1792,13 @@ document.querySelectorAll('[data-prop-player]').forEach(function(wrapper) {
         return;
       }
       document.getElementById('sgp-error').style.display = 'none';
-      document.getElementById('sgp-prob').textContent = d.prob.toFixed(1) + '%';
+      document.getElementById('sgp-prob').textContent = d.prob.toFixed(2) + '%';
       document.getElementById('sgp-odds').textContent = d.fair_odds;
-      document.getElementById('sgp-legs-count').textContent = d.legs;
+      document.getElementById('sgp-legs-count').textContent = d.total_legs;
+      document.getElementById('sgp-uncorr').textContent = d.uncorrelated_prob.toFixed(2) + '%';
       document.getElementById('sgp-result').style.display = 'block';
+      lastSgpData = d;
+      sgpRecalcPayout();
     })
     .catch(function() {
       document.getElementById('sgp-error').textContent = 'Error calculating — try again';

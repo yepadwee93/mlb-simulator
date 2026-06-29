@@ -97,6 +97,7 @@ from data.tracker import (
     log_odds,
     log_prediction,
     save_game_note,
+    settle_odds_history,
     update_results,
 )
 from simulation.engine import (
@@ -158,6 +159,7 @@ def _uid():
 
 
 _score_pairs_cache = {}  # game_pk -> score_pairs dict for SGP correlated prob (max 30 entries)
+_batter_props_cache = {}  # game_pk -> {away: [...], home: [...], away_team, home_team, ...}
 _SCORE_PAIRS_MAXSIZE = 30
 
 N_SIMS_SINGLE = 50_000  # simulations for one-game view (50k ≈ same accuracy as 100k, 2x faster)
@@ -719,6 +721,23 @@ def build_game_result(game, n_sims, use_splits=True):
     result["home_injury_impact"] = home_injury_impact
     result["home_k_pred"] = home_k_pred
 
+    # Pitcher K line probabilities for SGP builder (Poisson-based)
+    import math as _math
+
+    def _k_line_probs(k_pred):
+        if not k_pred or not k_pred.get("model_k"):
+            return {}
+        lam = k_pred["model_k"]
+        lines = {}
+        for line in [3.5, 4.5, 5.5, 6.5, 7.5]:
+            threshold = int(line + 0.5)
+            p_under = sum(_math.exp(-lam) * lam**k / _math.factorial(k) for k in range(threshold))
+            lines[str(line)] = round((1 - p_under) * 100, 1)
+        return lines
+
+    result["away_k_lines"] = _k_line_probs(away_k_pred)
+    result["home_k_lines"] = _k_line_probs(home_k_pred)
+
     # Attach IDs for logo/headshot URLs in templates
     result["away_team_id"] = game.get("away_id")
     result["home_team_id"] = game.get("home_id")
@@ -1157,6 +1176,10 @@ def simulate(game_pk):
                 away_implied_pct=game_odds.get("away_implied_pct"),
                 home_implied_pct=game_odds.get("home_implied_pct"),
                 over_under=ou_snap.get("line"),
+                model_away_pct=result.get("away_win_pct"),
+                model_home_pct=result.get("home_win_pct"),
+                model_away_runs=result.get("away_avg_runs"),
+                model_home_runs=result.get("home_avg_runs"),
             )
         except Exception:
             pass
@@ -1235,12 +1258,18 @@ def simulate(game_pk):
             home_pitcher_stats,
             weather=weather,
             venue=game.get("venue"),
+            recent_stats_list=away_recent,
+            umpire_name=umpire_name,
+            opp_catcher_cs=home_catcher_cs,
         )
         home_batter_props = predict_batter_props(
             home_batter_stats,
             away_pitcher_stats,
             weather=weather,
             venue=game.get("venue"),
+            recent_stats_list=home_recent,
+            umpire_name=umpire_name,
+            opp_catcher_cs=away_catcher_cs,
         )
         # Attach batter names to each slot
         for i, prop in enumerate(away_batter_props):
@@ -1255,6 +1284,17 @@ def simulate(game_pk):
 
     result["away_batter_props"] = away_batter_props
     result["home_batter_props"] = home_batter_props
+
+    # Cache batter props for SGP correlated probability calculations
+    if away_batter_props or home_batter_props:
+        if len(_batter_props_cache) >= _SCORE_PAIRS_MAXSIZE:
+            _batter_props_cache.pop(next(iter(_batter_props_cache)))
+        _batter_props_cache[game_pk] = {
+            "away": away_batter_props,
+            "home": home_batter_props,
+            "away_team": result.get("away_team", ""),
+            "home_team": result.get("home_team", ""),
+        }
 
     # ── Batting order optimizer ───────────────────────────────────────
     try:
@@ -1825,69 +1865,145 @@ def simulate_all():
     )
 
 
+# ── SGP Correlation Factors ──────────────────────────────────────────────────
+# Multiplicative adjustments to base prop probabilities conditioned on game legs.
+# Derived from MLB seasonal correlations between game outcomes and batter stats.
+_SGP_BATTER_CORR = {
+    "ml_same": {"hits": 1.12, "hr": 1.08, "rbi": 1.18, "tb": 1.14, "runs": 1.20},
+    "ml_opp": {"hits": 0.92, "hr": 0.94, "rbi": 0.85, "tb": 0.90, "runs": 0.82},
+    "rl_same": {"hits": 1.20, "hr": 1.15, "rbi": 1.30, "tb": 1.22, "runs": 1.28},
+    "rl_opp": {"hits": 0.85, "hr": 0.88, "rbi": 0.75, "tb": 0.82, "runs": 0.75},
+    "over": {"hits": 1.10, "hr": 1.12, "rbi": 1.15, "tb": 1.12, "runs": 1.15},
+    "under": {"hits": 0.90, "hr": 0.88, "rbi": 0.85, "tb": 0.88, "runs": 0.85},
+}
+_SGP_PITCHER_K_CORR = {
+    "ml_same": 1.05,
+    "ml_opp": 0.97,
+    "rl_same": 1.08,
+    "rl_opp": 0.94,
+    "over": 1.03,
+    "under": 1.08,
+}
+
+
+def _classify_game_leg(leg_type, player_team):
+    """Map a game leg type + player team to a correlation key."""
+    if leg_type in ("ml_away", "ml_home"):
+        is_same = (leg_type == "ml_away" and player_team == "away") or (
+            leg_type == "ml_home" and player_team == "home"
+        )
+        return "ml_same" if is_same else "ml_opp"
+    if leg_type in ("rl_away", "rl_home"):
+        is_same = (leg_type == "rl_away" and player_team == "away") or (
+            leg_type == "rl_home" and player_team == "home"
+        )
+        return "rl_same" if is_same else "rl_opp"
+    if leg_type == "over":
+        return "over"
+    if leg_type == "under":
+        return "under"
+    return None
+
+
+def _correlated_prop_prob(base_prob, prop_market, player_team, game_legs):
+    """Adjust a base prop probability for correlation with game-level legs."""
+    adj = base_prob
+    for leg in game_legs:
+        key = _classify_game_leg(leg.get("type", ""), player_team)
+        if not key:
+            continue
+        if prop_market == "k":
+            factor = _SGP_PITCHER_K_CORR.get(key, 1.0)
+        else:
+            factor = _SGP_BATTER_CORR.get(key, {}).get(prop_market, 1.0)
+        adj *= factor
+    return max(0.01, min(0.99, adj))
+
+
 @app.route("/sgp/<int:game_pk>", methods=["POST"])
 def sgp_calc(game_pk):
-    """Compute correlated SGP probability from simulation score_pairs."""
-    import json as _json
-
+    """Compute correlated SGP probability from simulation score_pairs + player props."""
     data = request.get_json(silent=True) or {}
-    legs = data.get("legs", [])  # each leg: {type, line, team}
-    # type: "ml_away"|"ml_home"|"over"|"under"|"rl_away"|"rl_home"
-    # line: numeric (e.g. 8.5 for totals, -1.5 for rl)
-    # team: ignored for over/under
+    legs = data.get("legs", [])
+    prop_legs = data.get("prop_legs", [])
 
-    # Retrieve cached score_pairs from last sim of this game
+    if not legs and not prop_legs:
+        return jsonify({"error": "Add at least one leg"}), 400
+
     raw_pairs = _score_pairs_cache.get(game_pk)
-    if not raw_pairs:
+    if not raw_pairs and legs:
         return jsonify({"error": "Run simulation first"}), 400
 
-    # keys are strings like "(3, 5)" from JSON serialization — parse back
-    pairs = {}
-    for k, v in raw_pairs.items():
-        try:
-            a, h = k.strip("()").split(", ")
-            pairs[(int(a), int(h))] = v
-        except Exception:
-            pass
+    # Game-level probability from score_pairs
+    game_prob = 1.0
+    total = 0
+    game_hits = 0
+    if legs and raw_pairs:
+        pairs = {}
+        for k, v in raw_pairs.items():
+            try:
+                a, h = k.strip("()").split(", ")
+                pairs[(int(a), int(h))] = v
+            except Exception:
+                pass
 
-    total = sum(pairs.values())
-    if total == 0:
-        return jsonify({"error": "No simulation data"}), 400
+        total = sum(pairs.values())
+        if total == 0:
+            return jsonify({"error": "No simulation data"}), 400
 
-    def leg_hits(a, h, leg):
-        t = leg.get("type", "")
-        line = float(leg.get("line", 0))
-        if t == "ml_away":
-            return a > h
-        if t == "ml_home":
-            return h > a
-        if t == "over":
-            return (a + h) > line
-        if t == "under":
-            return (a + h) < line
-        if t == "rl_away":
-            return (a - h) > line  # e.g. line=-1.5 → a-h > -1.5 → away wins by 2+
-        if t == "rl_home":
-            return (h - a) > line
-        return False
+        def leg_hits(a, h, leg):
+            t = leg.get("type", "")
+            line = float(leg.get("line", 0))
+            if t == "ml_away":
+                return a > h
+            if t == "ml_home":
+                return h > a
+            if t == "over":
+                return (a + h) > line
+            if t == "under":
+                return (a + h) < line
+            if t == "rl_away":
+                return (a - h) > line
+            if t == "rl_home":
+                return (h - a) > line
+            return False
 
-    # Count simulations where ALL legs hit
-    hits = 0
-    for (a, h), count in pairs.items():
-        if all(leg_hits(a, h, leg) for leg in legs):
-            hits += count
+        game_hits = 0
+        for (a, h), count in pairs.items():
+            if all(leg_hits(a, h, leg) for leg in legs):
+                game_hits += count
+        game_prob = game_hits / total
 
-    prob = hits / total
-    fair_odds = round((-100 / prob) if prob >= 0.5 else (100 * (1 - prob) / prob), 0)
+    # Prop legs: apply correlation adjustments
+    uncorrelated_prob = game_prob
+    combined_prob = game_prob
+    for pl in prop_legs:
+        base = float(pl.get("base_prob", 0.5))
+        uncorrelated_prob *= base
+        adj = _correlated_prop_prob(base, pl.get("market", "hits"), pl.get("team", "away"), legs)
+        combined_prob *= adj
+
+    if combined_prob <= 0:
+        combined_prob = 0.001
+
+    fair_odds = round(
+        (-100 / combined_prob)
+        if combined_prob >= 0.5
+        else (100 * (1 - combined_prob) / combined_prob),
+        0,
+    )
     fair_odds_str = f"+{int(fair_odds)}" if fair_odds > 0 else str(int(fair_odds))
 
     return jsonify(
         {
-            "prob": round(prob * 100, 2),
+            "prob": round(combined_prob * 100, 2),
             "fair_odds": fair_odds_str,
             "legs": len(legs),
-            "hits": hits,
+            "prop_legs": len(prop_legs),
+            "total_legs": len(legs) + len(prop_legs),
+            "hits": game_hits,
             "total": total,
+            "uncorrelated_prob": round(uncorrelated_prob * 100, 2),
         }
     )
 
@@ -1987,8 +2103,54 @@ def update_my_picks():
 @app.route("/odds-history")
 @login_required
 def odds_history_page():
-    rows = get_odds_history(limit=200)
-    return render_template("odds_history.html", rows=rows)
+    date_from = request.args.get("from")
+    date_to = request.args.get("to")
+    settle_odds_history()
+    rows = get_odds_history(limit=300, date_from=date_from, date_to=date_to)
+
+    # Compute summary stats
+    total = len(rows)
+    settled = [r for r in rows if r.get("actual_winner")]
+    vegas_correct = sum(
+        1
+        for r in settled
+        if r.get("actual_winner")
+        and (
+            (r.get("away_ml") and r["away_ml"] < 0 and r["actual_winner"] == r["away_team"])
+            or (r.get("home_ml") and r["home_ml"] < 0 and r["actual_winner"] == r["home_team"])
+        )
+    )
+    model_correct = sum(
+        1
+        for r in settled
+        if r.get("actual_winner")
+        and r.get("model_away_pct")
+        and (
+            (
+                r["model_away_pct"] >= r.get("model_home_pct", 50)
+                and r["actual_winner"] == r["away_team"]
+            )
+            or (
+                r.get("model_home_pct", 50) > r["model_away_pct"]
+                and r["actual_winner"] == r["home_team"]
+            )
+        )
+    )
+    stats = {
+        "total": total,
+        "settled": len(settled),
+        "vegas_correct": vegas_correct,
+        "vegas_pct": round(vegas_correct / len(settled) * 100, 1) if settled else 0,
+        "model_correct": model_correct,
+        "model_pct": round(model_correct / len(settled) * 100, 1) if settled else 0,
+    }
+    return render_template(
+        "odds_history.html",
+        rows=rows,
+        stats=stats,
+        date_from=date_from or "",
+        date_to=date_to or "",
+    )
 
 
 @app.route("/accuracy")
