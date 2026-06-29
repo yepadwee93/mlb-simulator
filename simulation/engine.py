@@ -843,6 +843,8 @@ def precompute_lineup(
     daynight_stats_list: list = None,
     batter_rest_days: int = None,
     savant_list: list = None,
+    bat_sides: list = None,
+    pitch_hand: str = None,
     umpire_name: str = None,
     homeaway_stats_list: list = None,
     opp_catcher_cs: float = None,
@@ -915,29 +917,17 @@ def precompute_lineup(
         # Pitcher quality modifier
         probs = apply_pitcher_modifier(probs, pitcher_stats)
 
-        # Lineup protection: pitchers issue more walks to good hitters when
-        # the next batter is significantly better (don't want to face the
-        # cleanup guy with a runner on). Conversely, they attack the zone
-        # more aggressively when a weak hitter follows.
-        # OUTCOME_ORDER index 0 = WALK
+        # Enhanced lineup protection: affects BB, HR, and contact quality
+        # based on surrounding hitters (on-deck + preceding batter)
         try:
-            n_batters = len(lineup_stats)
-            curr_ops = float(stats.get("ops", "0") or "0")
-            next_stats = lineup_stats[(i + 1) % n_batters]
-            next_ops = float(next_stats.get("ops", "0") or "0")
-            ops_diff = next_ops - curr_ops
-            if ops_diff >= 0.120:
-                probs[0] *= 1.18  # next batter is a monster -- lots of nibbling
-            elif ops_diff >= 0.060:
-                probs[0] *= 1.10  # next batter is clearly better
-            elif ops_diff >= 0.030:
-                probs[0] *= 1.05  # next batter is somewhat better
-            elif ops_diff <= -0.060:
-                probs[0] *= 0.94  # next batter is weaker -- pitcher attacks zone
-            total = sum(probs)
-            probs = [p / total for p in probs]
-        except (ValueError, TypeError, ZeroDivisionError):
-            pass  # missing OPS data -- skip protection modifier
+            prot_list = compute_lineup_protection(lineup_stats)
+            probs = apply_lineup_protection(probs, prot_list[i])
+        except (ValueError, TypeError, ZeroDivisionError, IndexError):
+            pass
+
+        # Platoon split modifier (L/R matchup advantage)
+        if bat_sides and i < len(bat_sides) and pitch_hand:
+            probs = apply_platoon_modifier(probs, bat_sides[i], pitch_hand)
 
         # Ballpark factor (dimensions, altitude, park tendencies)
         if venue:
@@ -1080,6 +1070,7 @@ def compute_batter_rates(lineup_stats: list) -> list:
                 "sf_rate": round(min(max(sf_rate, 0.005), 0.15), 3),
                 "sb_rate": round(min(max(sb_rate, 0.005), 0.20), 3),
                 "sb_success": round(min(max(sb_success, 0.45), 0.92), 3),
+                "speed": classify_runner_speed(stats),
             }
         )
 
@@ -1103,28 +1094,22 @@ def simulate_at_bat(cum_weights: list) -> str:
 # ── STEP 3: Advance base runners ─────────────────────────────────
 
 
-def advance_runners(b1: bool, b2: bool, b3: bool, outcome: str) -> tuple:
+def advance_runners(
+    b1: bool,
+    b2: bool,
+    b3: bool,
+    outcome: str,
+    speed_b1: str = "avg",
+    speed_b2: str = "avg",
+    speed_b3: str = "avg",
+) -> tuple:
     """
     Given who's on base and what just happened, return:
       (new_b1, new_b2, new_b3, runs_scored)
 
-    Uses MLB-research baserunning probabilities instead of deterministic rules.
-    The old model assumed singles always scored runners from 2nd and doubles
-    always scored everyone — this inflated run totals by ~0.4 runs/game and
-    caused the O/U model to skew over.
-
-    Empirical rates (2022-2024 MLB average):
-      Single:
-        - Runner on 3rd → scores 87% of the time (held 13% on aggressive D)
-        - Runner on 2nd → scores 62% (held at 3rd 38%)
-        - Runner on 1st → reaches 3rd 27%, stays at 2nd 73%
-      Double:
-        - Runner on 3rd → scores 95%
-        - Runner on 2nd → scores 87%
-        - Runner on 1st → scores 52%, stays at 3rd 48%
-      Triple: all runners score (essentially 100%)
-      HR: all runners + batter score (100%)
-      Walk: pure force advance (no randomness needed)
+    Uses speed-graded MLB baserunning probabilities. Each runner's speed tier
+    (elite/fast/avg/slow/plod) determines their advancement probability on
+    singles and doubles. Triples and HRs always score everyone.
     """
     r = random.random  # local alias for speed inside hot loop
 
@@ -1142,53 +1127,55 @@ def advance_runners(b1: bool, b2: bool, b3: bool, outcome: str) -> tuple:
 
     if outcome == SINGLE:
         runs = 0
-        new_b1 = True  # batter always reaches 1st
+        new_b1 = True
         new_b2 = False
         new_b3 = False
 
+        st = SPEED_TRANSITIONS["single"]
         if b3:
-            if r() < 0.87:
-                runs += 1  # scores
+            if r() < st["from_3rd"].get(speed_b3, 0.87):
+                runs += 1
             else:
-                new_b3 = True  # held at 3rd (rare)
+                new_b3 = True
 
         if b2:
-            if r() < 0.62:
-                runs += 1  # scores from 2nd
+            if r() < st["from_2nd"].get(speed_b2, 0.62):
+                runs += 1
             else:
-                new_b3 = True  # held at 3rd
+                new_b3 = True
 
         if b1:
-            if r() < 0.27:
-                new_b3 = True  # first-to-third (speed play)
+            if r() < st["from_1st_to_3rd"].get(speed_b1, 0.27):
+                new_b3 = True
             else:
-                new_b2 = True  # normal: 1st to 2nd
+                new_b2 = True
 
         return new_b1, new_b2, new_b3, runs
 
     if outcome == DOUBLE:
         runs = 0
         new_b1 = False
-        new_b2 = True  # batter always at 2nd
+        new_b2 = True
         new_b3 = False
 
+        st = SPEED_TRANSITIONS["double"]
         if b3:
-            if r() < 0.95:
+            if r() < st["from_3rd"].get(speed_b3, 0.95):
                 runs += 1
             else:
                 new_b3 = True
 
         if b2:
-            if r() < 0.87:
+            if r() < st["from_2nd"].get(speed_b2, 0.87):
                 runs += 1
             else:
                 new_b3 = True
 
         if b1:
-            if r() < 0.52:
-                runs += 1  # scores from 1st on a double
+            if r() < st["from_1st"].get(speed_b1, 0.52):
+                runs += 1
             else:
-                new_b3 = True  # stops at 3rd
+                new_b3 = True
 
         return new_b1, new_b2, new_b3, runs
 
@@ -1897,6 +1884,401 @@ def apply_count_model(probs: list, count_profile: dict) -> list:
     return [p / total for p in adjusted]
 
 
+# ── 6. PLATOON SPLIT MODEL (L/R MATCHUP) ─────────────────────────────────────
+# Lefty vs lefty and righty vs righty (same-side) matchups dramatically change
+# outcomes. Empirical MLB data (2019-2024 averages):
+#
+#   Same-side (LHP vs LHB or RHP vs RHB):
+#     K rate +12%, BB rate -8%, HR rate -15%, BABIP -18 points
+#   Opposite-side (LHP vs RHB or RHP vs LHB):
+#     K rate -6%, BB rate +5%, HR rate +10%, BABIP +12 points
+#   Switch hitter vs any: ~60% of the opposite-side advantage
+#
+# These factors are applied on top of the split-blended probs from web.py.
+# We dampen to 40% because web.py already blends platoon split stats into
+# the base probabilities — this model captures the RESIDUAL effect that
+# individual split stats miss (small samples, structural platoon advantage).
+PLATOON_EFFECTS = {
+    "same": {"k_mult": 1.12, "bb_mult": 0.92, "hr_mult": 0.85, "hit_mult": 0.94},
+    "opposite": {"k_mult": 0.94, "bb_mult": 1.05, "hr_mult": 1.10, "hit_mult": 1.06},
+    "switch_opp": {"k_mult": 0.96, "bb_mult": 1.03, "hr_mult": 1.06, "hit_mult": 1.04},
+    "neutral": {"k_mult": 1.0, "bb_mult": 1.0, "hr_mult": 1.0, "hit_mult": 1.0},
+}
+
+PLATOON_DAMPEN = 0.40
+
+
+def get_platoon_key(bat_side: str, pitch_hand: str) -> str:
+    if not bat_side or not pitch_hand:
+        return "neutral"
+    bat_side = bat_side.upper()
+    pitch_hand = pitch_hand.upper()
+    if bat_side == "S":
+        return "switch_opp"
+    if bat_side == pitch_hand:
+        return "same"
+    return "opposite"
+
+
+def apply_platoon_modifier(probs: list, bat_side: str, pitch_hand: str) -> list:
+    key = get_platoon_key(bat_side, pitch_hand)
+    effects = PLATOON_EFFECTS[key]
+    if key == "neutral":
+        return probs
+
+    k_adj = 1.0 + (effects["k_mult"] - 1.0) * PLATOON_DAMPEN
+    bb_adj = 1.0 + (effects["bb_mult"] - 1.0) * PLATOON_DAMPEN
+    hr_adj = 1.0 + (effects["hr_mult"] - 1.0) * PLATOON_DAMPEN
+    hit_adj = 1.0 + (effects["hit_mult"] - 1.0) * PLATOON_DAMPEN
+
+    adjusted = list(probs)
+    adjusted[0] *= bb_adj
+    adjusted[1] *= k_adj
+    adjusted[2] *= hit_adj
+    adjusted[3] *= hit_adj
+    adjusted[4] *= hit_adj
+    adjusted[5] *= hr_adj
+    total = sum(adjusted)
+    return [p / total for p in adjusted]
+
+
+# ── 7. RUNNER SPEED GRADES + MARKOV BASE-STATE TRANSITIONS ───────────────────
+# Instead of fixed advancement probabilities for all runners, we grade runners
+# into speed tiers based on sprint speed / stolen base data and use tier-specific
+# transition probabilities.
+#
+# Speed tiers (derived from Statcast sprint speed, ft/sec):
+#   "elite"  (≥29.0): Billy Hamilton, Trea Turner — extra-base taking machines
+#   "fast"   (≥28.0): above-average speed, aggressive baserunning
+#   "avg"    (≥27.0): league average
+#   "slow"   (≥26.0): below average, careful baserunning
+#   "plod"   (<26.0): catchers, DHs, aging sluggers — station-to-station
+#
+# Transition probabilities: P(scores | on base X, outcome Y) by speed tier
+SPEED_TRANSITIONS = {
+    "single": {
+        "from_3rd": {"elite": 0.95, "fast": 0.92, "avg": 0.87, "slow": 0.82, "plod": 0.75},
+        "from_2nd": {"elite": 0.78, "fast": 0.70, "avg": 0.62, "slow": 0.52, "plod": 0.40},
+        "from_1st_to_3rd": {"elite": 0.45, "fast": 0.35, "avg": 0.27, "slow": 0.18, "plod": 0.10},
+    },
+    "double": {
+        "from_3rd": {"elite": 0.98, "fast": 0.97, "avg": 0.95, "slow": 0.93, "plod": 0.90},
+        "from_2nd": {"elite": 0.95, "fast": 0.92, "avg": 0.87, "slow": 0.82, "plod": 0.75},
+        "from_1st": {"elite": 0.72, "fast": 0.62, "avg": 0.52, "slow": 0.40, "plod": 0.28},
+    },
+}
+
+LEAGUE_AVG_SPRINT_SPEED = 27.0
+
+
+def classify_runner_speed(stats: dict, savant: dict = None) -> str:
+    sprint = None
+    if savant:
+        sprint = savant.get("sprint_speed")
+    if sprint is None and stats:
+        sb = stats.get("stolenBases", 0) or 0
+        cs = stats.get("caughtStealing", 0) or 0
+        pa = stats.get("plateAppearances", 1) or 1
+        sb_rate = sb / pa
+        if sb_rate > 0.06:
+            sprint = 29.0
+        elif sb_rate > 0.03:
+            sprint = 28.0
+        elif sb_rate > 0.01:
+            sprint = 27.0
+        elif sb + cs == 0 and pa > 100:
+            sprint = 25.5
+        else:
+            sprint = 26.5
+    if sprint is None:
+        return "avg"
+    if sprint >= 29.0:
+        return "elite"
+    if sprint >= 28.0:
+        return "fast"
+    if sprint >= 27.0:
+        return "avg"
+    if sprint >= 26.0:
+        return "slow"
+    return "plod"
+
+
+# ── 8. ENHANCED LINEUP PROTECTION ────────────────────────────────────────────
+# The existing protection model only modifies walk rate. Real lineup protection
+# also affects:
+#   - Pitch quality: pitchers throw more strikes to batters before strong hitters
+#     → better contact quality (fewer weak contacts, more barrels)
+#   - HR rate: when protection is strong, batter sees more fastballs in zone
+#     → slight HR boost (the "protection effect" in sabermetrics)
+#   - Conversely, weak protection means more nibbling → worse contact but more BBs
+#
+# This replaces the simple OPS-diff walk modifier in precompute_lineup.
+def compute_lineup_protection(lineup_stats: list) -> list:
+    """Return per-batter protection multipliers based on surrounding lineup quality."""
+    n = len(lineup_stats)
+    protection = []
+    for i in range(n):
+        curr_ops = float(lineup_stats[i].get("ops", "0") or "0")
+        next_ops = float(lineup_stats[(i + 1) % n].get("ops", "0") or "0")
+        prev_ops = float(lineup_stats[(i - 1) % n].get("ops", "0") or "0")
+
+        # On-deck hitter drives the primary effect
+        ondeck_diff = next_ops - curr_ops
+        # Preceding hitter has a smaller effect (pitcher already faced them)
+        prev_diff = prev_ops - curr_ops
+
+        # Weighted protection score: on-deck is 75% of the signal
+        prot_score = ondeck_diff * 0.75 + prev_diff * 0.25
+
+        # Translate to multipliers
+        # Positive score = strong protection → more strikes → better contact, fewer BBs
+        # Negative score = weak protection → more nibbling → worse contact, more BBs
+        bb_mult = 1.0
+        hr_mult = 1.0
+        contact_mult = 1.0
+
+        if prot_score >= 0.120:
+            bb_mult = 1.20
+            hr_mult = 0.96
+            contact_mult = 0.97
+        elif prot_score >= 0.060:
+            bb_mult = 1.12
+            hr_mult = 0.98
+            contact_mult = 0.98
+        elif prot_score >= 0.030:
+            bb_mult = 1.06
+            hr_mult = 0.99
+            contact_mult = 0.99
+        elif prot_score <= -0.090:
+            bb_mult = 0.88
+            hr_mult = 1.06
+            contact_mult = 1.04
+        elif prot_score <= -0.060:
+            bb_mult = 0.92
+            hr_mult = 1.04
+            contact_mult = 1.02
+        elif prot_score <= -0.030:
+            bb_mult = 0.96
+            hr_mult = 1.02
+            contact_mult = 1.01
+
+        protection.append(
+            {
+                "bb_mult": bb_mult,
+                "hr_mult": hr_mult,
+                "contact_mult": contact_mult,
+            }
+        )
+    return protection
+
+
+def apply_lineup_protection(probs: list, prot: dict) -> list:
+    adjusted = list(probs)
+    adjusted[0] *= prot["bb_mult"]
+    adjusted[5] *= prot["hr_mult"]
+    adjusted[2] *= prot["contact_mult"]
+    adjusted[3] *= prot["contact_mult"]
+    adjusted[4] *= prot["contact_mult"]
+    total = sum(adjusted)
+    return [p / total for p in adjusted]
+
+
+# ── 9. CONTINUOUS PITCHER STAMINA DECAY ──────────────────────────────────────
+# The existing pitch-count model uses 4 fixed thresholds (60/80/100 pitches).
+# This replaces it with a continuous decay function that models:
+#   - Velocity loss: ~0.3 mph per 15 pitches after pitch 45
+#   - Command degradation: walk rate climbs exponentially after pitch 75
+#   - Barrel rate increase: fatigue → less movement → more hard contact
+#
+# The continuous model captures the gradual decline rather than step functions.
+def compute_stamina_decay(estimated_pitches: float, pitcher_stats: dict = None) -> dict:
+    """
+    Compute continuous stamina decay multipliers based on pitch count.
+
+    Returns dict of multipliers for K, BB, HR, and hit rates.
+    All multipliers are 1.0 at pitch 0 and degrade continuously.
+    """
+    if estimated_pitches < 30:
+        return {"k_mult": 1.0, "bb_mult": 1.0, "hr_mult": 1.0, "hit_mult": 1.0}
+
+    # Velocity decay: starts at pitch 45, accelerates after 80
+    # Each 0.5 mph lost ≈ 2% less K rate, 1.5% more barrel rate
+    if estimated_pitches <= 45:
+        velo_loss = 0.0
+    elif estimated_pitches <= 80:
+        velo_loss = (estimated_pitches - 45) * 0.009
+    else:
+        velo_loss = 35 * 0.009 + (estimated_pitches - 80) * 0.018
+
+    # Command decay: walk rate climbs after pitch 60
+    if estimated_pitches <= 60:
+        cmd_decay = 0.0
+    elif estimated_pitches <= 90:
+        cmd_decay = (estimated_pitches - 60) * 0.004
+    else:
+        cmd_decay = 30 * 0.004 + (estimated_pitches - 90) * 0.008
+
+    # Convert to multipliers
+    k_mult = max(0.75, 1.0 - velo_loss * 0.04)
+    bb_mult = min(1.30, 1.0 + cmd_decay)
+    hr_mult = min(1.25, 1.0 + velo_loss * 0.03)
+    hit_mult = min(1.15, 1.0 + velo_loss * 0.015 + cmd_decay * 0.5)
+
+    # Pitcher durability: high-IP pitchers handle pitch counts better
+    if pitcher_stats:
+        try:
+            ip = float(pitcher_stats.get("inningsPitched", "0") or "0")
+            if ip >= 180:
+                durability = 0.70
+            elif ip >= 160:
+                durability = 0.80
+            elif ip >= 140:
+                durability = 0.90
+            else:
+                durability = 1.0
+            k_mult = 1.0 + (k_mult - 1.0) * durability
+            bb_mult = 1.0 + (bb_mult - 1.0) * durability
+            hr_mult = 1.0 + (hr_mult - 1.0) * durability
+            hit_mult = 1.0 + (hit_mult - 1.0) * durability
+        except (ValueError, TypeError):
+            pass
+
+    return {"k_mult": k_mult, "bb_mult": bb_mult, "hr_mult": hr_mult, "hit_mult": hit_mult}
+
+
+def apply_stamina_decay(probs: list, decay: dict) -> list:
+    adjusted = list(probs)
+    adjusted[0] *= decay["bb_mult"]
+    adjusted[1] *= decay["k_mult"]
+    adjusted[2] *= decay["hit_mult"]
+    adjusted[3] *= decay["hit_mult"]
+    adjusted[4] *= decay["hit_mult"]
+    adjusted[5] *= decay["hr_mult"]
+    total = sum(adjusted)
+    return [p / total for p in adjusted]
+
+
+# ── 10. LEVERAGE INDEX (LI) MODEL ───────────────────────────────────────────
+# Real-time game leverage affects pitcher performance and manager decisions.
+# High-leverage situations (tying run at bat in late innings) produce measurably
+# different outcomes than low-leverage situations.
+#
+# Leverage Index (LI) measures how much a single PA affects the game outcome:
+#   LI = 1.0: average leverage (typical 5th inning, no runners)
+#   LI > 2.0: high leverage (late, close, runners on)
+#   LI < 0.5: low leverage (blowout, early innings)
+#
+# Effects of high leverage (observed in MLB data):
+#   - Relievers are higher quality (manager deploys best arms)
+#   - K rate increases (pitchers throw harder, batters expand zone)
+#   - Walk rate increases (pitchers nibble more carefully)
+#   - HR rate per contact decreases slightly (fewer pitches in zone)
+#   - BABIP drops slightly (outfielders play more carefully)
+LI_TABLE = {
+    (0, 0, 0, 0): 0.9,
+    (0, 0, 0, 1): 1.3,
+    (0, 0, 0, 2): 1.1,
+    (0, 0, 1, 0): 1.1,
+    (0, 0, 1, 1): 1.6,
+    (0, 0, 1, 2): 1.2,
+    (0, 1, 0, 0): 1.2,
+    (0, 1, 0, 1): 1.7,
+    (0, 1, 0, 2): 1.3,
+    (0, 1, 1, 0): 1.5,
+    (0, 1, 1, 1): 2.1,
+    (0, 1, 1, 2): 1.5,
+    (1, 0, 0, 0): 1.0,
+    (1, 0, 0, 1): 1.5,
+    (1, 0, 0, 2): 1.4,
+    (1, 0, 1, 0): 1.3,
+    (1, 0, 1, 1): 1.9,
+    (1, 0, 1, 2): 1.7,
+    (1, 1, 0, 0): 1.4,
+    (1, 1, 0, 1): 2.0,
+    (1, 1, 0, 2): 1.8,
+    (1, 1, 1, 0): 1.7,
+    (1, 1, 1, 1): 2.5,
+    (1, 1, 1, 2): 2.2,
+    (2, 0, 0, 0): 1.1,
+    (2, 0, 0, 1): 1.6,
+    (2, 0, 0, 2): 2.0,
+    (2, 0, 1, 0): 1.4,
+    (2, 0, 1, 1): 2.1,
+    (2, 0, 1, 2): 2.6,
+    (2, 1, 0, 0): 1.5,
+    (2, 1, 0, 1): 2.3,
+    (2, 1, 0, 2): 2.8,
+    (2, 1, 1, 0): 1.9,
+    (2, 1, 1, 1): 2.8,
+    (2, 1, 1, 2): 3.5,
+}
+
+
+def compute_leverage_index(outs: int, b1: bool, b2: bool, inning: int, run_diff: int) -> float:
+    """
+    Compute an approximate Leverage Index for the current game state.
+
+    Uses a simplified base-out state table scaled by inning and score proximity.
+    """
+    # Base LI from runners/outs state
+    b1_int = int(b1)
+    b2_int = int(b2)
+    close = 1 if abs(run_diff) <= 2 else 0
+    base_li = LI_TABLE.get((outs, b1_int, b2_int, close), 1.0)
+
+    # Scale by inning: late innings amplify leverage
+    if inning >= 8:
+        inning_mult = 1.4
+    elif inning >= 6:
+        inning_mult = 1.2
+    elif inning >= 4:
+        inning_mult = 1.0
+    else:
+        inning_mult = 0.8
+
+    # Score proximity: blowouts kill leverage regardless of state
+    if abs(run_diff) >= 6:
+        score_mult = 0.3
+    elif abs(run_diff) >= 4:
+        score_mult = 0.5
+    elif abs(run_diff) >= 3:
+        score_mult = 0.7
+    else:
+        score_mult = 1.0
+
+    return min(5.0, base_li * inning_mult * score_mult)
+
+
+def apply_leverage_modifier(probs: list, leverage: float) -> list:
+    """
+    Adjust outcome probabilities based on leverage index.
+
+    High leverage: K rate up (pitchers throw harder), walk rate up (nibble more),
+    BABIP down (defense sharpens), HR per contact slightly down.
+    Low leverage: opposite effects.
+    """
+    if 0.9 <= leverage <= 1.1:
+        return probs
+
+    # Scale effects relative to average leverage (1.0)
+    li_diff = leverage - 1.0
+    dampen = 0.03
+
+    k_adj = 1.0 + li_diff * dampen * 1.5
+    bb_adj = 1.0 + li_diff * dampen * 1.0
+    hr_adj = 1.0 - li_diff * dampen * 0.5
+    hit_adj = 1.0 - li_diff * dampen * 0.8
+
+    adjusted = list(probs)
+    adjusted[0] *= bb_adj
+    adjusted[1] *= k_adj
+    adjusted[2] *= hit_adj
+    adjusted[3] *= hit_adj
+    adjusted[5] *= hr_adj
+    total = sum(adjusted)
+    return [p / total for p in adjusted]
+
+
 # ── Run expectancy (RE24) base-out state table ────────────────────────────────
 # Expected runs from each base-out state (2020-2024 MLB average).
 # Used to weight strategic decisions like sac fly and stolen base thresholds.
@@ -2017,37 +2399,40 @@ def simulate_half_inning(
     outs = 0
     runs = 0
     b1 = b2 = b3 = False  # nobody on base
+    # Track which lineup slot is on each base (for speed grades)
+    b1_who = b2_who = b3_who = -1
     pos = lineup_pos
+
+    def _speed(slot):
+        if batter_rates and 0 <= slot < len(batter_rates):
+            return batter_rates[slot].get("speed", "avg")
+        return "avg"
 
     while outs < 3:
         # ── Stolen base attempt (between at-bats, runner on 1st only) ────────
-        # We check BEFORE the current batter faces a pitch.
-        # Uses the previous batter's (the runner's) steal tendency.
         if batter_rates and b1 and not b2 and outs < 2:
-            runner_idx = (pos - 1) % 9  # runner on 1st was the prior batter
+            runner_idx = (pos - 1) % 9
             r = batter_rates[runner_idx]
             if random.random() < r["sb_rate"]:
-                # RE24 break-even check: only steal if success probability
-                # exceeds the break-even point for this base-out state.
-                # Break-even = RE(caught) loss / (RE(success) gain + RE(caught) loss)
                 re_current = get_run_expectancy(b1, b2, b3, outs)
-                re_success = get_run_expectancy(False, True, b3, outs)  # runner now on 2nd
-                re_caught = get_run_expectancy(False, b2, b3, outs + 1)  # runner out, outs+1
+                re_success = get_run_expectancy(False, True, b3, outs)
+                re_caught = get_run_expectancy(False, b2, b3, outs + 1)
                 re_gain = re_success - re_current
                 re_loss = re_current - re_caught
                 denom = re_gain + re_loss
                 break_even = (re_loss / denom) if denom > 0 else 0.72
                 if r["sb_success"] >= break_even:
                     if random.random() < r["sb_success"]:
-                        b2, b1 = True, False  # successful steal of 2nd
+                        b2, b1 = True, False
+                        b2_who, b1_who = b1_who, -1
                     else:
-                        b1 = False  # caught stealing — runner is out
+                        b1 = False
+                        b1_who = -1
                         outs += 1
                         if outs >= 3:
                             break
 
         # ── Select probability array ──────────────────────────────────────────
-        # Switch to RISP stats when runner is on 2nd or 3rd (scoring position).
         if risp_precomp and (b2 or b3):
             cum_weights = risp_precomp[pos % 9]
         else:
@@ -2056,10 +2441,17 @@ def simulate_half_inning(
         # ── Situational hitting modifier (dynamic, per-PA) ───────────────────
         sit_key = get_situation_key(outs, b2, b3, inning, run_diff)
         if sit_key:
-            # Convert cumulative weights back to probs, apply mod, reconvert
             cw = cum_weights
             raw = [cw[0]] + [cw[j] - cw[j - 1] for j in range(1, len(cw))]
             raw = apply_situational_mod(raw, sit_key)
+            cum_weights = list(accumulate(raw))
+
+        # ── Leverage index modifier (dynamic, per-PA) ────────────────────────
+        li = compute_leverage_index(outs, b1, b2, inning, run_diff)
+        if li < 0.9 or li > 1.1:
+            cw = cum_weights
+            raw = [cw[0]] + [cw[j] - cw[j - 1] for j in range(1, len(cw))]
+            raw = apply_leverage_modifier(raw, li)
             cum_weights = list(accumulate(raw))
 
         outcome = simulate_at_bat(cum_weights)
@@ -2068,56 +2460,73 @@ def simulate_half_inning(
             if outcome == OUT and batter_rates and outs < 2:
                 batter_idx = pos % 9
 
-                # ── GIDP: runner on 1st, <2 outs, non-K out ──────────────────
-                # Ground ball turns into a double play — two outs, runner erased.
                 if b1:
                     if random.random() < batter_rates[batter_idx]["gdp_rate"]:
-                        outs += 2  # batter AND runner are both out
-                        b1 = False  # runner on 1st is erased
+                        outs += 2
+                        b1 = False
+                        b1_who = -1
                         pos += 1
                         continue
 
-                # ── Sac fly: runner on 3rd, <2 outs, non-K out ───────────────
-                # Ball is caught in the outfield — runner tags and scores.
-                # (Only checked if GIDP didn't fire above)
                 if b3:
                     if random.random() < batter_rates[batter_idx]["sf_rate"]:
-                        runs += 1  # run scores on the sac fly
-                        b3 = False  # runner on 3rd scores
+                        runs += 1
+                        b3 = False
+                        b3_who = -1
                         outs += 1
                         pos += 1
                         continue
 
-            # -- Error: on a non-K out, small chance batter reaches base
             if outcome == OUT and random.random() < ERROR_RATE:
-                # Fielding error -- batter reaches 1st, runners advance
-                b1, b2, b3, new_runs = advance_runners(b1, b2, b3, SINGLE)
+                sp_b1 = _speed(b1_who) if b1 else "avg"
+                sp_b2 = _speed(b2_who) if b2 else "avg"
+                sp_b3 = _speed(b3_who) if b3 else "avg"
+                b1, b2, b3, new_runs = advance_runners(b1, b2, b3, SINGLE, sp_b1, sp_b2, sp_b3)
                 runs += new_runs
+                # Batter reached on error → track on 1st
+                b1_who = pos % 9
                 pos += 1
-                continue  # no out recorded
+                continue
 
             outs += 1
 
-            # -- Wild pitch / passed ball: advance all runners one base
-            # Only matters when there are runners on base.
             if (b1 or b2 or b3) and random.random() < WILD_PITCH_RATE:
                 if b3:
                     runs += 1
-                b3 = b2
-                b2 = b1
-                b1 = False
+                b3, b3_who = b2, b2_who
+                b2, b2_who = b1, b1_who
+                b1, b1_who = False, -1
 
         else:
-            # -- Wild pitch before the hit: runners advance on passed ball
             if (b1 or b2 or b3) and random.random() < WILD_PITCH_RATE:
                 if b3:
                     runs += 1
-                b3 = b2
-                b2 = b1
-                b1 = False
+                b3, b3_who = b2, b2_who
+                b2, b2_who = b1, b1_who
+                b1, b1_who = False, -1
 
-            b1, b2, b3, new_runs = advance_runners(b1, b2, b3, outcome)
+            sp_b1 = _speed(b1_who) if b1 else "avg"
+            sp_b2 = _speed(b2_who) if b2 else "avg"
+            sp_b3 = _speed(b3_who) if b3 else "avg"
+            b1, b2, b3, new_runs = advance_runners(b1, b2, b3, outcome, sp_b1, sp_b2, sp_b3)
             runs += new_runs
+
+            # Track who's on base after the play
+            batter_slot = pos % 9
+            if outcome == SINGLE:
+                b1_who = batter_slot
+            elif outcome == DOUBLE:
+                b2_who = batter_slot
+            elif outcome == TRIPLE:
+                b1_who = b2_who = -1
+                b3_who = batter_slot
+            elif outcome == HR:
+                b1_who = b2_who = b3_who = -1
+            elif outcome == WALK:
+                if not b2 and not b3:
+                    b1_who = batter_slot
+                elif b1 and not b3:
+                    b1_who = batter_slot
 
         pos += 1
 
@@ -2145,6 +2554,8 @@ def simulate_game(
     closer_start: int = 7,  # 0-indexed: inning 8 in human terms
     mid_start: int = 2,  # 0-indexed: inning 3 in human terms
     resolve_ties: bool = True,  # False = return tied score as-is (for F3/F5/F7 push calc)
+    away_pitcher_stats: dict = None,  # away starter stats (for stamina durability)
+    home_pitcher_stats: dict = None,  # home starter stats (for stamina durability)
 ) -> tuple:
     """
     Simulate one complete 9-inning game with 3 pitching phases + RISP clutch stats:
@@ -2312,23 +2723,24 @@ def simulate_game(
         if not home_starter_pulled:
             away_tto = 1 + home_batters_faced // 9
             tto_away_cur = apply_tto(away_cur, away_tto)
-            # Pitch-count fatigue: apply per-batter to each slot
-            if home_pitch_count >= 60:
+            # Continuous stamina decay based on pitch count + pitcher durability
+            if home_pitch_count >= 30:
+                decay = compute_stamina_decay(home_pitch_count, home_pitcher_stats)
                 from itertools import accumulate as _acc2
 
                 tto_away_cur = [
                     list(
                         _acc2(
-                            apply_pitch_count_fatigue(
+                            apply_stamina_decay(
                                 [c - p for c, p in zip(bslot, [0] + list(bslot[:-1]))],
-                                home_pitch_count,
+                                decay,
                             )
                         )
                     )
                     for bslot in tto_away_cur
                 ]
         else:
-            tto_away_cur = away_cur  # bullpen resets TTO and pitch-count fatigue
+            tto_away_cur = away_cur  # bullpen resets TTO and stamina decay
         # run_diff from away team's perspective (batting team)
         away_rdiff = away_runs - home_runs
         runs, new_away_pos = simulate_half_inning(
@@ -2357,22 +2769,23 @@ def simulate_game(
         if not away_starter_pulled:
             home_tto = 1 + away_batters_faced // 9
             tto_home_cur = apply_tto(home_cur, home_tto)
-            if away_pitch_count >= 60:
+            if away_pitch_count >= 30:
+                decay = compute_stamina_decay(away_pitch_count, away_pitcher_stats)
                 from itertools import accumulate as _acc2
 
                 tto_home_cur = [
                     list(
                         _acc2(
-                            apply_pitch_count_fatigue(
+                            apply_stamina_decay(
                                 [c - p for c, p in zip(bslot, [0] + list(bslot[:-1]))],
-                                away_pitch_count,
+                                decay,
                             )
                         )
                     )
                     for bslot in tto_home_cur
                 ]
         else:
-            tto_home_cur = home_cur  # bullpen resets TTO and pitch-count fatigue
+            tto_home_cur = home_cur  # bullpen resets TTO and stamina decay
         # run_diff from home team's perspective (batting team)
         home_rdiff = home_runs - away_runs
         runs, new_home_pos = simulate_half_inning(
