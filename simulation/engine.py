@@ -843,11 +843,11 @@ def precompute_lineup(
     daynight_stats_list: list = None,
     batter_rest_days: int = None,
     savant_list: list = None,
-    bat_sides: list = None,
-    pitch_hand: str = None,
     umpire_name: str = None,
     homeaway_stats_list: list = None,
     opp_catcher_cs: float = None,
+    bat_sides: list = None,
+    pitch_hand: str = None,
 ) -> list:
     """
     Pre-calculate cumulative probability arrays for every batter in a lineup.
