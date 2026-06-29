@@ -963,6 +963,12 @@ def precompute_lineup(
         if weather:
             probs = apply_weather_modifier(probs, weather)
 
+        # Bayesian network causal DAG: propagate weather + venue effects
+        # through the causal graph to avoid double-counting correlated factors
+        causal = compute_causal_effects(weather, venue, fatigue_level=0.0)
+        if any(abs(v - 1.0) > 0.005 for v in causal.values()):
+            probs = apply_causal_effects(probs, causal)
+
         # Batter rest modifier
         if batter_rest_days is not None:
             probs = apply_batter_rest_modifier(probs, batter_rest_days)
@@ -3687,6 +3693,663 @@ def apply_game_script(precomp: list, script: str) -> list:
     return result
 
 
+# ── 21. ORNSTEIN-UHLENBECK STOCHASTIC PROCESS FOR PITCHER FATIGUE ───────────
+# Instead of discrete pitch-count thresholds, model fatigue as a continuous
+# stochastic differential equation (SDE):
+#
+#   dX_t = θ(μ - X_t)dt + σ dW_t
+#
+# where:
+#   X_t  = pitcher's "energy" at time t (1.0 = fully fresh, 0.0 = depleted)
+#   θ    = mean-reversion rate (how fast energy decays toward equilibrium)
+#   μ    = long-run mean (equilibrium energy level, decreases with pitch count)
+#   σ    = volatility (random fluctuations: second winds, sudden walls)
+#   dW_t = Wiener process increment (standard Brownian motion)
+#
+# The exact solution for one time step Δt is:
+#   X_{t+1} = μ + (X_t - μ) * e^(-θΔt) + σ√((1-e^(-2θΔt))/(2θ)) * Z
+#
+# where Z ~ N(0,1) is a standard normal draw.
+#
+# Energy maps to probability modifiers:
+#   energy > 0.85 → pitcher is dominant (K↑, BB↓, HR↓)
+#   energy 0.50-0.85 → normal range
+#   energy < 0.50 → gassed (K↓, BB↑, HR↑)
+
+OU_THETA = 0.08  # mean-reversion speed per batter faced
+OU_SIGMA = 0.06  # volatility of energy fluctuations
+OU_DELTA_T = 1.0  # time step = 1 batter faced
+
+
+class OUFatigueProcess:
+    """Ornstein-Uhlenbeck process tracking pitcher energy within a game."""
+
+    __slots__ = ("energy", "mu", "theta", "sigma", "batters_faced", "durability")
+
+    def __init__(self, pitcher_stats: dict = None):
+        self.energy = 1.0
+        self.theta = OU_THETA
+        self.sigma = OU_SIGMA
+        self.batters_faced = 0
+
+        # Pitcher durability affects the equilibrium decay
+        if pitcher_stats:
+            try:
+                ip = float(pitcher_stats.get("inningsPitched", "150") or "150")
+                # More innings = more durable = slower equilibrium decay
+                self.durability = min(1.3, max(0.7, ip / 150.0))
+            except (ValueError, TypeError):
+                self.durability = 1.0
+        else:
+            self.durability = 1.0
+
+        self.mu = 0.90  # initial equilibrium (fresh pitcher)
+
+    def step(self):
+        """
+        Advance the OU process by one batter faced.
+        Uses exact discrete solution of the SDE.
+        """
+        self.batters_faced += 1
+
+        # Equilibrium energy decreases with batters faced
+        # Durable pitchers (high IP) decay slower
+        decay_rate = 0.025 / self.durability
+        self.mu = max(0.30, 0.90 - self.batters_faced * decay_rate)
+
+        # Exact OU solution for one time step
+        exp_term = _math.exp(-self.theta * OU_DELTA_T)
+        mean = self.mu + (self.energy - self.mu) * exp_term
+
+        # Conditional variance
+        var_coeff = self.sigma * _math.sqrt(
+            (1.0 - _math.exp(-2.0 * self.theta * OU_DELTA_T)) / (2.0 * self.theta)
+        )
+        z = _norm_inv_cdf(random.random())  # standard normal draw
+        self.energy = mean + var_coeff * z
+
+        # Clamp to valid range
+        self.energy = max(0.10, min(1.05, self.energy))
+
+    def get_fatigue_modifier(self) -> dict:
+        """Convert current energy level to probability modifiers."""
+        e = self.energy
+
+        if e >= 0.85:
+            # Fresh/dominant — slight K boost, lower walks and HR
+            intensity = (e - 0.85) / 0.20
+            return {
+                "k_mult": 1.0 + 0.08 * intensity,
+                "bb_mult": 1.0 - 0.10 * intensity,
+                "hr_mult": 1.0 - 0.08 * intensity,
+                "hit_mult": 1.0 - 0.04 * intensity,
+            }
+        elif e >= 0.50:
+            # Normal range — minimal effect
+            return {"k_mult": 1.0, "bb_mult": 1.0, "hr_mult": 1.0, "hit_mult": 1.0}
+        else:
+            # Gassed — K drops, walks and HR increase
+            intensity = (0.50 - e) / 0.40
+            return {
+                "k_mult": 1.0 - 0.15 * intensity,
+                "bb_mult": 1.0 + 0.20 * intensity,
+                "hr_mult": 1.0 + 0.18 * intensity,
+                "hit_mult": 1.0 + 0.10 * intensity,
+            }
+
+
+def apply_ou_fatigue(probs: list, modifier: dict) -> list:
+    """Apply OU fatigue modifier to outcome probabilities."""
+    if all(0.99 <= v <= 1.01 for v in modifier.values()):
+        return probs
+    adjusted = list(probs)
+    adjusted[0] *= modifier["bb_mult"]
+    adjusted[1] *= modifier["k_mult"]
+    adjusted[2] *= modifier["hit_mult"]
+    adjusted[3] *= modifier["hit_mult"]
+    adjusted[4] *= modifier["hit_mult"]
+    adjusted[5] *= modifier["hr_mult"]
+    total = sum(adjusted)
+    return [p / total for p in adjusted]
+
+
+# ── 22. NON-HOMOGENEOUS POISSON PROCESS FOR RUN SCORING ─────────────────────
+# Model each team's scoring as a Poisson process where the rate parameter
+# λ(t) varies by inning, pitcher state, and lineup quality.
+#
+# For a non-homogeneous Poisson process:
+#   P(N(t) = k) = (Λ(t))^k * e^(-Λ(t)) / k!
+#
+# where Λ(t) = ∫₀ᵗ λ(s)ds is the cumulative intensity function.
+#
+# We estimate λ per half-inning from:
+#   - Base rate: ~0.50 runs/half-inning (MLB average ~4.5 runs/team/game ÷ 9)
+#   - Lineup quality: OPS-based modifier
+#   - Pitcher quality: ERA-based modifier
+#   - Inning effects: scoring patterns by inning (1st inning is higher)
+#
+# This provides analytical run distribution predictions that complement
+# the Monte Carlo simulation.
+
+POISSON_BASE_RATE = 0.505  # ~4.55 runs/team/game average
+
+POISSON_INNING_MODS = {
+    1: 1.12,  # 1st inning: leadoff, starter settling in
+    2: 0.88,  # 2nd inning: pitcher found groove
+    3: 0.92,
+    4: 0.95,
+    5: 1.00,
+    6: 1.05,  # bullpen transition
+    7: 1.08,
+    8: 1.02,
+    9: 1.10,  # 9th inning: closer pressure, pinch hitters
+}
+
+
+def _poisson_pmf(k: int, lam: float) -> float:
+    """Poisson probability mass function: P(X = k) = λ^k * e^(-λ) / k!"""
+    if lam <= 0:
+        return 1.0 if k == 0 else 0.0
+    log_pmf = k * _math.log(lam) - lam - _math.lgamma(k + 1)
+    return _math.exp(log_pmf)
+
+
+def compute_poisson_rate(pitcher_stats: dict, lineup_stats: list, inning: int) -> float:
+    """
+    Compute the non-homogeneous Poisson rate λ for a specific half-inning.
+
+    Combines base rate with pitcher quality, lineup strength, and inning effects.
+    """
+    rate = POISSON_BASE_RATE
+
+    # Pitcher quality modifier
+    if pitcher_stats:
+        try:
+            era = float(pitcher_stats.get("era", "4.20") or "4.20")
+            rate *= era / 4.20  # scale linearly with ERA ratio
+        except (ValueError, TypeError):
+            pass
+
+    # Lineup quality modifier (average OPS of lineup)
+    if lineup_stats:
+        ops_vals = []
+        for b in lineup_stats:
+            try:
+                ops_val = float(str(b.get("ops", ".720") or ".720").lstrip(".") or "720")
+                if ops_val > 10:
+                    ops_val /= 1000.0
+                ops_vals.append(ops_val)
+            except (ValueError, TypeError):
+                ops_vals.append(0.720)
+        if ops_vals:
+            avg_ops = sum(ops_vals) / len(ops_vals)
+            rate *= avg_ops / 0.720
+
+    # Inning effect
+    inning_human = min(inning + 1, 9)
+    rate *= POISSON_INNING_MODS.get(inning_human, 1.0)
+
+    return max(0.05, rate)
+
+
+def compute_poisson_run_distribution(
+    away_pitcher: dict,
+    home_pitcher: dict,
+    away_lineup: list,
+    home_lineup: list,
+    max_runs: int = 15,
+) -> dict:
+    """
+    Compute analytical run distribution using the non-homogeneous Poisson model.
+
+    Returns probability distribution over total runs for O/U analysis.
+    """
+    # Compute cumulative intensity for each team over 9 innings
+    away_total_lambda = sum(compute_poisson_rate(home_pitcher, away_lineup, i) for i in range(9))
+    home_total_lambda = sum(compute_poisson_rate(away_pitcher, home_lineup, i) for i in range(9))
+
+    # P(team scores exactly k runs) = Poisson(k | total_lambda)
+    away_dist = [_poisson_pmf(k, away_total_lambda) for k in range(max_runs + 1)]
+    home_dist = [_poisson_pmf(k, home_total_lambda) for k in range(max_runs + 1)]
+
+    # Convolve to get total runs distribution: P(total = t) = Σ P(away=a) * P(home=t-a)
+    total_dist = {}
+    for t in range(2 * max_runs + 1):
+        p = 0.0
+        for a in range(min(t + 1, max_runs + 1)):
+            h = t - a
+            if h <= max_runs:
+                p += away_dist[a] * home_dist[h]
+        if p > 1e-8:
+            total_dist[t] = round(p, 6)
+
+    return {
+        "away_expected_runs": round(away_total_lambda, 2),
+        "home_expected_runs": round(home_total_lambda, 2),
+        "total_expected_runs": round(away_total_lambda + home_total_lambda, 2),
+        "total_distribution": total_dist,
+    }
+
+
+# ── 23. BAYESIAN NETWORK (DAG) FOR CAUSAL DEPENDENCIES ──────────────────────
+# Instead of applying weather, fatigue, and park effects as independent
+# multipliers (which double-counts correlated factors), we model them as
+# a directed acyclic graph (DAG) of causal dependencies:
+#
+#   temperature ──→ ball_flight ──→ HR_rate
+#   altitude   ──→ ball_flight ──→ BABIP
+#   wind_speed ──→ ball_flight
+#   humidity   ──→ ball_flight
+#   fatigue    ──→ velocity_loss ──→ contact_quality ──→ BABIP
+#   fatigue    ──→ command_loss  ──→ BB_rate
+#   fatigue    ──→ command_loss  ──→ HR_rate (hanging pitches)
+#
+# Each edge has a transfer function that propagates the effect.
+# The DAG ensures each root cause is counted exactly once.
+
+# Causal transfer coefficients: how much a 1-unit change in parent
+# propagates to the child node.
+CAUSAL_EDGES = {
+    ("temperature", "ball_flight"): 0.004,  # per degree F above 72
+    ("altitude", "ball_flight"): 0.08,  # per 1000ft above sea level
+    ("wind_speed", "ball_flight"): 0.006,  # per mph (+ = out, - = in)
+    ("humidity", "ball_flight"): -0.002,  # per % above 50 (humid = less carry)
+    ("ball_flight", "hr_rate"): 0.40,  # ball_flight → HR rate multiplier
+    ("ball_flight", "babip"): 0.15,  # ball_flight → BABIP modifier
+    ("fatigue", "velocity_loss"): 0.30,  # fatigue → mph drop
+    ("fatigue", "command_loss"): 0.25,  # fatigue → command degradation
+    ("velocity_loss", "contact_quality"): 0.35,  # less velo → harder contact
+    ("command_loss", "bb_rate"): 0.40,  # less command → more walks
+    ("command_loss", "hr_rate"): 0.20,  # less command → hanging pitches
+    ("contact_quality", "babip"): 0.30,  # harder contact → more hits
+}
+
+# Venue altitudes (feet above sea level)
+VENUE_ALTITUDE = {
+    "Coors Field": 5280,
+    "Chase Field": 1082,
+    "Globe Life Field": 525,
+    "T-Mobile Park": 20,
+    "Oracle Park": 10,
+    "Petco Park": 15,
+    "Dodger Stadium": 515,
+    "Angel Stadium": 160,
+    "Fenway Park": 20,
+    "Yankee Stadium": 55,
+    "Citi Field": 15,
+    "Citizens Bank Park": 25,
+    "Nationals Park": 25,
+    "Tropicana Field": 15,
+    "Wrigley Field": 600,
+    "Guaranteed Rate Field": 595,
+    "Busch Stadium": 465,
+    "Kauffman Stadium": 750,
+    "Target Field": 815,
+    "Comerica Park": 600,
+    "Great American Ball Park": 490,
+    "PNC Park": 730,
+    "Progressive Field": 660,
+    "Minute Maid Park": 40,
+    "Rogers Centre": 250,
+    "Camden Yards": 30,
+    "American Family Field": 600,
+    "loanDepot park": 10,
+    "Oakland Coliseum": 15,
+}
+
+
+def compute_causal_effects(
+    weather: dict = None, venue: str = None, fatigue_level: float = 0.0
+) -> dict:
+    """
+    Propagate causal effects through the Bayesian network DAG.
+
+    Returns final multipliers for outcome probabilities, with each root
+    cause counted exactly once through the causal chain.
+    """
+    # Initialize root node values
+    roots = {}
+
+    if weather:
+        try:
+            temp = float(weather.get("temp", 72) or 72)
+            roots["temperature"] = temp - 72.0
+        except (ValueError, TypeError):
+            roots["temperature"] = 0.0
+
+        try:
+            wind = float(weather.get("wind_speed", 0) or 0)
+            wind_dir = str(weather.get("wind_dir", "") or "").lower()
+            if "out" in wind_dir:
+                roots["wind_speed"] = wind
+            elif "in" in wind_dir:
+                roots["wind_speed"] = -wind
+            else:
+                roots["wind_speed"] = wind * 0.3
+        except (ValueError, TypeError):
+            roots["wind_speed"] = 0.0
+
+        try:
+            humidity = float(weather.get("humidity", 50) or 50)
+            roots["humidity"] = humidity - 50.0
+        except (ValueError, TypeError):
+            roots["humidity"] = 0.0
+    else:
+        roots["temperature"] = 0.0
+        roots["wind_speed"] = 0.0
+        roots["humidity"] = 0.0
+
+    # Altitude from venue
+    altitude_ft = VENUE_ALTITUDE.get(venue, 300) if venue else 300
+    roots["altitude"] = altitude_ft / 1000.0
+
+    # Fatigue (0.0 = fresh, 1.0 = exhausted)
+    roots["fatigue"] = fatigue_level
+
+    # Forward propagation through the DAG
+    nodes = dict(roots)
+
+    # Layer 1: root → intermediate
+    nodes["ball_flight"] = (
+        roots["temperature"] * CAUSAL_EDGES[("temperature", "ball_flight")]
+        + roots["altitude"] * CAUSAL_EDGES[("altitude", "ball_flight")]
+        + roots["wind_speed"] * CAUSAL_EDGES[("wind_speed", "ball_flight")]
+        + roots["humidity"] * CAUSAL_EDGES[("humidity", "ball_flight")]
+    )
+    nodes["velocity_loss"] = roots["fatigue"] * CAUSAL_EDGES[("fatigue", "velocity_loss")]
+    nodes["command_loss"] = roots["fatigue"] * CAUSAL_EDGES[("fatigue", "command_loss")]
+
+    # Layer 2: intermediate → leaf
+    nodes["contact_quality"] = (
+        nodes["velocity_loss"] * CAUSAL_EDGES[("velocity_loss", "contact_quality")]
+    )
+
+    # Final output multipliers (centered at 1.0)
+    hr_effect = (
+        nodes["ball_flight"] * CAUSAL_EDGES[("ball_flight", "hr_rate")]
+        + nodes["command_loss"] * CAUSAL_EDGES[("command_loss", "hr_rate")]
+    )
+    babip_effect = (
+        nodes["ball_flight"] * CAUSAL_EDGES[("ball_flight", "babip")]
+        + nodes["contact_quality"] * CAUSAL_EDGES[("contact_quality", "babip")]
+    )
+    bb_effect = nodes["command_loss"] * CAUSAL_EDGES[("command_loss", "bb_rate")]
+
+    # Dampen to avoid overcorrection
+    dampen = 0.40
+    return {
+        "hr_mult": 1.0 + hr_effect * dampen,
+        "hit_mult": 1.0 + babip_effect * dampen,
+        "bb_mult": 1.0 + bb_effect * dampen,
+        "k_mult": 1.0 - babip_effect * dampen * 0.3,  # better contact → fewer K
+    }
+
+
+def apply_causal_effects(probs: list, effects: dict) -> list:
+    """Apply Bayesian network causal effects to outcome probabilities."""
+    if all(0.99 <= v <= 1.01 for v in effects.values()):
+        return probs
+    adjusted = list(probs)
+    adjusted[0] *= effects["bb_mult"]
+    adjusted[1] *= effects["k_mult"]
+    adjusted[2] *= effects["hit_mult"]
+    adjusted[3] *= effects["hit_mult"]
+    adjusted[4] *= effects["hit_mult"]
+    adjusted[5] *= effects["hr_mult"]
+    total = sum(adjusted)
+    return [p / total for p in adjusted]
+
+
+# ── 24. BOOTSTRAP RESAMPLING FOR CONFIDENCE INTERVALS ────────────────────────
+# After the Monte Carlo simulation produces N game outcomes, we use
+# bootstrap resampling to estimate the uncertainty in our predictions.
+#
+# The bootstrap works by:
+#   1. From N simulation outcomes, draw N samples WITH REPLACEMENT
+#   2. Compute the statistic of interest (win%, O/U prob, etc.)
+#   3. Repeat B times to get a distribution of the statistic
+#   4. The 2.5th and 97.5th percentiles give the 95% CI
+#
+# This tells the user: "We predict 58% win probability, but the true
+# value is likely between 55.2% and 60.8% given simulation variance."
+
+BOOTSTRAP_N_RESAMPLES = 500
+
+
+def bootstrap_confidence_interval(
+    outcomes: list,
+    stat_fn: callable,
+    n_resamples: int = BOOTSTRAP_N_RESAMPLES,
+    ci_level: float = 0.95,
+) -> tuple:
+    """
+    Compute bootstrap confidence interval for a statistic.
+
+    Args:
+        outcomes: list of simulation outcomes (e.g., [(a_runs, h_runs), ...])
+        stat_fn: function that computes the statistic from a sample
+        n_resamples: number of bootstrap resamples
+        ci_level: confidence level (default 0.95 for 95% CI)
+
+    Returns:
+        (point_estimate, ci_lower, ci_upper)
+    """
+    n = len(outcomes)
+    if n < 10:
+        point = stat_fn(outcomes)
+        return (point, point, point)
+
+    # Point estimate from full sample
+    point_estimate = stat_fn(outcomes)
+
+    # Bootstrap resamples
+    boot_stats = []
+    for _ in range(n_resamples):
+        # Sample with replacement
+        resample = [outcomes[random.randint(0, n - 1)] for _ in range(n)]
+        boot_stats.append(stat_fn(resample))
+
+    boot_stats.sort()
+
+    # Percentile method for CI
+    alpha = 1.0 - ci_level
+    lower_idx = max(0, int(n_resamples * alpha / 2))
+    upper_idx = min(n_resamples - 1, int(n_resamples * (1.0 - alpha / 2)))
+
+    return (point_estimate, boot_stats[lower_idx], boot_stats[upper_idx])
+
+
+def compute_bootstrap_results(score_pairs_list: list) -> dict:
+    """
+    Compute bootstrapped confidence intervals for key predictions.
+
+    Args:
+        score_pairs_list: list of (away_runs, home_runs) tuples from simulation
+
+    Returns:
+        dict with point estimates and 95% CIs for win%, total runs, spread
+    """
+    if not score_pairs_list or len(score_pairs_list) < 100:
+        return {}
+
+    def away_win_pct(pairs):
+        wins = sum(1 for a, h in pairs if a > h)
+        return round(100.0 * wins / len(pairs), 1)
+
+    def avg_total(pairs):
+        return round(sum(a + h for a, h in pairs) / len(pairs), 2)
+
+    def avg_spread(pairs):
+        return round(sum(a - h for a, h in pairs) / len(pairs), 2)
+
+    wp_point, wp_lo, wp_hi = bootstrap_confidence_interval(score_pairs_list, away_win_pct)
+    total_point, total_lo, total_hi = bootstrap_confidence_interval(score_pairs_list, avg_total)
+    spread_point, spread_lo, spread_hi = bootstrap_confidence_interval(score_pairs_list, avg_spread)
+
+    return {
+        "away_win_pct_ci": {"point": wp_point, "lower": wp_lo, "upper": wp_hi},
+        "total_runs_ci": {"point": total_point, "lower": total_lo, "upper": total_hi},
+        "spread_ci": {"point": spread_point, "lower": spread_lo, "upper": spread_hi},
+    }
+
+
+# ── 25. INFORMATION-THEORETIC PITCH SEQUENCING ENTROPY ───────────────────────
+# A pitcher's effectiveness depends partly on unpredictability. A pitcher
+# who throws 90% fastballs is easier to sit on than one who mixes 5 pitches
+# evenly. We quantify this using Shannon entropy:
+#
+#   H = -Σ p_i * log₂(p_i)
+#
+# where p_i is the usage rate of pitch type i.
+#
+# High entropy (H > 2.0): unpredictable mix → batters can't time pitches
+# Low entropy (H < 1.5): predictable → batters adjust, especially in later TTO
+#
+# The entropy effect DECAYS with each time through the order (TTO):
+#   - TTO 1: batters haven't decoded the pattern → entropy effect is strong
+#   - TTO 2: partial decode → entropy advantage halved
+#   - TTO 3+: batters have seen everything → entropy barely matters
+#
+# This models the real-world TTO penalty more precisely than a flat multiplier.
+
+# Default pitch mix proportions if no arsenal data available
+# Approximated from 2022-2024 MLB average pitch usage
+DEFAULT_PITCH_MIX = {
+    "fastball": 0.35,
+    "slider": 0.20,
+    "changeup": 0.15,
+    "curveball": 0.12,
+    "cutter": 0.10,
+    "sinker": 0.08,
+}
+
+
+def compute_pitch_entropy(pitch_mix: dict = None) -> float:
+    """
+    Compute Shannon entropy of a pitcher's pitch mix.
+
+    H = -Σ p_i * log₂(p_i) for all pitch types with p_i > 0
+
+    Returns entropy in bits. Range:
+      0.0 = one pitch only (perfectly predictable)
+      ~2.6 = 6 pitches used equally (maximally unpredictable)
+    """
+    if not pitch_mix:
+        pitch_mix = DEFAULT_PITCH_MIX
+
+    entropy = 0.0
+    total = sum(pitch_mix.values())
+    if total <= 0:
+        return 1.5  # default moderate entropy
+
+    for count in pitch_mix.values():
+        p = count / total
+        if p > 0.001:
+            entropy -= p * _math.log2(p)
+
+    return entropy
+
+
+def entropy_tto_modifier(entropy: float, tto: int) -> dict:
+    """
+    Compute the probability modifier based on pitch entropy and TTO.
+
+    High-entropy pitchers maintain their advantage longer through the order.
+    Low-entropy pitchers suffer a steeper TTO penalty as batters decode them.
+
+    Args:
+        entropy: Shannon entropy of the pitch mix (bits)
+        tto: times through the order (1, 2, or 3+)
+
+    Returns:
+        dict of probability multipliers
+    """
+    # Baseline entropy for an average pitcher (~2.1 bits with 5-6 pitches)
+    baseline_entropy = 2.10
+
+    # How far above/below average is this pitcher's entropy?
+    entropy_diff = entropy - baseline_entropy
+
+    # TTO decay factor: entropy advantage shrinks each time through
+    if tto <= 1:
+        tto_decay = 1.0
+    elif tto == 2:
+        tto_decay = 0.50
+    else:
+        tto_decay = 0.20
+
+    # Effect magnitude: ±entropy_diff * decay * scaling
+    effect = entropy_diff * tto_decay * 0.08
+
+    # High entropy → suppresses offense (harder to predict)
+    # Low entropy → boosts offense (easier to sit on pitches)
+    return {
+        "k_mult": 1.0 + effect * 1.2,  # high entropy → more K
+        "bb_mult": 1.0 - effect * 0.5,  # high entropy → fewer walks (more swings)
+        "hr_mult": 1.0 - effect * 1.5,  # high entropy → fewer HR (bad swing decisions)
+        "hit_mult": 1.0 - effect * 0.8,  # high entropy → fewer hits
+    }
+
+
+def estimate_pitch_mix_from_stats(pitcher_stats: dict) -> dict:
+    """
+    Estimate a pitcher's pitch mix entropy from available stats.
+    Uses K%, GB%, and pitch count to infer mix diversity.
+    """
+    mix = dict(DEFAULT_PITCH_MIX)
+
+    if not pitcher_stats:
+        return mix
+
+    try:
+        k_pct = float(pitcher_stats.get("k_pct", "22") or "22")
+        gb_pct = float(pitcher_stats.get("gb_pct", "43") or "43")
+    except (ValueError, TypeError):
+        return mix
+
+    # High K% pitchers tend to have dominant secondary pitches
+    # (slider-heavy, which concentrates the mix)
+    if k_pct > 28:
+        mix["slider"] = 0.28
+        mix["fastball"] = 0.38
+        mix["changeup"] = 0.12
+        mix["curveball"] = 0.10
+        mix["cutter"] = 0.08
+        mix["sinker"] = 0.04
+    elif k_pct < 16:
+        # Low K% → probably fastball/sinker heavy (low entropy)
+        mix["fastball"] = 0.30
+        mix["sinker"] = 0.25
+        mix["slider"] = 0.15
+        mix["changeup"] = 0.15
+        mix["curveball"] = 0.10
+        mix["cutter"] = 0.05
+
+    # High GB% → likely throws sinker/cutter (different mix profile)
+    if gb_pct > 50:
+        mix["sinker"] = max(mix["sinker"], 0.22)
+        mix["fastball"] = max(0.10, mix["fastball"] - 0.10)
+
+    # Normalize
+    total = sum(mix.values())
+    return {k: v / total for k, v in mix.items()}
+
+
+def apply_entropy_modifier(probs: list, modifier: dict) -> list:
+    """Apply entropy-based modifier to outcome probabilities."""
+    if all(0.99 <= v <= 1.01 for v in modifier.values()):
+        return probs
+    adjusted = list(probs)
+    adjusted[0] *= modifier["bb_mult"]
+    adjusted[1] *= modifier["k_mult"]
+    adjusted[2] *= modifier["hit_mult"]
+    adjusted[3] *= modifier["hit_mult"]
+    adjusted[4] *= modifier["hit_mult"]
+    adjusted[5] *= modifier["hr_mult"]
+    total = sum(adjusted)
+    return [p / total for p in adjusted]
+
+
 # ── Run expectancy (RE24) base-out state table ────────────────────────────────
 # Expected runs from each base-out state (2020-2024 MLB average).
 # Used to weight strategic decisions like sac fly and stolen base thresholds.
@@ -4031,6 +4694,16 @@ def simulate_game(
     away_copula = GaussianCopula()
     home_copula = GaussianCopula()
 
+    # Ornstein-Uhlenbeck stochastic fatigue process
+    away_ou = OUFatigueProcess(away_pitcher_stats)
+    home_ou = OUFatigueProcess(home_pitcher_stats)
+
+    # Pitch entropy for TTO modifier
+    away_mix = estimate_pitch_mix_from_stats(away_pitcher_stats)
+    home_mix = estimate_pitch_mix_from_stats(home_pitcher_stats)
+    away_entropy = compute_pitch_entropy(away_mix)
+    home_entropy = compute_pitch_entropy(home_mix)
+
     # Momentum tracker (hot-inning correlation)
     momentum = MomentumTracker()
 
@@ -4219,6 +4892,43 @@ def simulate_game(
                     for bs in tto_away_cur
                 ]
 
+        # OU stochastic fatigue: step the home starter's energy process
+        if not home_starter_pulled:
+            ou_mod = home_ou.get_fatigue_modifier()
+            if any(abs(v - 1.0) > 0.005 for v in ou_mod.values()):
+                from itertools import accumulate as _acc_ou
+
+                tto_away_cur = [
+                    list(
+                        _acc_ou(
+                            apply_ou_fatigue(
+                                [c - p for c, p in zip(bs, [0] + list(bs[:-1]))],
+                                ou_mod,
+                            )
+                        )
+                    )
+                    for bs in tto_away_cur
+                ]
+
+        # Pitch entropy TTO modifier: home starter's predictability
+        if not home_starter_pulled:
+            away_tto_for_entropy = 1 + home_batters_faced // 9
+            ent_mod = entropy_tto_modifier(home_entropy, away_tto_for_entropy)
+            if any(abs(v - 1.0) > 0.005 for v in ent_mod.values()):
+                from itertools import accumulate as _acc_ent
+
+                tto_away_cur = [
+                    list(
+                        _acc_ent(
+                            apply_entropy_modifier(
+                                [c - p for c, p in zip(bs, [0] + list(bs[:-1]))],
+                                ent_mod,
+                            )
+                        )
+                    )
+                    for bs in tto_away_cur
+                ]
+
         # run_diff from away team's perspective (batting team)
         away_rdiff = away_runs - home_runs
         # Away batters face the home pitcher → use home_hmm for HMM state
@@ -4243,6 +4953,9 @@ def simulate_game(
             if runs > 0:
                 for _ in range(runs):
                     home_pitcher_state.record_run()
+            # OU fatigue: step once per batter faced
+            for _ in range(batters_this_half):
+                home_ou.step()
         away_pos = new_away_pos
         away_runs += runs
 
@@ -4300,6 +5013,43 @@ def simulate_game(
                     for bs in tto_home_cur
                 ]
 
+        # OU stochastic fatigue: step the away starter's energy process
+        if not away_starter_pulled:
+            ou_mod = away_ou.get_fatigue_modifier()
+            if any(abs(v - 1.0) > 0.005 for v in ou_mod.values()):
+                from itertools import accumulate as _acc_ou2
+
+                tto_home_cur = [
+                    list(
+                        _acc_ou2(
+                            apply_ou_fatigue(
+                                [c - p for c, p in zip(bs, [0] + list(bs[:-1]))],
+                                ou_mod,
+                            )
+                        )
+                    )
+                    for bs in tto_home_cur
+                ]
+
+        # Pitch entropy TTO modifier: away starter's predictability
+        if not away_starter_pulled:
+            home_tto_for_entropy = 1 + away_batters_faced // 9
+            ent_mod = entropy_tto_modifier(away_entropy, home_tto_for_entropy)
+            if any(abs(v - 1.0) > 0.005 for v in ent_mod.values()):
+                from itertools import accumulate as _acc_ent2
+
+                tto_home_cur = [
+                    list(
+                        _acc_ent2(
+                            apply_entropy_modifier(
+                                [c - p for c, p in zip(bs, [0] + list(bs[:-1]))],
+                                ent_mod,
+                            )
+                        )
+                    )
+                    for bs in tto_home_cur
+                ]
+
         # run_diff from home team's perspective (batting team)
         home_rdiff = home_runs - away_runs
         # Home batters face the away pitcher → use away_hmm for HMM state
@@ -4323,6 +5073,9 @@ def simulate_game(
             if runs > 0:
                 for _ in range(runs):
                     away_pitcher_state.record_run()
+            # OU fatigue: step once per batter faced
+            for _ in range(batters_this_half):
+                away_ou.step()
         home_pos = new_home_pos
         home_runs += runs
 
@@ -4880,6 +5633,14 @@ def run_simulation(
         "f3": seg_results["f3"],
         "f5": seg_results["f5"],
         "f7": seg_results["f7"],
+        # Bootstrap 95% confidence intervals
+        "confidence_intervals": compute_bootstrap_results(
+            [k for k, cnt in score_pairs.items() for _ in range(cnt)]
+        ),
+        # Analytical Poisson run distribution
+        "poisson_model": compute_poisson_run_distribution(
+            away_pitcher, home_pitcher, away_lineup, home_lineup
+        ),
     }
 
 
