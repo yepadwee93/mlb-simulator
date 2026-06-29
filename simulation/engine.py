@@ -2525,9 +2525,9 @@ def predict_batter_props(
         # non-HR RBI: hit with runner on → runner scores ~62% on single, ~87% on double
         avg_runners_on = rob_rate * 2.1  # avg runners on base (weighted by occupancy)
         rbi_from_hr = avg_hr * (1.0 + avg_runners_on * 0.90)  # 90% of runners score on HR
-        rbi_from_1b = (p_1b * pa_expected) * rob_rate * 0.35   # single scores ~35% of ROB
-        rbi_from_2b = (p_2b * pa_expected) * rob_rate * 0.65   # double scores ~65% of ROB
-        rbi_from_3b = (p_3b * pa_expected) * rob_rate * 0.90   # triple scores ~90% of ROB
+        rbi_from_1b = (p_1b * pa_expected) * rob_rate * 0.35  # single scores ~35% of ROB
+        rbi_from_2b = (p_2b * pa_expected) * rob_rate * 0.65  # double scores ~65% of ROB
+        rbi_from_3b = (p_3b * pa_expected) * rob_rate * 0.90  # triple scores ~90% of ROB
         avg_rbi = rbi_from_hr + rbi_from_1b + rbi_from_2b + rbi_from_3b
 
         # P(at least 1 hit)

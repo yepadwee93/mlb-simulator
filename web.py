@@ -731,10 +731,7 @@ def build_game_result(game, n_sims, use_splits=True):
         lines = {}
         for line in [3.5, 4.5, 5.5, 6.5, 7.5]:
             threshold = int(line + 0.5)
-            p_under = sum(
-                _math.exp(-lam) * lam**k / _math.factorial(k)
-                for k in range(threshold)
-            )
+            p_under = sum(_math.exp(-lam) * lam**k / _math.factorial(k) for k in range(threshold))
             lines[str(line)] = round((1 - p_under) * 100, 1)
         return lines
 
@@ -1872,17 +1869,20 @@ def simulate_all():
 # Multiplicative adjustments to base prop probabilities conditioned on game legs.
 # Derived from MLB seasonal correlations between game outcomes and batter stats.
 _SGP_BATTER_CORR = {
-    "ml_same":  {"hits": 1.12, "hr": 1.08, "rbi": 1.18, "tb": 1.14, "runs": 1.20},
-    "ml_opp":   {"hits": 0.92, "hr": 0.94, "rbi": 0.85, "tb": 0.90, "runs": 0.82},
-    "rl_same":  {"hits": 1.20, "hr": 1.15, "rbi": 1.30, "tb": 1.22, "runs": 1.28},
-    "rl_opp":   {"hits": 0.85, "hr": 0.88, "rbi": 0.75, "tb": 0.82, "runs": 0.75},
-    "over":     {"hits": 1.10, "hr": 1.12, "rbi": 1.15, "tb": 1.12, "runs": 1.15},
-    "under":    {"hits": 0.90, "hr": 0.88, "rbi": 0.85, "tb": 0.88, "runs": 0.85},
+    "ml_same": {"hits": 1.12, "hr": 1.08, "rbi": 1.18, "tb": 1.14, "runs": 1.20},
+    "ml_opp": {"hits": 0.92, "hr": 0.94, "rbi": 0.85, "tb": 0.90, "runs": 0.82},
+    "rl_same": {"hits": 1.20, "hr": 1.15, "rbi": 1.30, "tb": 1.22, "runs": 1.28},
+    "rl_opp": {"hits": 0.85, "hr": 0.88, "rbi": 0.75, "tb": 0.82, "runs": 0.75},
+    "over": {"hits": 1.10, "hr": 1.12, "rbi": 1.15, "tb": 1.12, "runs": 1.15},
+    "under": {"hits": 0.90, "hr": 0.88, "rbi": 0.85, "tb": 0.88, "runs": 0.85},
 }
 _SGP_PITCHER_K_CORR = {
-    "ml_same": 1.05, "ml_opp": 0.97,
-    "rl_same": 1.08, "rl_opp": 0.94,
-    "over": 1.03, "under": 1.08,
+    "ml_same": 1.05,
+    "ml_opp": 0.97,
+    "rl_same": 1.08,
+    "rl_opp": 0.94,
+    "over": 1.03,
+    "under": 1.08,
 }
 
 
@@ -1987,7 +1987,9 @@ def sgp_calc(game_pk):
         combined_prob = 0.001
 
     fair_odds = round(
-        (-100 / combined_prob) if combined_prob >= 0.5 else (100 * (1 - combined_prob) / combined_prob),
+        (-100 / combined_prob)
+        if combined_prob >= 0.5
+        else (100 * (1 - combined_prob) / combined_prob),
         0,
     )
     fair_odds_str = f"+{int(fair_odds)}" if fair_odds > 0 else str(int(fair_odds))
@@ -2124,8 +2126,14 @@ def odds_history_page():
         if r.get("actual_winner")
         and r.get("model_away_pct")
         and (
-            (r["model_away_pct"] >= r.get("model_home_pct", 50) and r["actual_winner"] == r["away_team"])
-            or (r.get("model_home_pct", 50) > r["model_away_pct"] and r["actual_winner"] == r["home_team"])
+            (
+                r["model_away_pct"] >= r.get("model_home_pct", 50)
+                and r["actual_winner"] == r["away_team"]
+            )
+            or (
+                r.get("model_home_pct", 50) > r["model_away_pct"]
+                and r["actual_winner"] == r["home_team"]
+            )
         )
     )
     stats = {
@@ -2137,7 +2145,11 @@ def odds_history_page():
         "model_pct": round(model_correct / len(settled) * 100, 1) if settled else 0,
     }
     return render_template(
-        "odds_history.html", rows=rows, stats=stats, date_from=date_from or "", date_to=date_to or ""
+        "odds_history.html",
+        rows=rows,
+        stats=stats,
+        date_from=date_from or "",
+        date_to=date_to or "",
     )
 
 
