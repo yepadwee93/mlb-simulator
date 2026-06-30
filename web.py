@@ -2043,6 +2043,8 @@ def update_my_picks():
 @login_required
 def clear_my_picks():
     try:
+        from data.db import supa
+
         uid = _uid()
         rows = supa().table("picks").select("id").eq("user_id", int(uid)).execute()
         ids = [r["id"] for r in (rows.data or [])]
