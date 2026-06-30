@@ -8,7 +8,7 @@ No API key needed — MLB makes this data public.
 """
 
 import time
-from datetime import date
+from datetime import date, datetime, timezone, timedelta
 
 import requests
 
@@ -127,10 +127,11 @@ def get_today_schedule(game_date=None):
     Returns a list of today's MLB games.
     Each game dict has: gamePk (unique game ID), teams, status, venue, time.
 
-    game_date: optional string like '2026-06-25'. Defaults to today.
+    game_date: optional string like '2026-06-25'. Defaults to today (EST).
     """
     if game_date is None:
-        game_date = date.today().isoformat()  # e.g. "2026-06-25"
+        est = timezone(timedelta(hours=-5))
+        game_date = datetime.now(est).date().isoformat()
 
     data = _get(
         "/schedule",
@@ -144,6 +145,7 @@ def get_today_schedule(game_date=None):
     games = []
     # The API wraps results in dates[] -> games[]
     for day in data.get("dates", []):
+        day_date = day.get("date", game_date)
         for game in day.get("games", []):
             away = game["teams"]["away"]
             home = game["teams"]["home"]
@@ -155,6 +157,7 @@ def get_today_schedule(game_date=None):
             games.append(
                 {
                     "gamePk": game["gamePk"],
+                    "game_date": day_date,
                     "status": game["status"]["detailedState"],
                     "home_team": home["team"]["name"],
                     "away_team": away["team"]["name"],
