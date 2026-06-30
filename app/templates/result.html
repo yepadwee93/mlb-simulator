@@ -676,6 +676,75 @@
 </div>
 {% endif %}
 
+<!-- ── Quick Bet Slip ── -->
+{% if away_avg_odds is defined and away_avg_odds %}
+<div class="card" id="quick-bet-card">
+  <div class="section-title">Quick Bet</div>
+  <p style="font-size:0.72rem;color:#9aa0b8;margin-bottom:12px;">One-click bet logging from this simulation</p>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+    <button class="qb-btn" onclick="qbSelect('{{ away_team }}','ML','{{ away_avg_odds }}',{{ away_edge|default(0) }})" style="flex:1;min-width:120px;padding:10px;background:#1a2a4a;border:1px solid #2563eb;border-radius:8px;color:#64b5f6;font-weight:700;font-size:0.85rem;cursor:pointer;">
+      {{ away_team }} ML ({{ away_avg_odds }})
+    </button>
+    <button class="qb-btn" onclick="qbSelect('{{ home_team }}','ML','{{ home_avg_odds }}',{{ home_edge|default(0) }})" style="flex:1;min-width:120px;padding:10px;background:#1a3a2a;border:1px solid #2e7d32;border-radius:8px;color:#81c784;font-weight:700;font-size:0.85rem;cursor:pointer;">
+      {{ home_team }} ML ({{ home_avg_odds }})
+    </button>
+  </div>
+  {% if ou_line is defined and ou_line %}
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+    <button class="qb-btn" onclick="qbSelect('OVER {{ ou_line }}','O/U','{{ ou_over_odds|default(-110) }}',{{ ou_over_edge|default(0) }})" style="flex:1;min-width:120px;padding:10px;background:#1a2a1a;border:1px solid #555870;border-radius:8px;color:#ffa726;font-weight:700;font-size:0.85rem;cursor:pointer;">
+      Over {{ ou_line }} ({{ ou_over_odds|default('-110') }})
+    </button>
+    <button class="qb-btn" onclick="qbSelect('UNDER {{ ou_line }}','O/U','{{ ou_under_odds|default(-110) }}',{{ ou_under_edge|default(0) }})" style="flex:1;min-width:120px;padding:10px;background:#1a1a2a;border:1px solid #555870;border-radius:8px;color:#64b5f6;font-weight:700;font-size:0.85rem;cursor:pointer;">
+      Under {{ ou_line }} ({{ ou_under_odds|default('-110') }})
+    </button>
+  </div>
+  {% endif %}
+  <div id="qb-form" style="display:none;background:#0d1120;border-radius:10px;padding:14px;margin-top:8px;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+      <span id="qb-label" style="font-weight:700;font-size:0.9rem;color:#e8eaf0;"></span>
+      <span id="qb-edge-badge" style="font-size:0.75rem;font-weight:700;padding:2px 8px;border-radius:10px;"></span>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;">
+      <label style="font-size:0.78rem;color:#b0b8cc;">Wager $</label>
+      <input id="qb-amount" type="number" value="100" min="1" style="width:80px;background:#1a1e2e;border:1px solid #353a52;border-radius:6px;color:#e8eaf0;padding:6px 8px;font-size:0.85rem;">
+      <button onclick="qbSubmit()" style="padding:8px 20px;background:linear-gradient(135deg,#7c3aed,#2563eb);color:#fff;font-weight:700;font-size:0.85rem;border:none;border-radius:8px;cursor:pointer;">Log Bet</button>
+      <button onclick="document.getElementById('qb-form').style.display='none'" style="padding:8px 12px;background:#353a52;color:#b0b8cc;border:none;border-radius:8px;cursor:pointer;font-size:0.8rem;">Cancel</button>
+    </div>
+    <div id="qb-msg" style="font-size:0.78rem;margin-top:8px;"></div>
+  </div>
+</div>
+<script>
+var qbData = {};
+function qbSelect(betOn, betType, odds, edge) {
+  qbData = {betOn: betOn, betType: betType, odds: parseInt(odds) || -110, edge: edge};
+  document.getElementById('qb-label').textContent = betOn + ' (' + (odds > 0 ? '+' : '') + odds + ')';
+  var badge = document.getElementById('qb-edge-badge');
+  if (edge > 3) { badge.textContent = '+' + edge.toFixed(1) + '% edge'; badge.style.background = '#1b3a2a'; badge.style.color = '#4caf50'; }
+  else if (edge < -3) { badge.textContent = edge.toFixed(1) + '% edge'; badge.style.background = '#3a1b1b'; badge.style.color = '#ef5350'; }
+  else { badge.textContent = edge.toFixed(1) + '% edge'; badge.style.background = '#252836'; badge.style.color = '#b0b8cc'; }
+  document.getElementById('qb-form').style.display = 'block';
+  document.querySelectorAll('.qb-btn').forEach(function(b){ b.style.opacity = '0.5'; });
+  event.target.style.opacity = '1';
+}
+function qbSubmit() {
+  var amount = parseFloat(document.getElementById('qb-amount').value) || 100;
+  var body = {
+    game_pk: '{{ game_pk }}', game_date: '{{ game_date|default("") }}',
+    away_team: '{{ away_team }}', home_team: '{{ home_team }}',
+    bet_on: qbData.betOn, bet_type: qbData.betType,
+    odds: qbData.odds, amount: amount, model_edge: qbData.edge
+  };
+  csrfFetch('/bets/log', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      var msg = document.getElementById('qb-msg');
+      if (d.status === 'ok') { msg.innerHTML = '<span style="color:#4caf50;">Bet logged! <a href="/bets" style="color:#64b5f6;">View bets →</a></span>'; }
+      else { msg.innerHTML = '<span style="color:#ef5350;">Error logging bet</span>'; }
+    });
+}
+</script>
+{% endif %}
+
 <!-- ── Pitching matchup card ── -->
 <div class="card">
   <div class="section-title">Starting Pitchers</div>
