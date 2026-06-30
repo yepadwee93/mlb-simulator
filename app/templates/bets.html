@@ -268,9 +268,9 @@
         <option value="">Pick a game first</option>
       </select>
     </div>
-    <div class="form-group">
-      <label>O/U Line</label>
-      <input id="lb-ouline" type="number" step="0.5" value="8.5" placeholder="8.5" style="display:none;">
+    <div class="form-group" id="lb-line-group" style="display:none;">
+      <label id="lb-line-label">Line</label>
+      <select id="lb-line-select"></select>
     </div>
     <div class="form-group">
       <label>Odds (American)</label>
@@ -420,42 +420,42 @@ function updateBetOnOptions() {
   var home = document.getElementById('lb-home').value;
   var type = document.getElementById('lb-type').value;
   var sel = document.getElementById('lb-beton');
-  var ouLine = document.getElementById('lb-ouline');
+  var lineGroup = document.getElementById('lb-line-group');
+  var lineSel = document.getElementById('lb-line-select');
+  var lineLabel = document.getElementById('lb-line-label');
 
   sel.innerHTML = '';
+  lineSel.innerHTML = '';
 
   if (!away || !home) {
     sel.innerHTML = '<option value="">Pick a game first</option>';
-    ouLine.style.display = 'none';
+    lineGroup.style.display = 'none';
     return;
   }
 
   if (type === 'ML' || type === 'F5') {
     sel.innerHTML = '<option value="' + away + '">' + away + '</option>'
                   + '<option value="' + home + '">' + home + '</option>';
-    ouLine.style.display = 'none';
+    lineGroup.style.display = 'none';
   } else if (type === 'RL') {
-    sel.innerHTML = '<option value="' + away + ' -1.5">' + away + ' -1.5</option>'
-                  + '<option value="' + home + ' +1.5">' + home + ' +1.5</option>'
-                  + '<option value="' + away + ' +1.5">' + away + ' +1.5</option>'
-                  + '<option value="' + home + ' -1.5">' + home + ' -1.5</option>';
-    ouLine.style.display = 'none';
+    sel.innerHTML = '<option value="' + away + '">' + away + '</option>'
+                  + '<option value="' + home + '">' + home + '</option>';
+    lineGroup.style.display = '';
+    lineLabel.textContent = 'Run Line';
+    var rlLines = ['-1.5', '+1.5', '-2.5', '+2.5', '-3.5', '+3.5'];
+    rlLines.forEach(function(l) {
+      lineSel.innerHTML += '<option value="' + l + '">' + l + '</option>';
+    });
   } else if (type === 'OVER' || type === 'UNDER') {
-    ouLine.style.display = '';
-    var line = ouLine.value || '8.5';
-    if (type === 'OVER') {
-      sel.innerHTML = '<option value="OVER ' + line + '">Over ' + line + '</option>';
-    } else {
-      sel.innerHTML = '<option value="UNDER ' + line + '">Under ' + line + '</option>';
+    sel.innerHTML = '<option value="OVER">Over</option>'
+                  + '<option value="UNDER">Under</option>';
+    if (type === 'UNDER') sel.value = 'UNDER';
+    lineGroup.style.display = '';
+    lineLabel.textContent = 'Total Line';
+    for (var n = 4.5; n <= 15.5; n += 0.5) {
+      var selected = (n === 8.5) ? ' selected' : '';
+      lineSel.innerHTML += '<option value="' + n + '"' + selected + '>' + n + '</option>';
     }
-    ouLine.oninput = function() {
-      var l = ouLine.value;
-      if (type === 'OVER') {
-        sel.innerHTML = '<option value="OVER ' + l + '">Over ' + l + '</option>';
-      } else {
-        sel.innerHTML = '<option value="UNDER ' + l + '">Under ' + l + '</option>';
-      }
-    };
   }
 }
 
@@ -464,14 +464,25 @@ loadTodayGames();
 
 async function logBet() {
   const msg = document.getElementById('lb-msg');
-  const betOn = document.getElementById('lb-beton');
+  var betOnVal = document.getElementById('lb-beton').value;
+  var betType = document.getElementById('lb-type').value;
+  var lineGroup = document.getElementById('lb-line-group');
+  var lineSel = document.getElementById('lb-line-select');
+  // Combine bet_on with line for RL and O/U
+  if (lineGroup.style.display !== 'none' && lineSel.value) {
+    if (betType === 'RL') {
+      betOnVal = betOnVal + ' ' + lineSel.value;
+    } else if (betType === 'OVER' || betType === 'UNDER') {
+      betOnVal = betOnVal + ' ' + lineSel.value;
+    }
+  }
   const payload = {
     game_pk:    document.getElementById('lb-gpk').value,
     game_date:  document.getElementById('lb-date').value,
     away_team:  document.getElementById('lb-away').value,
     home_team:  document.getElementById('lb-home').value,
-    bet_on:     betOn.value || betOn.options[betOn.selectedIndex]?.text || '',
-    bet_type:   document.getElementById('lb-type').value,
+    bet_on:     betOnVal,
+    bet_type:   betType,
     odds:       document.getElementById('lb-odds').value,
     amount:     document.getElementById('lb-amount').value,
     model_edge: document.getElementById('lb-edge').value,
