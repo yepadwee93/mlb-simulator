@@ -2000,19 +2000,23 @@ def api_scores():
 @app.route("/api/today-games")
 def api_today_games():
     """JSON: today's scheduled games for the bet form picker."""
-    games = get_today_schedule(game_date=_today_est().isoformat())
-    out = []
-    for g in games:
-        out.append(
-            {
-                "gamePk": g.get("gamePk", g.get("game_pk", "")),
-                "away": g.get("away_team", ""),
-                "home": g.get("home_team", ""),
-                "status": g.get("status", g.get("abstract_state", "")),
-                "game_time": g.get("game_time", g.get("game_time_utc", "")),
-            }
-        )
-    return jsonify(out)
+    try:
+        td = _today_est().isoformat()
+        games = get_today_schedule(game_date=td)
+        out = []
+        for g in games:
+            out.append(
+                {
+                    "gamePk": g.get("gamePk", g.get("game_pk", "")),
+                    "away": g.get("away_team", ""),
+                    "home": g.get("home_team", ""),
+                    "status": g.get("status", g.get("abstract_state", "")),
+                    "game_time": g.get("game_time", g.get("game_time_utc", "")),
+                }
+            )
+        return jsonify(out)
+    except Exception as e:
+        return jsonify({"error": str(e), "games": []})
 
 
 @app.route("/api/bets")
