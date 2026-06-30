@@ -347,11 +347,11 @@ def get_single_game_predictions():
 def get_accuracy_stats():
     """
     Accuracy metrics for the /accuracy page.
-    Only counts manually-run (single-game) simulations.
+    Counts all simulations (single + bulk/simulate-all).
     Returns dict with total_predictions, results_available, correct_picks,
     accuracy_pct, avg_run_diff_error, by_confidence, recent, all_single.
     """
-    all_rows = get_single_game_predictions()
+    all_rows = get_all_predictions()
     completed = [r for r in all_rows if r.get("correct_pick") is not None]
 
     if not completed:

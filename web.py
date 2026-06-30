@@ -1831,7 +1831,15 @@ def api_sim_card(game_pk):
     except Exception:
         pass
 
-    # Log prediction
+    # Compute confidence grade
+    conf = {}
+    try:
+        conf = compute_model_confidence(result)
+        result["confidence"] = conf
+    except Exception:
+        pass
+
+    # Log prediction with confidence
     try:
         log_prediction(
             game_pk=game_pk,
@@ -1843,6 +1851,10 @@ def api_sim_card(game_pk):
             away_avg_runs=result.get("avg_away_runs", 0),
             home_avg_runs=result.get("avg_home_runs", 0),
             n_sims=N_SIMS_ALL,
+            source="bulk",
+            confidence_grade=conf.get("grade") if conf.get("grade") != "—" else None,
+            confidence_score=conf.get("score"),
+            confidence_signals=conf.get("signal_count"),
         )
     except Exception:
         pass
