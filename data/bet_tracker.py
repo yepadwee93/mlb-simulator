@@ -65,15 +65,12 @@ def settle_bets(user_id=None, csv_path=None):
 
     from data.mlb_api import _get
 
-    res = (
-        supa()
-        .table("bets")
-        .select("*")
-        .eq("user_id", int(user_id))
-        .eq("result", "pending")
-        .execute()
-    )
-    pending = res.data or []
+    all_bets = supa().table("bets").select("*").eq("user_id", int(user_id)).execute()
+    pending = [
+        b
+        for b in (all_bets.data or [])
+        if (b.get("result") or "pending").lower() in ("pending", "open", "")
+    ]
     settled = 0
 
     print(f"[settle_bets] found {len(pending)} pending bets")

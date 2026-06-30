@@ -9,7 +9,7 @@ Then open:  http://127.0.0.1:5000
 """
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import date
+from datetime import date, datetime
 
 
 def _today_est():
@@ -1200,6 +1200,9 @@ def simulate(game_pk):
             model_over = round(over_count / n_sims * 100, 1)
             model_under = round(100 - model_over, 1)
             result["ou_line"] = ou_line
+            result["avg_total_runs"] = round(
+                sum(tot * cnt for tot, cnt in hist.items()) / max(sum(hist.values()), 1), 1
+            )
             result["model_over_pct"] = model_over
             result["model_under_pct"] = model_under
             result["ou_over_implied"] = ou["over_implied"]
@@ -1336,6 +1339,29 @@ def simulate(game_pk):
         result.get("away_lineup", []),
         result.get("home_lineup", []),
     )
+
+    # ── Model confidence scoring ─────────────────────────────────────
+    try:
+        result["confidence"] = compute_model_confidence(result)
+    except Exception:
+        result["confidence"] = {
+            "grade": "—",
+            "best_side": "",
+            "score": 0,
+            "signal_count": 0,
+            "signals": [],
+        }
+
+    # ── O/U edge via KDE ─────────────────────────────────────────────
+    try:
+        if result.get("ou_line") and result.get("total_runs_hist"):
+            ou_edge = compute_ou_edge(
+                result["total_runs_hist"],
+                result["ou_line"],
+            )
+            result["kde_ou_edge"] = ou_edge
+    except Exception:
+        pass
 
     return render_template("result.html", game_pk=game_pk, n_sims=n_sims, **result)
 
@@ -2039,8 +2065,51 @@ def log_bet_route():
 @app.route("/bets/settle", methods=["POST"])
 @login_required
 def settle_bets_route():
-    n = settle_bets(user_id=_uid())
-    return jsonify({"settled": n})
+    try:
+        n = settle_bets(user_id=_uid())
+        return jsonify({"settled": n})
+    except Exception as e:
+        return jsonify({"settled": 0, "error": str(e)})
+
+
+@app.route("/bets/manual-result", methods=["POST"])
+@login_required
+def manual_result_route():
+    """Manually mark a bet as win/loss/push when auto-settle can't find it."""
+    data = request.get_json() or {}
+    bet_id = data.get("bet_id")
+    result = data.get("result", "").lower()
+    if not bet_id or result not in ("win", "loss", "push"):
+        return jsonify({"status": "error", "msg": "Need bet_id and result (win/loss/push)"}), 400
+    try:
+        from data.db import supa
+
+        bet_res = (
+            supa().table("bets").select("*").eq("id", int(bet_id)).eq("user_id", _uid()).execute()
+        )
+        bet = (bet_res.data or [None])[0]
+        if not bet:
+            return jsonify({"status": "error", "msg": "Bet not found"}), 404
+
+        odds = int(bet.get("odds") or -110)
+        amount = float(bet.get("amount") or 100)
+        if result == "win":
+            payout = (amount * odds / 100) if odds > 0 else (amount * 100 / abs(odds))
+        elif result == "loss":
+            payout = -amount
+        else:
+            payout = 0.0
+
+        supa().table("bets").update(
+            {
+                "result": result,
+                "payout": round(payout, 2),
+                "settled_at": datetime.utcnow().isoformat(),
+            }
+        ).eq("id", int(bet_id)).execute()
+        return jsonify({"status": "ok", "result": result, "payout": round(payout, 2)})
+    except Exception as e:
+        return jsonify({"status": "error", "msg": str(e)}), 500
 
 
 # ── Account Settings ─────────────────────────────────────────────────────────

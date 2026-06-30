@@ -322,7 +322,13 @@
         {% if r == "win" %}<span class="badge badge-win">WIN</span>
         {% elif r == "loss" %}<span class="badge badge-loss">LOSS</span>
         {% elif r == "push" %}<span class="badge badge-push">PUSH</span>
-        {% else %}<span class="badge badge-open">OPEN</span>{% endif %}
+        {% else %}<span class="badge badge-open">OPEN</span>
+          <span style="display:inline-flex;gap:3px;margin-left:4px;">
+            <button onclick="markResult({{ b.id }},'win')" style="background:#1b3a2a;color:#4caf50;border:1px solid #2a5a3a;border-radius:4px;padding:1px 6px;font-size:0.6rem;cursor:pointer;font-weight:700;">W</button>
+            <button onclick="markResult({{ b.id }},'loss')" style="background:#3a1a1a;color:#ef5350;border:1px solid #5a2a2a;border-radius:4px;padding:1px 6px;font-size:0.6rem;cursor:pointer;font-weight:700;">L</button>
+            <button onclick="markResult({{ b.id }},'push')" style="background:#252836;color:#b0b8cc;border:1px solid #333650;border-radius:4px;padding:1px 6px;font-size:0.6rem;cursor:pointer;font-weight:700;">P</button>
+          </span>
+        {% endif %}
       </td>
       <td>{% if b.clv %}<span class="{% if b.clv|float > 0 %}green{% else %}red{% endif %}">{% if b.clv|float > 0 %}+{% endif %}{{ b.clv }}pp</span>{% else %}—{% endif %}</td>
       <td>{% if b.payout is not none and b.result != "pending" %}
@@ -399,6 +405,23 @@ async function logBet() {
 function getCsrfToken(){return document.cookie.split(';').map(function(c){return c.trim();}).find(function(c){return c.startsWith('csrf_token=');})?.split('=')[1]||'';}
 function csrfFetch(url,opts){opts=opts||{};opts.headers=Object.assign({'X-CSRFToken':getCsrfToken()},opts.headers||{});return fetch(url,opts);}
 
+async function markResult(betId, result) {
+  try {
+    var r = await csrfFetch('/bets/manual-result', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({bet_id: betId, result: result})
+    });
+    var d = await r.json();
+    if (d.status === 'ok') {
+      location.reload();
+    } else {
+      alert(d.msg || 'Error updating bet.');
+    }
+  } catch(e) {
+    alert('Network error.');
+  }
+}
+
 async function settleBets() {
   var btn = document.getElementById('settle-btn');
   var msg = document.getElementById('settle-msg');
@@ -408,13 +431,16 @@ async function settleBets() {
   try {
     var r = await csrfFetch('/bets/settle', {method: 'POST'});
     var d = await r.json();
-    if (d.settled > 0) {
+    if (d.error) {
+      msg.style.color = '#ffa726';
+      msg.textContent = 'Settle error: ' + d.error + '. Use W/L/P buttons to mark manually.';
+    } else if (d.settled > 0) {
       msg.style.color = '#4caf50';
       msg.textContent = d.settled + ' bet(s) settled!';
       setTimeout(function(){ location.reload(); }, 1000);
     } else {
       msg.style.color = '#b0b8cc';
-      msg.textContent = 'No pending bets to settle (games may not be final yet).';
+      msg.textContent = 'No bets auto-settled. Games may not be final — use W/L/P buttons to mark results manually.';
     }
   } catch(e) {
     msg.style.color = '#ef5350';
