@@ -226,11 +226,13 @@ def get_today_schedule(game_date=None):
 # ──────────────────────────────────────────────
 
 
-def get_game_lineup(game_pk):
+def get_game_lineup(game_pk, fresh=False):
     """
     Given a gamePk, returns the batting lineups and starting pitchers
     for both teams. Works for live, completed, or scheduled games
     (though pre-game lineups may not be available until ~30 min before first pitch).
+
+    fresh: if True, bypass cache to get the latest lineup data.
 
     Returns a dict with keys: home_batters, away_batters,
                                home_pitcher, away_pitcher
@@ -238,7 +240,8 @@ def get_game_lineup(game_pk):
     Each pitcher is {id, name}
     """
     # The boxscore endpoint has the full lineup once it's set
-    data = _get(f"/game/{game_pk}/boxscore")
+    fetcher = _get_nocache if fresh else _get
+    data = fetcher(f"/game/{game_pk}/boxscore")
 
     result = {
         "home_batters": [],

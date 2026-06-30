@@ -262,7 +262,7 @@ def _get_day_night(game_time_str):
         return "n"
 
 
-def build_game_result(game, n_sims, use_splits=True):
+def build_game_result(game, n_sims, use_splits=True, fresh_lineup=False):
     """
     Full pipeline for one game:
       fetch lineup → get pitcher hands → fetch batter stats →
@@ -270,10 +270,11 @@ def build_game_result(game, n_sims, use_splits=True):
 
     use_splits: if True, fetch L/R split stats per batter (more accurate but slower).
                 Set to False for simulate-all mode to keep things fast.
+    fresh_lineup: if True, bypass cache to get the latest lineup data.
 
     Returns None if the lineup isn't available yet.
     """
-    lineup = get_game_lineup(game["gamePk"])
+    lineup = get_game_lineup(game["gamePk"], fresh=fresh_lineup)
     if not lineup["away_batters"] or not lineup["home_batters"]:
         return None
 
@@ -1832,7 +1833,7 @@ def api_sim_card(game_pk):
         return jsonify({"error": "Game not found"}), 404
 
     try:
-        result = build_game_result(game, n_sims=N_SIMS_ALL, use_splits=False)
+        result = build_game_result(game, n_sims=N_SIMS_ALL, use_splits=False, fresh_lineup=True)
     except Exception:
         result = None
     if result is None:
