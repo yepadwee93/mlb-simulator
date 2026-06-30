@@ -2042,19 +2042,10 @@ def update_my_picks():
 @app.route("/my-picks/clear", methods=["POST"])
 @login_required
 def clear_my_picks():
-    try:
-        from data.db import supa
+    from data.my_picks import clear_all_picks
 
-        uid = _uid()
-        rows = supa().table("picks").select("id").eq("user_id", int(uid)).execute()
-        ids = [r["id"] for r in (rows.data or [])]
-        if not ids:
-            return jsonify({"status": "ok", "deleted": 0, "error": "No picks found"})
-        for rid in ids:
-            supa().table("picks").delete().eq("id", rid).execute()
-        return jsonify({"status": "ok", "deleted": len(ids)})
-    except Exception as e:
-        return jsonify({"status": "error", "deleted": 0, "error": str(e)}), 500
+    deleted = clear_all_picks(user_id=_uid())
+    return jsonify({"status": "ok", "deleted": deleted})
 
 
 @app.route("/odds-history")
