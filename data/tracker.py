@@ -22,6 +22,9 @@ def log_prediction(
     home_avg_runs,
     n_sims,
     source="bulk",
+    confidence_grade=None,
+    confidence_score=None,
+    confidence_signals=None,
 ):
     """
     Upsert one simulation result. If this game_pk already has a row,
@@ -51,6 +54,12 @@ def log_prediction(
         "n_sims": int(n_sims),
         "source": source,
     }
+    if confidence_grade:
+        row["confidence_grade"] = confidence_grade
+    if confidence_score is not None:
+        row["confidence_score"] = float(confidence_score)
+    if confidence_signals is not None:
+        row["confidence_signals"] = int(confidence_signals)
 
     if existing.data:
         # Update prediction fields but don't wipe real results
@@ -340,3 +349,105 @@ def get_accuracy_stats():
         "recent": completed[:20],
         "all_single": all_rows,  # all single-game sims, pending + settled
     }
+
+
+def get_confidence_history():
+    """
+    Returns confidence grade accuracy over time.
+    Groups settled predictions by grade (A/B/C/D) and computes win rate for each.
+    Also returns daily data for charting.
+    """
+    rows = (
+        supa()
+        .table("predictions")
+        .select("*")
+        .not_.is_("confidence_grade", "null")
+        .not_.is_("correct_pick", "null")
+        .order("game_date", desc=False)
+        .execute()
+    ).data or []
+
+    by_grade = {}
+    daily = {}
+    for r in rows:
+        grade = r.get("confidence_grade", "")
+        if not grade or grade == "—":
+            continue
+        correct = int(r.get("correct_pick", 0))
+
+        if grade not in by_grade:
+            by_grade[grade] = {"total": 0, "correct": 0}
+        by_grade[grade]["total"] += 1
+        by_grade[grade]["correct"] += correct
+
+        gd = r.get("game_date", "")
+        if gd:
+            if gd not in daily:
+                daily[gd] = {"total": 0, "correct": 0}
+            daily[gd]["total"] += 1
+            daily[gd]["correct"] += correct
+
+    grade_stats = []
+    for g in ["A", "B", "C", "D"]:
+        d = by_grade.get(g, {"total": 0, "correct": 0})
+        pct = round(d["correct"] / d["total"] * 100, 1) if d["total"] > 0 else None
+        grade_stats.append({"grade": g, "total": d["total"], "correct": d["correct"], "pct": pct})
+
+    daily_list = []
+    for dt in sorted(daily.keys()):
+        d = daily[dt]
+        pct = round(d["correct"] / d["total"] * 100, 1) if d["total"] > 0 else 0
+        daily_list.append({"date": dt, "total": d["total"], "correct": d["correct"], "pct": pct})
+
+    return {"by_grade": grade_stats, "daily": daily_list, "total_graded": len(rows)}
+
+
+def detect_rlm(line_movement, public_betting):
+    """
+    Detect reverse line movement: line moves AGAINST public betting %.
+    line_movement: {(team_a, team_b): {"open_away": int, "current_away": int, ...}}
+    public_betting: {frozenset: {"away_pct": float, "home_pct": float}}
+    Returns list of RLM alerts.
+    """
+    alerts = []
+    for key, lm in line_movement.items():
+        open_away = lm.get("open_away") or lm.get("away_open")
+        curr_away = lm.get("current_away") or lm.get("away_current")
+        if open_away is None or curr_away is None:
+            continue
+
+        fs_key = frozenset(key) if not isinstance(key, frozenset) else key
+        pub = public_betting.get(fs_key, {})
+        away_bet_pct = pub.get("away_pct", 50)
+
+        line_moved_toward_away = curr_away < open_away
+        line_moved_toward_home = curr_away > open_away
+        public_on_away = away_bet_pct > 55
+        public_on_home = away_bet_pct < 45
+
+        if line_moved_toward_away and public_on_home:
+            alerts.append(
+                {
+                    "away_team": lm.get("away_team", list(key)[0]),
+                    "home_team": lm.get("home_team", list(key)[-1]),
+                    "direction": "away",
+                    "bet_pct": away_bet_pct,
+                    "line_open": open_away,
+                    "line_current": curr_away,
+                    "shift": curr_away - open_away,
+                }
+            )
+        elif line_moved_toward_home and public_on_away:
+            alerts.append(
+                {
+                    "away_team": lm.get("away_team", list(key)[0]),
+                    "home_team": lm.get("home_team", list(key)[-1]),
+                    "direction": "home",
+                    "bet_pct": 100 - away_bet_pct,
+                    "line_open": open_away,
+                    "line_current": curr_away,
+                    "shift": curr_away - open_away,
+                }
+            )
+
+    return alerts

@@ -79,3 +79,36 @@ CREATE TABLE IF NOT EXISTS picks (
     sim_pick_correct SMALLINT,
     run_diff_error   NUMERIC(5,2)
 );
+
+-- Confidence grade + score on predictions (for #71 confidence history chart)
+ALTER TABLE predictions ADD COLUMN IF NOT EXISTS confidence_grade TEXT;
+ALTER TABLE predictions ADD COLUMN IF NOT EXISTS confidence_score NUMERIC(5,1);
+ALTER TABLE predictions ADD COLUMN IF NOT EXISTS confidence_signals INTEGER;
+
+-- Odds snapshots for line movement tracking
+CREATE TABLE IF NOT EXISTS odds_snapshots (
+    id           BIGSERIAL PRIMARY KEY,
+    game_pk      TEXT NOT NULL,
+    game_date    TEXT,
+    away_team    TEXT,
+    home_team    TEXT,
+    away_odds    INTEGER,
+    home_odds    INTEGER,
+    ou_line      NUMERIC(4,1),
+    snapshot_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_odds_snap_gpk ON odds_snapshots(game_pk);
+
+-- RLM alerts log
+CREATE TABLE IF NOT EXISTS rlm_alerts (
+    id           BIGSERIAL PRIMARY KEY,
+    game_pk      TEXT NOT NULL,
+    game_date    TEXT,
+    away_team    TEXT,
+    home_team    TEXT,
+    direction    TEXT,
+    bet_pct      NUMERIC(5,1),
+    line_open    INTEGER,
+    line_current INTEGER,
+    alert_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);

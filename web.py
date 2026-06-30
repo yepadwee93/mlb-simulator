@@ -90,8 +90,10 @@ from data.odds_api import (
 )
 from data.tracker import (
     delete_game_note,
+    detect_rlm,
     get_accuracy_stats,
     get_all_predictions,
+    get_confidence_history,
     get_game_notes,
     get_odds_history,
     log_odds,
@@ -1055,6 +1057,14 @@ def index():
         except Exception:
             pass
 
+    # RLM detection
+    rlm_alerts = []
+    try:
+        if line_movement and pub_pcts:
+            rlm_alerts = detect_rlm(line_movement, pub_pcts)
+    except Exception:
+        pass
+
     return render_template(
         "index.html",
         games=games,
@@ -1065,6 +1075,7 @@ def index():
         is_today=is_today,
         pub_pcts=pub_pcts,
         line_movement=line_movement,
+        rlm_alerts=rlm_alerts,
         multi_day=multi_day,
         game_notes=get_game_notes(current_user.id) if current_user.is_authenticated else {},
         api_remaining=get_requests_remaining(),
@@ -1372,6 +1383,28 @@ def simulate(game_pk):
                 result["ou_line"],
             )
             result["kde_ou_edge"] = ou_edge
+    except Exception:
+        pass
+
+    # ── Update prediction with confidence grade ──────────────────────
+    try:
+        conf = result.get("confidence", {})
+        if conf.get("grade") and conf["grade"] != "—":
+            log_prediction(
+                game_pk=game_pk,
+                game_date=_today_est().isoformat(),
+                away_team=result["away_team"],
+                home_team=result["home_team"],
+                away_win_pct=result["away_win_pct"],
+                home_win_pct=result["home_win_pct"],
+                away_avg_runs=result["away_avg_runs"],
+                home_avg_runs=result["home_avg_runs"],
+                n_sims=n_sims,
+                source="single",
+                confidence_grade=conf["grade"],
+                confidence_score=conf.get("score"),
+                confidence_signals=conf.get("signal_count"),
+            )
     except Exception:
         pass
 
@@ -1940,6 +1973,14 @@ def accuracy_page():
     update_results()
     stats = get_accuracy_stats()
     return render_template("accuracy.html", **stats, username=current_user.username)
+
+
+@app.route("/confidence-history")
+@login_required
+def confidence_history_page():
+    update_results()
+    data = get_confidence_history()
+    return render_template("confidence_history.html", **data, username=current_user.username)
 
 
 @app.route("/update-results", methods=["POST"])
