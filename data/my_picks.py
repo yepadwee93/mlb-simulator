@@ -156,6 +156,21 @@ def get_all_picks(user_id=None):
         return res.data or []
 
 
+def clear_all_picks(user_id=None):
+    """Delete all picks for this user. Returns count deleted."""
+    if not user_id:
+        return 0
+    try:
+        rows = supa().table("picks").select("id").eq("user_id", int(user_id)).execute()
+        ids = [r["id"] for r in (rows.data or [])]
+        for rid in ids:
+            supa().table("picks").delete().eq("id", rid).execute()
+        return len(ids)
+    except Exception as e:
+        print(f"[picks] clear error: {e}")
+        return 0
+
+
 def get_pick_stats(user_id=None):
     """Summary stats for the My Picks page."""
     rows = get_all_picks(user_id=user_id)
