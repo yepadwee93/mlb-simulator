@@ -85,20 +85,15 @@ def update_pick_results(user_id=None):
     if not user_id:
         return 0
 
-    res = (
-        supa()
-        .table("picks")
-        .select("*")
-        .eq("user_id", int(user_id))
-        .is_("actual_winner", "null")
-        .execute()
-    )
-    rows = res.data or []
+    all_picks = supa().table("picks").select("*").eq("user_id", int(user_id)).execute()
+    rows = [p for p in (all_picks.data or []) if not p.get("actual_winner")]
+    print(f"[picks] found {len(rows)} unsettled picks for user {user_id}")
     updated = 0
 
     for row in rows:
         game_pk = row.get("game_pk")
         if not game_pk:
+            print(f"[picks] skipping pick id={row.get('id')} — no game_pk")
             continue
         try:
             import requests as _req
@@ -132,6 +127,7 @@ def update_pick_results(user_id=None):
 
             supa().table("picks").update(update).eq("id", row["id"]).execute()
             updated += 1
+            print(f"[picks] settled game_pk={game_pk} winner={actual_winner}")
 
         except Exception as e:
             print(f"[picks] game_pk={game_pk} error: {e}")
