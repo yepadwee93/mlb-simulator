@@ -4754,6 +4754,7 @@ def compute_pitch_cliff_modifier(pitch_count: float) -> dict:
 # then compares to Vegas to find the edge. Returns the edge as a percentage
 # and the KDE-smoothed over/under probabilities.
 
+
 def compute_ou_edge(total_runs_hist: dict, vegas_line: float, vegas_over_odds: int = -110) -> dict:
     run_list = [t for t, cnt in total_runs_hist.items() for _ in range(cnt)]
     if len(run_list) < 50:
@@ -4808,12 +4809,14 @@ def compute_protection_mults(lineup: list) -> list:
             continue
         diff = ops - PROTECTION_LEAGUE_OPS
         prot = diff * 0.25
-        mults.append({
-            "k_mult": round(max(0.90, min(1.08, 1.0 + prot * 0.15)), 4),
-            "bb_mult": round(max(0.85, min(1.15, 1.0 - prot * 0.30)), 4),
-            "hit_mult": round(max(0.94, min(1.08, 1.0 + prot * 0.10)), 4),
-            "hr_mult": round(max(0.90, min(1.12, 1.0 + prot * 0.12)), 4),
-        })
+        mults.append(
+            {
+                "k_mult": round(max(0.90, min(1.08, 1.0 + prot * 0.15)), 4),
+                "bb_mult": round(max(0.85, min(1.15, 1.0 - prot * 0.30)), 4),
+                "hit_mult": round(max(0.94, min(1.08, 1.0 + prot * 0.10)), 4),
+                "hr_mult": round(max(0.90, min(1.12, 1.0 + prot * 0.12)), 4),
+            }
+        )
     return mults
 
 
