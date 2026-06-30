@@ -4639,6 +4639,187 @@ def kde_over_under_prob(run_totals: list, line: float) -> tuple:
     return round(over_pct, 4), round(1.0 - over_pct, 4)
 
 
+# ── 31. PLATOON SPLITS BY RELIEVER HANDEDNESS ─────────────────────────────────
+# When the bullpen enters, batters should face platoon-adjusted probs.
+# LHB vs LHP: disadvantage (lower AVG, more K)
+# LHB vs RHP: advantage (higher AVG)
+# RHB vs LHP: advantage
+# RHB vs RHP: disadvantage
+# These multipliers capture the platoon differential BEYOND the starter split
+# that's already baked into the lineup stats.
+
+PLATOON_SPLITS = {
+    ("L", "L"): {"k_mult": 1.10, "bb_mult": 0.92, "hit_mult": 0.88, "hr_mult": 0.82},
+    ("L", "R"): {"k_mult": 0.94, "bb_mult": 1.04, "hit_mult": 1.08, "hr_mult": 1.12},
+    ("R", "L"): {"k_mult": 0.93, "bb_mult": 1.05, "hit_mult": 1.10, "hr_mult": 1.15},
+    ("R", "R"): {"k_mult": 1.06, "bb_mult": 0.96, "hit_mult": 0.94, "hr_mult": 0.90},
+    ("S", "L"): {"k_mult": 1.02, "bb_mult": 0.98, "hit_mult": 0.96, "hr_mult": 0.94},
+    ("S", "R"): {"k_mult": 0.97, "bb_mult": 1.02, "hit_mult": 1.04, "hr_mult": 1.06},
+}
+
+
+def compute_platoon_mults(batter_hand: str, reliever_hand: str) -> dict:
+    key = (batter_hand or "R", reliever_hand or "R")
+    return PLATOON_SPLITS.get(key, {"k_mult": 1.0, "bb_mult": 1.0, "hit_mult": 1.0, "hr_mult": 1.0})
+
+
+def build_platoon_lineup_mults(lineup: list, reliever_hand: str) -> list:
+    mults = []
+    for batter in lineup[:9]:
+        hand = "R"
+        if batter:
+            hand = batter.get("batSide", batter.get("bat_side", "R")) or "R"
+            hand = hand[0].upper() if hand else "R"
+        mults.append(compute_platoon_mults(hand, reliever_hand))
+    return mults
+
+
+# ── 32. UMPIRE ZONE SHAPE MODEL ──────────────────────────────────────────────
+# Beyond K/BB rates, umpire zone shape affects batted ball type.
+# Wide-zone umps expand the zone horizontally → more weak contact on outside
+# pitches → more ground balls. Tight-zone umps shrink it → hitters swing at
+# better pitches → more fly balls and line drives.
+#
+# This modifies the GB/FB balance which affects HR rate and BABIP.
+
+UMP_ZONE_SHAPE = {
+    "Laz Diaz": {"gb_mult": 1.08, "fb_mult": 0.92},
+    "Alfonso Marquez": {"gb_mult": 1.06, "fb_mult": 0.94},
+    "Hunter Wendelstedt": {"gb_mult": 1.05, "fb_mult": 0.95},
+    "Jim Reynolds": {"gb_mult": 1.04, "fb_mult": 0.96},
+    "Brian Knight": {"gb_mult": 1.03, "fb_mult": 0.97},
+    "Pat Hoberg": {"gb_mult": 1.00, "fb_mult": 1.00},
+    "Will Little": {"gb_mult": 1.00, "fb_mult": 1.00},
+    "Roberto Ortiz": {"gb_mult": 1.00, "fb_mult": 1.00},
+    "Andy Fletcher": {"gb_mult": 0.97, "fb_mult": 1.03},
+    "Lance Barksdale": {"gb_mult": 0.96, "fb_mult": 1.04},
+    "Sam Holbrook": {"gb_mult": 0.95, "fb_mult": 1.05},
+    "Dan Iassogna": {"gb_mult": 0.94, "fb_mult": 1.06},
+    "Phil Cuzzi": {"gb_mult": 0.93, "fb_mult": 1.07},
+    "CB Bucknor": {"gb_mult": 0.92, "fb_mult": 1.08},
+    "Tom Hallion": {"gb_mult": 0.93, "fb_mult": 1.07},
+    "Bill Miller": {"gb_mult": 0.92, "fb_mult": 1.08},
+}
+
+
+def compute_ump_zone_modifier(umpire_name: str) -> dict:
+    if not umpire_name:
+        return {"hit_mult": 1.0, "hr_mult": 1.0, "k_mult": 1.0, "bb_mult": 1.0}
+    shape = UMP_ZONE_SHAPE.get(umpire_name)
+    if not shape:
+        return {"hit_mult": 1.0, "hr_mult": 1.0, "k_mult": 1.0, "bb_mult": 1.0}
+    gb = shape["gb_mult"]
+    fb = shape["fb_mult"]
+    hr_adj = fb * 0.15 + 0.85
+    hit_adj = 1.0 + (gb - 1.0) * 0.08
+    return {
+        "hit_mult": round(hit_adj, 4),
+        "hr_mult": round(hr_adj, 4),
+        "k_mult": 1.0,
+        "bb_mult": 1.0,
+    }
+
+
+# ── 33. NONLINEAR PITCH COUNT DECAY CURVE ────────────────────────────────────
+# Real MLB velocity/spin data shows a flat curve through ~75 pitches,
+# then a sharp cliff. The existing linear stamina model underestimates
+# this cliff. We replace with a sigmoid-based decay:
+#
+#   decay(p) = 1 / (1 + exp(k * (p - p₀)))
+#
+# p₀ = inflection point (where decay hits 50%)
+# k = steepness of the cliff
+# The output is a multiplier on the existing stamina decay — it amplifies
+# the decay past the cliff point and dampens it before.
+
+PITCH_CLIFF_P0 = 82.0
+PITCH_CLIFF_K = 0.12
+
+
+def compute_pitch_cliff_modifier(pitch_count: float) -> dict:
+    if pitch_count < 50:
+        return {"k_mult": 1.0, "bb_mult": 1.0, "hr_mult": 1.0, "hit_mult": 1.0}
+    sigmoid = 1.0 / (1.0 + _math.exp(-PITCH_CLIFF_K * (pitch_count - PITCH_CLIFF_P0)))
+    cliff_factor = sigmoid * 0.40
+    return {
+        "k_mult": max(0.70, 1.0 - cliff_factor * 0.25),
+        "bb_mult": min(1.40, 1.0 + cliff_factor * 0.60),
+        "hr_mult": min(1.35, 1.0 + cliff_factor * 0.45),
+        "hit_mult": min(1.20, 1.0 + cliff_factor * 0.30),
+    }
+
+
+# ── 34. CORRELATION-AWARE O/U EDGE ───────────────────────────────────────────
+# Uses KDE (model 30) to compute a smooth implied probability for any O/U line,
+# then compares to Vegas to find the edge. Returns the edge as a percentage
+# and the KDE-smoothed over/under probabilities.
+
+
+def compute_ou_edge(total_runs_hist: dict, vegas_line: float, vegas_over_odds: int = -110) -> dict:
+    run_list = [t for t, cnt in total_runs_hist.items() for _ in range(cnt)]
+    if len(run_list) < 50:
+        return {}
+    kde_over, kde_under = kde_over_under_prob(run_list, vegas_line)
+    if vegas_over_odds < 0:
+        implied_over = abs(vegas_over_odds) / (abs(vegas_over_odds) + 100)
+    else:
+        implied_over = 100 / (vegas_over_odds + 100)
+    implied_under = 1.0 - implied_over
+    over_edge = kde_over - implied_over
+    under_edge = kde_under - implied_under
+    best_side = "over" if over_edge > under_edge else "under"
+    best_edge = max(over_edge, under_edge)
+    return {
+        "kde_over_pct": round(kde_over * 100, 2),
+        "kde_under_pct": round(kde_under * 100, 2),
+        "implied_over_pct": round(implied_over * 100, 2),
+        "implied_under_pct": round(implied_under * 100, 2),
+        "over_edge": round(over_edge * 100, 2),
+        "under_edge": round(under_edge * 100, 2),
+        "best_side": best_side,
+        "best_edge_pct": round(best_edge * 100, 2),
+    }
+
+
+# ── 35. LINEUP PROTECTION EFFECTS ────────────────────────────────────────────
+# The quality of the on-deck batter affects pitch selection to the current
+# batter. With a dangerous hitter on deck, pitchers attack the zone more
+# (fewer BB, more hittable pitches). With a weak hitter on deck, pitchers
+# nibble more (more BB, fewer strikes in the zone).
+#
+# "Protection" is measured by OPS of the on-deck batter relative to league avg.
+
+PROTECTION_LEAGUE_OPS = 0.710
+
+
+def compute_protection_mults(lineup: list) -> list:
+    mults = []
+    for i in range(9):
+        ondeck_idx = (i + 1) % 9
+        ondeck = lineup[ondeck_idx] if ondeck_idx < len(lineup) else None
+        if not ondeck:
+            mults.append({"k_mult": 1.0, "bb_mult": 1.0, "hit_mult": 1.0, "hr_mult": 1.0})
+            continue
+        try:
+            ops = float(ondeck.get("ops", 0) or 0)
+        except (ValueError, TypeError):
+            ops = 0
+        if ops < 0.100:
+            mults.append({"k_mult": 1.0, "bb_mult": 1.0, "hit_mult": 1.0, "hr_mult": 1.0})
+            continue
+        diff = ops - PROTECTION_LEAGUE_OPS
+        prot = diff * 0.25
+        mults.append(
+            {
+                "k_mult": round(max(0.90, min(1.08, 1.0 + prot * 0.15)), 4),
+                "bb_mult": round(max(0.85, min(1.15, 1.0 - prot * 0.30)), 4),
+                "hit_mult": round(max(0.94, min(1.08, 1.0 + prot * 0.10)), 4),
+                "hr_mult": round(max(0.90, min(1.12, 1.0 + prot * 0.12)), 4),
+            }
+        )
+    return mults
+
+
 def simulate_half_inning(
     precomp_lineup: list,
     lineup_pos: int,
@@ -4652,6 +4833,9 @@ def simulate_half_inning(
     hawkes: "HawkesRunProcess | None" = None,
     sv_mod: dict = None,
     beta_mults: list = None,
+    protection_mults: list = None,
+    platoon_mults: list = None,
+    ump_zone_mod: dict = None,
 ) -> tuple:
     """
     Simulate one half-inning (3 outs) for one team.
@@ -4843,6 +5027,35 @@ def simulate_half_inning(
             cm[5] *= bm["hr_mult"]
             needs_modify = True
 
+        # Lineup protection (on-deck batter quality)
+        if protection_mults:
+            pm = protection_mults[pos % 9]
+            if abs(pm["bb_mult"] - 1.0) > 0.005:
+                cm[0] *= pm["bb_mult"]
+                cm[1] *= pm["k_mult"]
+                cm[2] *= pm["hit_mult"]
+                cm[3] *= pm["hit_mult"]
+                cm[5] *= pm["hr_mult"]
+                needs_modify = True
+
+        # Platoon splits (reliever handedness)
+        if platoon_mults:
+            plm = platoon_mults[pos % 9]
+            if abs(plm["hit_mult"] - 1.0) > 0.005:
+                cm[0] *= plm["bb_mult"]
+                cm[1] *= plm["k_mult"]
+                cm[2] *= plm["hit_mult"]
+                cm[3] *= plm["hit_mult"]
+                cm[5] *= plm["hr_mult"]
+                needs_modify = True
+
+        # Umpire zone shape (GB/FB balance)
+        if ump_zone_mod and abs(ump_zone_mod["hr_mult"] - 1.0) > 0.005:
+            cm[2] *= ump_zone_mod["hit_mult"]
+            cm[3] *= ump_zone_mod["hit_mult"]
+            cm[5] *= ump_zone_mod["hr_mult"]
+            needs_modify = True
+
         # Single decompose → multiply → recompose pass
         if needs_modify:
             cw = cum_weights
@@ -4972,6 +5185,11 @@ def simulate_game(
     home_pitcher_stats: dict = None,  # home starter stats (for stamina durability)
     away_beta_mults: list = None,  # Beta-binomial per-batter uncertainty multipliers
     home_beta_mults: list = None,
+    away_protection_mults: list = None,  # Lineup protection effects
+    home_protection_mults: list = None,
+    ump_zone_mod: dict = None,  # Umpire zone shape modifier
+    away_platoon_mults: list = None,  # Platoon splits for bullpen
+    home_platoon_mults: list = None,
 ) -> tuple:
     """
     Simulate one complete 9-inning game with 3 pitching phases + RISP clutch stats:
@@ -5186,6 +5404,14 @@ def simulate_game(
                 _away_extra_mults["hr"] *= decay.get("hr_mult", 1.0)
                 _away_extra_mults["hit"] *= decay.get("hit_mult", 1.0)
 
+            # Pitch count cliff (nonlinear sigmoid decay)
+            if home_pitch_count >= 50:
+                cliff = compute_pitch_cliff_modifier(home_pitch_count)
+                _away_extra_mults["k"] *= cliff["k_mult"]
+                _away_extra_mults["bb"] *= cliff["bb_mult"]
+                _away_extra_mults["hr"] *= cliff["hr_mult"]
+                _away_extra_mults["hit"] *= cliff["hit_mult"]
+
             # Bayesian in-game pitcher
             p_adj = home_pitcher_state.get_adjustment()
             _away_extra_mults["k"] *= p_adj.get("k_mult", 1.0)
@@ -5234,6 +5460,9 @@ def simulate_game(
             hawkes=away_hawkes,
             sv_mod=_away_sv_mod,
             beta_mults=away_beta_mults,
+            protection_mults=away_protection_mults,
+            platoon_mults=away_platoon_mults if home_starter_pulled else None,
+            ump_zone_mod=ump_zone_mod,
         )
         batters_this_half = (new_away_pos - away_pos) % len(away_cur) or len(away_cur)
         if not home_starter_pulled:
@@ -5277,6 +5506,14 @@ def simulate_game(
                 _home_extra_mults["bb"] *= decay.get("bb_mult", 1.0)
                 _home_extra_mults["hr"] *= decay.get("hr_mult", 1.0)
                 _home_extra_mults["hit"] *= decay.get("hit_mult", 1.0)
+
+            # Pitch count cliff (nonlinear sigmoid decay)
+            if away_pitch_count >= 50:
+                cliff = compute_pitch_cliff_modifier(away_pitch_count)
+                _home_extra_mults["k"] *= cliff["k_mult"]
+                _home_extra_mults["bb"] *= cliff["bb_mult"]
+                _home_extra_mults["hr"] *= cliff["hr_mult"]
+                _home_extra_mults["hit"] *= cliff["hit_mult"]
 
             # Bayesian in-game pitcher
             p_adj = away_pitcher_state.get_adjustment()
@@ -5326,6 +5563,9 @@ def simulate_game(
             hawkes=home_hawkes,
             sv_mod=_home_sv_mod,
             beta_mults=home_beta_mults,
+            protection_mults=home_protection_mults,
+            platoon_mults=home_platoon_mults if away_starter_pulled else None,
+            ump_zone_mod=ump_zone_mod,
         )
         batters_this_half = (new_home_pos - home_pos) % len(home_cur) or len(home_cur)
         if not away_starter_pulled:
@@ -5672,6 +5912,22 @@ def run_simulation(
     away_batter_rates = compute_batter_rates(away_lineup)
     home_batter_rates = compute_batter_rates(home_lineup)
 
+    # ── Lineup protection effects (on-deck batter quality) ────────────
+    away_prot_mults = compute_protection_mults(away_lineup)
+    home_prot_mults = compute_protection_mults(home_lineup)
+
+    # ── Umpire zone shape (GB/FB balance modifier) ────────────────────
+    _ump_zone = compute_ump_zone_modifier(umpire_name)
+
+    # ── Platoon splits for bullpen innings ────────────────────────────
+    # Estimate reliever handedness mix: ~60% RHP, 40% LHP in avg bullpen
+    # We pick a random reliever hand per-sim in the loop, but pre-build
+    # both lookup tables here.
+    _away_platoon_r = build_platoon_lineup_mults(away_lineup, "R")
+    _away_platoon_l = build_platoon_lineup_mults(away_lineup, "L")
+    _home_platoon_r = build_platoon_lineup_mults(home_lineup, "R")
+    _home_platoon_l = build_platoon_lineup_mults(home_lineup, "L")
+
     # ── Run the simulation loop ───────────────────────────────────────
     away_wins = 0
     home_wins = 0
@@ -5732,11 +5988,18 @@ def run_simulation(
     for _ in range(n):
         _away_beta = [sample_beta_rates(b) for b in away_lineup[:9]]
         _home_beta = [sample_beta_rates(b) for b in home_lineup[:9]]
+        _away_plat = _away_platoon_r if random.random() > 0.40 else _away_platoon_l
+        _home_plat = _home_platoon_r if random.random() > 0.40 else _home_platoon_l
         a, h = _sim(
             away_pitcher_stats=away_pitcher,
             home_pitcher_stats=home_pitcher,
             away_beta_mults=_away_beta,
             home_beta_mults=_home_beta,
+            away_protection_mults=away_prot_mults,
+            home_protection_mults=home_prot_mults,
+            ump_zone_mod=_ump_zone,
+            away_platoon_mults=_away_plat,
+            home_platoon_mults=_home_plat,
         )
         away_total += a
         home_total += h
