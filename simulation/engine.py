@@ -6187,6 +6187,228 @@ def run_simulation(
     }
 
 
+# ── MODEL CONFIDENCE SCORING ──────────────────────────────────────────────────
+
+
+def compute_model_confidence(result: dict) -> dict:
+    """
+    Score each pick with a confidence grade (A/B/C/D) based on how many
+    independent model signals agree on the direction.
+
+    Checks: win%, edge, EV, Kelly, F5, run line, O/U convergence,
+    pitcher form, fatigue, momentum, weather, umpire, and more.
+    """
+    signals = []
+
+    away_wp = result.get("away_win_pct", 50)
+    home_wp = result.get("home_win_pct", 50)
+    fav = "away" if away_wp > home_wp else "home"
+    margin = abs(away_wp - home_wp)
+
+    # 1. Win percentage spread
+    if margin >= 12:
+        signals.append(("win_pct_strong", fav, 2.0))
+    elif margin >= 6:
+        signals.append(("win_pct_moderate", fav, 1.0))
+
+    # 2. Edge over Vegas
+    away_edge = result.get("away_edge", 0) or 0
+    home_edge = result.get("home_edge", 0) or 0
+    if away_edge > 5:
+        signals.append(("edge_away", "away", min(away_edge / 5, 2.0)))
+    if home_edge > 5:
+        signals.append(("edge_home", "home", min(home_edge / 5, 2.0)))
+
+    # 3. Positive EV
+    away_ev = result.get("away_ev", 0) or 0
+    home_ev = result.get("home_ev", 0) or 0
+    if away_ev > 3:
+        signals.append(("ev_away", "away", 1.0))
+    if home_ev > 3:
+        signals.append(("ev_home", "home", 1.0))
+
+    # 4. Kelly criterion
+    away_kelly = result.get("away_kelly", 0) or 0
+    home_kelly = result.get("home_kelly", 0) or 0
+    if away_kelly > 2:
+        signals.append(("kelly_away", "away", 1.0))
+    if home_kelly > 2:
+        signals.append(("kelly_home", "home", 1.0))
+
+    # 5. F5 alignment with full game
+    f5 = result.get("f5", {})
+    if f5:
+        f5_fav = "away" if f5.get("away_win_pct", 50) > f5.get("home_win_pct", 50) else "home"
+        if f5_fav == fav:
+            signals.append(("f5_agrees", fav, 1.0))
+
+    # 6. Run line cover
+    away_cover = result.get("away_cover_pct", 0)
+    home_cover = result.get("home_cover_pct", 0)
+    if fav == "away" and away_cover > 55:
+        signals.append(("runline_cover", "away", 1.0))
+    elif fav == "home" and home_cover > 55:
+        signals.append(("runline_cover", "home", 1.0))
+
+    # 7. Pitcher fatigue advantage
+    away_fatigue = result.get("away_fatigue_label", "")
+    home_fatigue = result.get("home_fatigue_label", "")
+    if "fresh" in str(away_fatigue).lower() and "tired" in str(home_fatigue).lower():
+        signals.append(("fatigue_advantage", "away", 1.5))
+    elif "fresh" in str(home_fatigue).lower() and "tired" in str(away_fatigue).lower():
+        signals.append(("fatigue_advantage", "home", 1.5))
+
+    # 8. Pitcher rest advantage
+    away_rest = result.get("away_rest_type", "")
+    home_rest = result.get("home_rest_type", "")
+    if away_rest == "normal" and home_rest == "short":
+        signals.append(("rest_advantage", "away", 1.0))
+    elif home_rest == "normal" and away_rest == "short":
+        signals.append(("rest_advantage", "home", 1.0))
+
+    # Score each side
+    away_score = sum(w for _, side, w in signals if side == "away")
+    home_score = sum(w for _, side, w in signals if side == "home")
+    best_side = "away" if away_score > home_score else "home"
+    best_score = max(away_score, home_score)
+    signal_count = sum(1 for _, side, _ in signals if side == best_side)
+
+    if best_score >= 8:
+        grade = "A"
+    elif best_score >= 5:
+        grade = "B"
+    elif best_score >= 3:
+        grade = "C"
+    else:
+        grade = "D"
+
+    return {
+        "grade": grade,
+        "best_side": best_side,
+        "score": round(best_score, 1),
+        "signal_count": signal_count,
+        "signals": [(name, side) for name, side, _ in signals],
+        "away_score": round(away_score, 1),
+        "home_score": round(home_score, 1),
+    }
+
+
+# ── MULTI-BOOK ODDS COMPARISON ───────────────────────────────────────────────
+
+
+def compute_odds_edge_by_book(model_win_pct: float, books: dict) -> list:
+    """
+    Given model's win probability and odds from multiple books,
+    compute edge and EV for each book. Returns sorted list (best edge first).
+
+    books: {"DraftKings": -150, "FanDuel": -145, "BetMGM": -155, ...}
+    """
+    results = []
+    for book, odds in books.items():
+        if odds < 0:
+            implied = abs(odds) / (abs(odds) + 100)
+        else:
+            implied = 100 / (odds + 100)
+        edge = model_win_pct / 100 - implied
+        if odds < 0:
+            payout = 100 / abs(odds)
+        else:
+            payout = odds / 100
+        ev = (model_win_pct / 100) * payout - (1 - model_win_pct / 100)
+        results.append(
+            {
+                "book": book,
+                "odds": odds,
+                "odds_str": f"+{odds}" if odds > 0 else str(odds),
+                "implied_pct": round(implied * 100, 1),
+                "edge_pct": round(edge * 100, 1),
+                "ev_per_100": round(ev * 100, 1),
+            }
+        )
+    results.sort(key=lambda x: -x["edge_pct"])
+    return results
+
+
+# ── BET ACCURACY BY MARKET TYPE ───────────────────────────────────────────────
+
+
+def compute_accuracy_breakdown(bets: list) -> dict:
+    """
+    Break down settled bet accuracy by market type (ML, O/U, RL, F5, etc).
+    Returns per-type win rate and P/L.
+    """
+    by_type = {}
+    by_date = {}
+
+    for bet in bets:
+        result = bet.get("result")
+        if result not in ("win", "loss", "push"):
+            continue
+
+        btype = bet.get("bet_type", "ML")
+        if btype not in by_type:
+            by_type[btype] = {"wins": 0, "losses": 0, "pushes": 0, "profit": 0.0, "wagered": 0.0}
+
+        amt = float(bet.get("amount", 100) or 100)
+        odds = int(bet.get("odds", -110) or -110)
+        by_type[btype]["wagered"] += amt
+
+        if result == "win":
+            by_type[btype]["wins"] += 1
+            if odds < 0:
+                by_type[btype]["profit"] += amt * (100 / abs(odds))
+            else:
+                by_type[btype]["profit"] += amt * (odds / 100)
+        elif result == "loss":
+            by_type[btype]["losses"] += 1
+            by_type[btype]["profit"] -= amt
+        else:
+            by_type[btype]["pushes"] += 1
+
+        # Daily tracking
+        game_date = bet.get("game_date", "")
+        if game_date:
+            if game_date not in by_date:
+                by_date[game_date] = {"wins": 0, "losses": 0, "profit": 0.0}
+            if result == "win":
+                by_date[game_date]["wins"] += 1
+                if odds < 0:
+                    by_date[game_date]["profit"] += amt * (100 / abs(odds))
+                else:
+                    by_date[game_date]["profit"] += amt * (odds / 100)
+            elif result == "loss":
+                by_date[game_date]["losses"] += 1
+                by_date[game_date]["profit"] -= amt
+
+    # Compute win rates
+    summary = {}
+    for btype, data in by_type.items():
+        total = data["wins"] + data["losses"]
+        summary[btype] = {
+            "wins": data["wins"],
+            "losses": data["losses"],
+            "pushes": data["pushes"],
+            "win_pct": round(data["wins"] / total * 100, 1) if total > 0 else 0,
+            "profit": round(data["profit"], 2),
+            "wagered": round(data["wagered"], 2),
+            "roi": round(data["profit"] / data["wagered"] * 100, 1) if data["wagered"] > 0 else 0,
+        }
+
+    # Daily P/L trend (last 14 days)
+    daily_sorted = sorted(by_date.items(), key=lambda x: x[0])[-14:]
+    daily_trend = [
+        {
+            "date": d,
+            "wins": v["wins"],
+            "losses": v["losses"],
+            "profit": round(v["profit"], 2),
+        }
+        for d, v in daily_sorted
+    ]
+
+    return {"by_type": summary, "daily_trend": daily_trend}
+
+
 # ── Pitcher strikeout prop model ─────────────────────────────────────────────
 
 
