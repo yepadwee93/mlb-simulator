@@ -308,6 +308,34 @@ def get_game_lineup(game_pk, fresh=False):
     return result
 
 
+def _roster_fallback_lineup(team_id):
+    """
+    When boxscore lineups aren't posted yet, pull the active roster
+    and return the top 9 position players as a stand-in lineup.
+    """
+    try:
+        data = _get(f"/teams/{team_id}/roster", params={"rosterType": "active"})
+    except Exception:
+        return []
+
+    position_players = []
+    for entry in data.get("roster", []):
+        pos = entry.get("position", {}).get("abbreviation", "")
+        if pos in ("P", "TWP"):
+            continue
+        person = entry.get("person", {})
+        position_players.append(
+            {
+                "id": person.get("id"),
+                "name": person.get("fullName"),
+                "position": pos,
+                "batting_order": 0,
+            }
+        )
+
+    return position_players[:9]
+
+
 # ──────────────────────────────────────────────
 # 3. SEASON STATS FOR A PLAYER
 # ──────────────────────────────────────────────

@@ -46,6 +46,7 @@ from flask_wtf.csrf import CSRFProtect, generate_csrf
 from data.auth import check_password, create_user, get_user_by_id
 from data.bet_tracker import get_all_bets, get_bet_stats, log_bet, settle_bets
 from data.mlb_api import (
+    _roster_fallback_lineup,
     compute_injury_impact,
     get_ballpark_weather,
     get_batter_risp_stats,
@@ -275,11 +276,24 @@ def build_game_result(game, n_sims, use_splits=True, fresh_lineup=False):
     Returns None if the lineup isn't available yet.
     """
     lineup = get_game_lineup(game["gamePk"], fresh=fresh_lineup)
+
+    # Fall back to roster when boxscore lineups aren't posted yet
     if not lineup["away_batters"] or not lineup["home_batters"]:
-        return None
+        if not lineup["away_batters"] and game.get("away_id"):
+            lineup["away_batters"] = _roster_fallback_lineup(game["away_id"])
+        if not lineup["home_batters"] and game.get("home_id"):
+            lineup["home_batters"] = _roster_fallback_lineup(game["home_id"])
+        if not lineup["away_batters"] or not lineup["home_batters"]:
+            return None
 
     away_pitcher = lineup.get("away_pitcher") or {}
     home_pitcher = lineup.get("home_pitcher") or {}
+
+    # Use probable pitchers from schedule when boxscore hasn't started
+    if not away_pitcher.get("id") and game.get("away_probable_id"):
+        away_pitcher = {"id": game["away_probable_id"], "name": game.get("away_probable", "TBD")}
+    if not home_pitcher.get("id") and game.get("home_probable_id"):
+        home_pitcher = {"id": game["home_probable_id"], "name": game.get("home_probable", "TBD")}
 
     # Get which hand each pitcher throws with
     away_hand = get_pitcher_hand(away_pitcher["id"]) if away_pitcher.get("id") else "R"
