@@ -73,8 +73,8 @@ def update_results():
     For every prediction without a real result, check the MLB API.
     Returns count of newly settled rows.
     """
-    res = supa().table("predictions").select("*").is_("actual_winner", "null").execute()
-    rows = res.data or []
+    all_preds = supa().table("predictions").select("*").execute()
+    rows = [r for r in (all_preds.data or []) if not r.get("actual_winner")]
     updated = 0
 
     for row in rows:
@@ -191,28 +191,28 @@ def get_odds_history(limit=200, date_from=None, date_to=None):
 def settle_odds_history():
     """Fill in actual results for unsettled odds_history rows using predictions table."""
     try:
-        unsettled = (
+        all_odds = (
             supa()
             .table("odds_history")
-            .select("game_pk, game_date")
-            .is_("actual_winner", "null")
-            .limit(100)
+            .select("game_pk, game_date, actual_winner")
+            .limit(500)
             .execute()
         )
-        if not unsettled.data:
+        unsettled_rows = [r for r in (all_odds.data or []) if not r.get("actual_winner")]
+        if not unsettled_rows:
             return 0
 
-        game_pks = [r["game_pk"] for r in unsettled.data]
-        settled = (
+        game_pks = list({r["game_pk"] for r in unsettled_rows})
+        all_preds = (
             supa()
             .table("predictions")
             .select("game_pk, actual_winner, actual_away_runs, actual_home_runs")
             .in_("game_pk", game_pks)
-            .not_.is_("actual_winner", "null")
             .execute()
         )
+        settled = [p for p in (all_preds.data or []) if p.get("actual_winner")]
         count = 0
-        for pred in settled.data or []:
+        for pred in settled:
             gpk = pred["game_pk"]
             winner = pred["actual_winner"]
             supa().table("odds_history").update(
