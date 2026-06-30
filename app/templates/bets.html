@@ -163,7 +163,11 @@
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
 #scoreboard-inner::-webkit-scrollbar { display:none; }
 </style>
-<h1>Bet Tracker</h1>
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:6px;">
+  <h1>Bet Tracker</h1>
+  <button onclick="settleBets()" id="settle-btn" style="background:#1b3a2a;color:#4caf50;border:1px solid #2a5a3a;border-radius:8px;padding:7px 16px;font-size:0.78rem;font-weight:700;cursor:pointer;">Settle Bets</button>
+  <span id="settle-msg" style="font-size:0.78rem;color:#4caf50;"></span>
+</div>
 <p class="subtitle">Log your bets, track results, measure your edge over the book.</p>
 <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;background:#1a1e2e;border:1px solid #252836;border-radius:10px;padding:12px 16px;">
   <span style="font-size:0.82rem;color:#b0b8cc;">Unit Size:</span>
@@ -219,14 +223,15 @@
   {% for bt, d in by_type.items() %}
   <div class="type-card">
     <div class="type-name">{{ bt }}</div>
-    <div class="type-row"><span>Record</span><span>{{ d.w }}-{{ d.l }}</span></div>
+    <div class="type-row"><span>Record</span><span>{{ d.wins }}-{{ d.losses }}</span></div>
     <div class="type-row"><span>P&L</span>
-      <span class="{% if d.pl > 0 %}green{% elif d.pl < 0 %}red{% endif %}">
-        {% if d.pl >= 0 %}+{% endif %}${{ "%.2f"|format(d.pl) }}
+      <span class="{% if d.profit > 0 %}green{% elif d.profit < 0 %}red{% endif %}">
+        {% if d.profit >= 0 %}+{% endif %}${{ "%.2f"|format(d.profit) }}
       </span></div>
-    <div class="type-row"><span>ROI</span>
-      <span>{% if d.wagered > 0 %}{% set r = (d.pl / d.wagered * 100) %}
-        <span class="{% if r > 0 %}green{% else %}red{% endif %}">{% if r > 0 %}+{% endif %}{{ "%.1f"|format(r) }}%</span>
+    <div class="type-row"><span>Win %</span>
+      <span>{% set total_settled = d.wins + d.losses %}
+        {% if total_settled > 0 %}{% set wr = (d.wins / total_settled * 100) %}
+        <span class="{% if wr >= 55 %}green{% else %}red{% endif %}">{{ "%.1f"|format(wr) }}%</span>
       {% else %}—{% endif %}</span></div>
   </div>
   {% endfor %}
@@ -312,16 +317,17 @@
       <td>{{ b.odds }}</td>
       <td>${{ b.amount }}</td>
       <td>{% if b.model_edge %}<span class="{% if b.model_edge|float > 0 %}green{% else %}red{% endif %}">{{ b.model_edge }}%</span>{% else %}—{% endif %}</td>
-      <td>{% if b.clv %}<span class="{% if b.clv|float > 0 %}green{% else %}red{% endif %}">{% if b.clv|float > 0 %}+{% endif %}{{ b.clv }}pp</span>{% else %}—{% endif %}</td>
       <td>
-        {% if b.result == "WIN" %}<span class="badge badge-win">WIN</span>
-        {% elif b.result == "LOSS" %}<span class="badge badge-loss">LOSS</span>
-        {% elif b.result == "PUSH" %}<span class="badge badge-push">PUSH</span>
+        {% set r = (b.result or "pending")|lower %}
+        {% if r == "win" %}<span class="badge badge-win">WIN</span>
+        {% elif r == "loss" %}<span class="badge badge-loss">LOSS</span>
+        {% elif r == "push" %}<span class="badge badge-push">PUSH</span>
         {% else %}<span class="badge badge-open">OPEN</span>{% endif %}
       </td>
-      <td>{% if b.profit_loss %}
-        <span class="{% if b.profit_loss|float > 0 %}green{% elif b.profit_loss|float < 0 %}red{% endif %}">
-          {% if b.profit_loss|float >= 0 %}+{% endif %}${{ "%.2f"|format(b.profit_loss|float) }}
+      <td>{% if b.clv %}<span class="{% if b.clv|float > 0 %}green{% else %}red{% endif %}">{% if b.clv|float > 0 %}+{% endif %}{{ b.clv }}pp</span>{% else %}—{% endif %}</td>
+      <td>{% if b.payout is not none and b.result != "pending" %}
+        <span class="{% if b.payout|float > 0 %}green{% elif b.payout|float < 0 %}red{% endif %}">
+          {% if b.payout|float >= 0 %}+{% endif %}${{ "%.2f"|format(b.payout|float) }}
         </span>
       {% else %}—{% endif %}</td>
     </tr>
@@ -392,6 +398,31 @@ async function logBet() {
 <script>
 function getCsrfToken(){return document.cookie.split(';').map(function(c){return c.trim();}).find(function(c){return c.startsWith('csrf_token=');})?.split('=')[1]||'';}
 function csrfFetch(url,opts){opts=opts||{};opts.headers=Object.assign({'X-CSRFToken':getCsrfToken()},opts.headers||{});return fetch(url,opts);}
+
+async function settleBets() {
+  var btn = document.getElementById('settle-btn');
+  var msg = document.getElementById('settle-msg');
+  btn.disabled = true;
+  btn.textContent = 'Settling...';
+  msg.textContent = '';
+  try {
+    var r = await csrfFetch('/bets/settle', {method: 'POST'});
+    var d = await r.json();
+    if (d.settled > 0) {
+      msg.style.color = '#4caf50';
+      msg.textContent = d.settled + ' bet(s) settled!';
+      setTimeout(function(){ location.reload(); }, 1000);
+    } else {
+      msg.style.color = '#b0b8cc';
+      msg.textContent = 'No pending bets to settle (games may not be final yet).';
+    }
+  } catch(e) {
+    msg.style.color = '#ef5350';
+    msg.textContent = 'Error settling bets.';
+  }
+  btn.disabled = false;
+  btn.textContent = 'Settle Bets';
+}
 </script></body>
 </html>
 

@@ -101,6 +101,10 @@ from data.tracker import (
     update_results,
 )
 from simulation.engine import (
+    compute_accuracy_breakdown,
+    compute_model_confidence,
+    compute_odds_edge_by_book,
+    compute_ou_edge,
     detect_pitcher_form,
     optimize_batting_order,
     predict_batter_props,
