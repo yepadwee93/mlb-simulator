@@ -118,6 +118,52 @@ def _get(path, params=None):
 
 
 # ──────────────────────────────────────────────
+# 0. TEAM RECORDS (STANDINGS)
+# ──────────────────────────────────────────────
+
+_team_records_cache = {}  # season -> {team_name: {wins, losses, run_diff, ...}}
+
+
+def get_team_records(season=None):
+    """
+    Fetch current W/L records and run differentials for all 30 MLB teams.
+    Returns dict keyed by team name.
+    """
+    if season is None:
+        season = date.today().year
+
+    if season in _team_records_cache:
+        return _team_records_cache[season]
+
+    try:
+        data = _get("/standings", params={"leagueId": "103,104", "season": season})
+        records = {}
+        for rec in data.get("records", []):
+            for team_rec in rec.get("teamRecords", []):
+                name = team_rec.get("team", {}).get("name", "")
+                wins = int(team_rec.get("wins", 0))
+                losses = int(team_rec.get("losses", 0))
+                games = wins + losses
+                rs = int(team_rec.get("runsScored", 0))
+                ra = int(team_rec.get("runsAllowed", 0))
+                rdiff_pg = round((rs - ra) / games, 2) if games > 0 else 0.0
+                win_pct = round(wins / games, 3) if games > 0 else 0.500
+                records[name] = {
+                    "wins": wins,
+                    "losses": losses,
+                    "run_diff": rs - ra,
+                    "run_diff_per_game": rdiff_pg,
+                    "runs_scored": rs,
+                    "runs_allowed": ra,
+                    "win_pct": win_pct,
+                }
+        _team_records_cache[season] = records
+        return records
+    except Exception:
+        return {}
+
+
+# ──────────────────────────────────────────────
 # 1. TODAY'S SCHEDULE
 # ──────────────────────────────────────────────
 
