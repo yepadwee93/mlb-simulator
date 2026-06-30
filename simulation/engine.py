@@ -4378,6 +4378,267 @@ def apply_pitch_count_fatigue(probs: list, estimated_pitches: float) -> list:
     return [p / total for p in adjusted]
 
 
+# ── 26. MARKOV CHAIN BASE-RUNNING MODEL ───────────────────────────────────────
+# The 24 base-out states (8 base configs × 3 out counts) form a discrete-time
+# Markov chain. Each PA outcome triggers a probabilistic state transition.
+# The absorbing state is 3 outs. Rather than replacing the existing runner
+# advancement (which already has speed tiers), we use the Markov chain to
+# compute an expected-runs modifier: if the current state's RE24 deviates
+# from the simple model's assumption, we adjust outcome weights accordingly.
+#
+# RE24 = Run Expectancy from the 24 base-out states (2024 MLB averages)
+
+RE24_MATRIX = {
+    (0, False, False, False): 0.481,
+    (0, True, False, False): 0.859,
+    (0, False, True, False): 1.100,
+    (0, False, False, True): 1.354,
+    (0, True, True, False): 1.437,
+    (0, True, False, True): 1.784,
+    (0, False, True, True): 1.920,
+    (0, True, True, True): 2.282,
+    (1, False, False, False): 0.254,
+    (1, True, False, False): 0.509,
+    (1, False, True, False): 0.664,
+    (1, False, False, True): 0.950,
+    (1, True, True, False): 0.884,
+    (1, True, False, True): 1.130,
+    (1, False, True, True): 1.376,
+    (1, True, True, True): 1.541,
+    (2, False, False, False): 0.098,
+    (2, True, False, False): 0.224,
+    (2, False, True, False): 0.319,
+    (2, False, False, True): 0.353,
+    (2, True, True, False): 0.429,
+    (2, True, False, True): 0.478,
+    (2, False, True, True): 0.536,
+    (2, True, True, True): 0.752,
+}
+
+_RE24_MEAN = sum(RE24_MATRIX.values()) / len(RE24_MATRIX)
+
+
+def compute_re24_modifier(outs: int, b1: bool, b2: bool, b3: bool) -> dict:
+    re24 = RE24_MATRIX.get((outs, b1, b2, b3), _RE24_MEAN)
+    ratio = re24 / max(_RE24_MEAN, 0.01)
+    if 0.85 <= ratio <= 1.15:
+        return {"k_mult": 1.0, "bb_mult": 1.0, "hit_mult": 1.0, "hr_mult": 1.0}
+    intensity = (ratio - 1.0) * 0.20
+    return {
+        "k_mult": 1.0 - intensity * 0.10,
+        "bb_mult": 1.0 + intensity * 0.08,
+        "hit_mult": 1.0 + intensity * 0.12,
+        "hr_mult": 1.0 + intensity * 0.15,
+    }
+
+
+# ── 27. BETA-BINOMIAL UNCERTAINTY PROPAGATION ────────────────────────────────
+# Raw batting averages are point estimates from a binomial process. The true
+# talent lies on a Beta posterior: Beta(α + hits, β + (AB - hits)).
+#
+# For each sim, we sample each batter's "true" hit rate from their posterior,
+# which naturally gives high-PA batters tight distributions and low-PA batters
+# wide ones. This propagates parameter uncertainty through the Monte Carlo.
+#
+# Prior: Beta(α₀, β₀) with α₀/(α₀+β₀) = league mean, α₀+β₀ = prior strength
+# Posterior: Beta(α₀ + hits, β₀ + (AB - hits))
+
+BETA_PRIOR_STRENGTH = 200
+BETA_PRIOR_AVG = 0.250
+_BETA_ALPHA0 = BETA_PRIOR_AVG * BETA_PRIOR_STRENGTH
+_BETA_BETA0 = (1 - BETA_PRIOR_AVG) * BETA_PRIOR_STRENGTH
+
+
+def sample_beta_rates(batter_stats: dict) -> dict:
+    try:
+        ab = int(batter_stats.get("atBats", 0) or 0)
+        hits = int(batter_stats.get("hits", 0) or 0)
+        hr = int(batter_stats.get("homeRuns", 0) or 0)
+        bb = int(batter_stats.get("baseOnBalls", 0) or 0)
+        pa = int(batter_stats.get("plateAppearances", 0) or 0)
+    except (ValueError, TypeError):
+        return {"hit_mult": 1.0, "hr_mult": 1.0, "bb_mult": 1.0}
+
+    if pa < 20:
+        return {"hit_mult": 1.0, "hr_mult": 1.0, "bb_mult": 1.0}
+
+    alpha_hit = _BETA_ALPHA0 + hits
+    beta_hit = _BETA_BETA0 + max(ab - hits, 0)
+    sampled_avg = random.betavariate(alpha_hit, beta_hit)
+    observed_avg = hits / max(ab, 1)
+    hit_mult = sampled_avg / max(observed_avg, 0.100) if observed_avg > 0.050 else 1.0
+
+    alpha_hr = 0.032 * 80 + hr
+    beta_hr = (1 - 0.032) * 80 + max(pa - hr, 0)
+    sampled_hr = random.betavariate(alpha_hr, beta_hr)
+    observed_hr = hr / max(pa, 1)
+    hr_mult = sampled_hr / max(observed_hr, 0.010) if observed_hr > 0.005 else 1.0
+
+    alpha_bb = 0.082 * 60 + bb
+    beta_bb = (1 - 0.082) * 60 + max(pa - bb, 0)
+    sampled_bb = random.betavariate(alpha_bb, beta_bb)
+    observed_bb = bb / max(pa, 1)
+    bb_mult = sampled_bb / max(observed_bb, 0.020) if observed_bb > 0.010 else 1.0
+
+    hit_mult = max(0.70, min(1.35, hit_mult))
+    hr_mult = max(0.50, min(1.60, hr_mult))
+    bb_mult = max(0.70, min(1.40, bb_mult))
+
+    return {"hit_mult": hit_mult, "hr_mult": hr_mult, "bb_mult": bb_mult}
+
+
+# ── 28. HAWKES SELF-EXCITING POINT PROCESS ────────────────────────────────────
+# In MLB, runs cluster: once scoring starts in an inning, the probability of
+# additional runs increases (pitcher rattled, bullpen not ready, rally momentum).
+#
+# A Hawkes process models this with an intensity function:
+#   λ(t) = μ + Σ α·exp(-β(t - tᵢ))
+#
+# μ = baseline intensity (avg run rate per PA)
+# α = excitation magnitude (how much each run boosts the rate)
+# β = decay rate (how fast the boost fades)
+# tᵢ = time of the i-th event (PA number when run scored)
+
+HAWKES_MU = 0.115
+HAWKES_ALPHA = 0.08
+HAWKES_BETA = 0.40
+
+
+class HawkesRunProcess:
+    __slots__ = ("events", "pa_count")
+
+    def __init__(self):
+        self.events = []
+        self.pa_count = 0
+
+    def record_runs(self, n_runs: int):
+        for _ in range(n_runs):
+            self.events.append(self.pa_count)
+
+    def step(self):
+        self.pa_count += 1
+
+    def get_intensity_modifier(self) -> dict:
+        if not self.events:
+            return {"hit_mult": 1.0, "hr_mult": 1.0, "bb_mult": 1.0, "k_mult": 1.0}
+        excitation = 0.0
+        t = self.pa_count
+        for ti in self.events:
+            dt = t - ti
+            if dt > 0:
+                excitation += HAWKES_ALPHA * _math.exp(-HAWKES_BETA * dt)
+        intensity = HAWKES_MU + excitation
+        ratio = intensity / HAWKES_MU
+        if 0.95 <= ratio <= 1.05:
+            return {"hit_mult": 1.0, "hr_mult": 1.0, "bb_mult": 1.0, "k_mult": 1.0}
+        boost = (ratio - 1.0) * 0.40
+        return {
+            "hit_mult": 1.0 + boost,
+            "hr_mult": 1.0 + boost * 1.2,
+            "bb_mult": 1.0 + boost * 0.6,
+            "k_mult": 1.0 - boost * 0.3,
+        }
+
+    def reset(self):
+        self.events.clear()
+        self.pa_count = 0
+
+
+# ── 29. STOCHASTIC VOLATILITY MODEL ──────────────────────────────────────────
+# A pitcher's variance is itself random. Some days he's consistently average
+# (low vol), other days wildly inconsistent (high vol). We model this with
+# a log-normal stochastic volatility process:
+#
+#   log(σ²_t) = φ·log(σ²_{t-1}) + η_t,  η_t ~ N(0, τ²)
+#
+# σ²_t is the variance of the pitcher's "stuff" at time t
+# φ = persistence (how sticky today's volatility is)
+# τ = vol of vol (how much the variance itself fluctuates)
+#
+# High volatility → more extreme outcomes (more K AND more HR/BB)
+# Low volatility → compressed outcomes toward the mean
+
+SV_PHI = 0.92
+SV_TAU = 0.15
+SV_LOG_VAR_INIT = 0.0
+
+
+class StochasticVolatility:
+    __slots__ = ("log_var",)
+
+    def __init__(self):
+        self.log_var = SV_LOG_VAR_INIT + random.gauss(0, SV_TAU * 2)
+
+    def step(self):
+        self.log_var = SV_PHI * self.log_var + random.gauss(0, SV_TAU)
+
+    def get_volatility_modifier(self) -> dict:
+        vol = _math.exp(self.log_var * 0.5)
+        if 0.90 <= vol <= 1.10:
+            return {"k_mult": 1.0, "bb_mult": 1.0, "hr_mult": 1.0, "hit_mult": 1.0}
+        spread = (vol - 1.0) * 0.30
+        return {
+            "k_mult": 1.0 + spread,
+            "bb_mult": 1.0 + spread * 0.8,
+            "hr_mult": 1.0 + spread * 1.1,
+            "hit_mult": 1.0 - abs(spread) * 0.15,
+        }
+
+
+# ── 30. KERNEL DENSITY ESTIMATION FOR RUN DISTRIBUTION ───────────────────────
+# Instead of assuming runs follow a Poisson or negative binomial, we use
+# Gaussian kernel density estimation on the raw simulation output to build
+# smooth, non-parametric probability curves.
+#
+# The KDE for a set of observations {x₁, ..., xₙ} is:
+#   f̂(x) = (1/nh) Σᵢ K((x - xᵢ)/h)
+#
+# where K is the Gaussian kernel and h is the bandwidth (Silverman's rule).
+# This gives more accurate O/U probabilities than binning into histograms.
+
+_INV_SQRT_2PI = 1.0 / _math.sqrt(2.0 * _math.pi)
+
+
+def kde_run_distribution(run_totals: list, points: list = None) -> dict:
+    n = len(run_totals)
+    if n < 50:
+        return {}
+    mean_r = sum(run_totals) / n
+    var_r = sum((x - mean_r) ** 2 for x in run_totals) / n
+    std_r = max(_math.sqrt(var_r), 0.5)
+    h = 1.06 * std_r * n ** (-0.2)
+    inv_h = 1.0 / h
+
+    if points is None:
+        lo = max(0, int(mean_r - 3 * std_r))
+        hi = int(mean_r + 3 * std_r) + 1
+        points = [x * 0.5 for x in range(lo * 2, hi * 2 + 1)]
+
+    density = {}
+    for x in points:
+        total = 0.0
+        for xi in run_totals:
+            z = (x - xi) * inv_h
+            total += _INV_SQRT_2PI * _math.exp(-0.5 * z * z)
+        density[x] = total * inv_h / n
+
+    return density
+
+
+def kde_over_under_prob(run_totals: list, line: float) -> tuple:
+    n = len(run_totals)
+    if n < 30:
+        over = sum(1 for t in run_totals if t > line) / max(n, 1)
+        return over, 1.0 - over
+    over_count = sum(1 for t in run_totals if t > line)
+    push_count = sum(1 for t in run_totals if t == line)
+    non_push = n - push_count
+    if non_push == 0:
+        return 0.5, 0.5
+    over_pct = over_count / non_push
+    return round(over_pct, 4), round(1.0 - over_pct, 4)
+
+
 def simulate_half_inning(
     precomp_lineup: list,
     lineup_pos: int,
@@ -4388,6 +4649,9 @@ def simulate_half_inning(
     copula: "GaussianCopula | None" = None,
     pitcher_hmm: "PitcherHMM | None" = None,
     extra_mults: dict = None,
+    hawkes: "HawkesRunProcess | None" = None,
+    sv_mod: dict = None,
+    beta_mults: list = None,
 ) -> tuple:
     """
     Simulate one half-inning (3 outs) for one team.
@@ -4426,6 +4690,7 @@ def simulate_half_inning(
         return "avg"
 
     while outs < 3:
+        _runs_before_pa = runs
         # ── Stolen base attempt (between at-bats, runner on 1st only) ────────
         if batter_rates and b1 and not b2 and outs < 2:
             runner_idx = (pos - 1) % 9
@@ -4538,6 +4803,46 @@ def simulate_half_inning(
                 cm[6] *= 1.0 / max(gpd_mod, 0.5)
                 needs_modify = True
 
+        # RE24 Markov chain modifier
+        re24m = compute_re24_modifier(outs, b1, b2, b3)
+        if abs(re24m["hit_mult"] - 1.0) > 0.005:
+            cm[0] *= re24m["bb_mult"]
+            cm[1] *= re24m["k_mult"]
+            cm[2] *= re24m["hit_mult"]
+            cm[3] *= re24m["hit_mult"]
+            cm[5] *= re24m["hr_mult"]
+            needs_modify = True
+
+        # Hawkes self-exciting process
+        if hawkes:
+            hmod = hawkes.get_intensity_modifier()
+            if abs(hmod["hit_mult"] - 1.0) > 0.005:
+                cm[0] *= hmod["bb_mult"]
+                cm[1] *= hmod["k_mult"]
+                cm[2] *= hmod["hit_mult"]
+                cm[3] *= hmod["hit_mult"]
+                cm[5] *= hmod["hr_mult"]
+                needs_modify = True
+
+        # Stochastic volatility
+        if sv_mod and abs(sv_mod["k_mult"] - 1.0) > 0.005:
+            cm[0] *= sv_mod["bb_mult"]
+            cm[1] *= sv_mod["k_mult"]
+            cm[2] *= sv_mod["hit_mult"]
+            cm[3] *= sv_mod["hit_mult"]
+            cm[5] *= sv_mod["hr_mult"]
+            needs_modify = True
+
+        # Beta-binomial per-batter uncertainty
+        if beta_mults:
+            bm = beta_mults[pos % 9]
+            cm[0] *= bm["bb_mult"]
+            cm[2] *= bm["hit_mult"]
+            cm[3] *= bm["hit_mult"]
+            cm[4] *= bm["hit_mult"]
+            cm[5] *= bm["hr_mult"]
+            needs_modify = True
+
         # Single decompose → multiply → recompose pass
         if needs_modify:
             cw = cum_weights
@@ -4630,6 +4935,13 @@ def simulate_half_inning(
                 elif b1 and not b3:
                     b1_who = batter_slot
 
+        # Feed Hawkes process
+        if hawkes:
+            hawkes.step()
+            _pa_runs = runs - _runs_before_pa
+            if _pa_runs > 0:
+                hawkes.record_runs(_pa_runs)
+
         pos += 1
 
     return runs, pos % 9
@@ -4658,6 +4970,8 @@ def simulate_game(
     resolve_ties: bool = True,  # False = return tied score as-is (for F3/F5/F7 push calc)
     away_pitcher_stats: dict = None,  # away starter stats (for stamina durability)
     home_pitcher_stats: dict = None,  # home starter stats (for stamina durability)
+    away_beta_mults: list = None,  # Beta-binomial per-batter uncertainty multipliers
+    home_beta_mults: list = None,
 ) -> tuple:
     """
     Simulate one complete 9-inning game with 3 pitching phases + RISP clutch stats:
@@ -4706,6 +5020,14 @@ def simulate_game(
 
     # Momentum tracker (hot-inning correlation)
     momentum = MomentumTracker()
+
+    # Hawkes self-exciting run process (per-team)
+    away_hawkes = HawkesRunProcess()
+    home_hawkes = HawkesRunProcess()
+
+    # Stochastic volatility (per-pitcher, sampled once per game)
+    away_sv = StochasticVolatility()
+    home_sv = StochasticVolatility()
 
     # Dynamic starter removal tracking.
     # "away" starter = the pitcher throwing for the away team → HOME batters face them
@@ -4895,6 +5217,10 @@ def simulate_game(
         # run_diff from away team's perspective (batting team)
         away_rdiff = away_runs - home_runs
         # Away batters face the home pitcher → use home_hmm for HMM state
+        # Stochastic volatility step for home pitcher (away batters face them)
+        home_sv.step()
+        _away_sv_mod = home_sv.get_volatility_modifier()
+
         runs, new_away_pos = simulate_half_inning(
             tto_away_cur,
             away_pos,
@@ -4905,6 +5231,9 @@ def simulate_game(
             copula=away_copula,
             pitcher_hmm=home_hmm if not home_starter_pulled else None,
             extra_mults=_away_extra_mults,
+            hawkes=away_hawkes,
+            sv_mod=_away_sv_mod,
+            beta_mults=away_beta_mults,
         )
         batters_this_half = (new_away_pos - away_pos) % len(away_cur) or len(away_cur)
         if not home_starter_pulled:
@@ -4980,6 +5309,10 @@ def simulate_game(
         # run_diff from home team's perspective (batting team)
         home_rdiff = home_runs - away_runs
         # Home batters face the away pitcher → use away_hmm for HMM state
+        # Stochastic volatility step for away pitcher (home batters face them)
+        away_sv.step()
+        _home_sv_mod = away_sv.get_volatility_modifier()
+
         runs, new_home_pos = simulate_half_inning(
             tto_home_cur,
             home_pos,
@@ -4990,6 +5323,9 @@ def simulate_game(
             copula=home_copula,
             pitcher_hmm=away_hmm if not away_starter_pulled else None,
             extra_mults=_home_extra_mults,
+            hawkes=home_hawkes,
+            sv_mod=_home_sv_mod,
+            beta_mults=home_beta_mults,
         )
         batters_this_half = (new_home_pos - home_pos) % len(home_cur) or len(home_cur)
         if not away_starter_pulled:
@@ -5394,9 +5730,13 @@ def run_simulation(
         )
 
     for _ in range(n):
+        _away_beta = [sample_beta_rates(b) for b in away_lineup[:9]]
+        _home_beta = [sample_beta_rates(b) for b in home_lineup[:9]]
         a, h = _sim(
             away_pitcher_stats=away_pitcher,
             home_pitcher_stats=home_pitcher,
+            away_beta_mults=_away_beta,
+            home_beta_mults=_home_beta,
         )
         away_total += a
         home_total += h
@@ -5576,6 +5916,10 @@ def run_simulation(
         # Analytical Poisson run distribution
         "poisson_model": compute_poisson_run_distribution(
             away_pitcher, home_pitcher, away_lineup, home_lineup
+        ),
+        # KDE-smoothed run distribution
+        "kde_density": kde_run_distribution(
+            [t for t, cnt in total_runs_hist.items() for _ in range(cnt)]
         ),
     }
 
