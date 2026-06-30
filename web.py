@@ -96,10 +96,13 @@ from data.tracker import (
     get_confidence_history,
     get_game_notes,
     get_odds_history,
+    get_prop_accuracy,
     log_odds,
     log_prediction,
+    log_prop_predictions,
     save_game_note,
     settle_odds_history,
+    settle_prop_predictions,
     update_results,
 )
 from simulation.engine import (
@@ -1326,6 +1329,27 @@ def simulate(game_pk):
             "home_team": result.get("home_team", ""),
         }
 
+    # Log prop predictions for accuracy tracking
+    try:
+        if away_batter_props:
+            log_prop_predictions(
+                game_pk,
+                game_date,
+                result.get("away_team", ""),
+                away_batter_props,
+                result.get("away_k_pred"),
+            )
+        if home_batter_props:
+            log_prop_predictions(
+                game_pk,
+                game_date,
+                result.get("home_team", ""),
+                home_batter_props,
+                result.get("home_k_pred"),
+            )
+    except Exception:
+        pass
+
     # ── Batting order optimizer ───────────────────────────────────────
     try:
         result["away_order_opt"] = optimize_batting_order(
@@ -1981,6 +2005,32 @@ def confidence_history_page():
     update_results()
     data = get_confidence_history()
     return render_template("confidence_history.html", **data, username=current_user.username)
+
+
+@app.route("/prop-accuracy")
+@login_required
+def prop_accuracy_page():
+    settle_prop_predictions()
+    data = get_prop_accuracy()
+    return render_template("prop_accuracy.html", **data, username=current_user.username)
+
+
+@app.route("/api/auto-settle", methods=["POST"])
+@login_required
+def api_auto_settle():
+    """Auto-settle predictions, bets, odds, and props when games go final."""
+    pred_count = update_results()
+    bet_count = settle_bets(current_user.id)
+    odds_count = settle_odds_history()
+    prop_count = settle_prop_predictions()
+    return jsonify(
+        {
+            "predictions": pred_count,
+            "bets": bet_count,
+            "odds": odds_count,
+            "props": prop_count,
+        }
+    )
 
 
 @app.route("/update-results", methods=["POST"])
