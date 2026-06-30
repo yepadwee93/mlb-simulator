@@ -1848,8 +1848,12 @@ def api_sim_card(game_pk):
 
     try:
         result = build_game_result(game, n_sims=N_SIMS_ALL, use_splits=False, fresh_lineup=True)
-    except Exception:
-        result = None
+    except Exception as exc:
+        import traceback
+
+        traceback.print_exc()
+        print(f"[sim-card] game_pk={game_pk} error: {exc}")
+        return jsonify({"error": f"Simulation error: {exc}"}), 500
     if result is None:
         return jsonify({"error": "Lineup not available"}), 404
 
