@@ -297,6 +297,7 @@ if (localStorage.getItem('email_nudge_dismissed') === '1') {
     <div style="display:flex; gap:16px; font-size:0.85rem; align-items:center;">
       <a href="/accuracy" style="color:#64b5f6; text-decoration:none; font-weight:600;">📊 Accuracy</a>
       <a href="/confidence-history" style="color:#c084fc;text-decoration:none;font-weight:600;">📈 Confidence</a>
+      <a href="/prop-accuracy" style="color:#b39ddb;text-decoration:none;font-weight:600;">🎯 Props</a>
       <a href="/odds-history" style="color:#ffd54f;text-decoration:none;font-weight:600;">📋 Odds</a>
       <span class="nav-dropdown"><a href="/bets">&#128176; My Bets &#9660;</a><div class="nav-dropdown-menu"><a href="/bets">&#128176; My Bets</a><a href="/bankroll">&#128200; Bankroll</a><a href="/calculator">&#129518; Calculator</a><a href="/parlay">&#127920; Parlay</a><a href="/my-picks">&#127919; My Picks</a></div></span>
       {% if current_user.is_authenticated %}
@@ -707,8 +708,16 @@ function csrfFetch(url,opts){opts=opts||{};opts.headers=Object.assign({'X-CSRFTo
     }
   }
 
+  var lastHadFinal = false;
   function refresh() {
-    fetch('/api/scores').then(function(r){ return r.json(); }).then(renderLive).catch(function(){});
+    fetch('/api/scores').then(function(r){ return r.json(); }).then(function(games){
+      renderLive(games);
+      var hasFinal = games.some(function(g){ var s = (g.status||'').toLowerCase(); return s.indexOf('final') >= 0 || s.indexOf('game over') >= 0; });
+      if (hasFinal && !lastHadFinal) {
+        csrfFetch('/api/auto-settle', {method:'POST'}).catch(function(){});
+      }
+      lastHadFinal = hasFinal;
+    }).catch(function(){});
   }
 
   refresh();

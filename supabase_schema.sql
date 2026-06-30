@@ -99,6 +99,24 @@ CREATE TABLE IF NOT EXISTS odds_snapshots (
 );
 CREATE INDEX IF NOT EXISTS idx_odds_snap_gpk ON odds_snapshots(game_pk);
 
+-- Player prop predictions for accuracy tracking
+CREATE TABLE IF NOT EXISTS prop_predictions (
+    id            BIGSERIAL PRIMARY KEY,
+    game_pk       TEXT NOT NULL,
+    game_date     TEXT,
+    team          TEXT,
+    player_name   TEXT,
+    slot          INTEGER,
+    prop_type     TEXT,          -- 'hits', 'hr', 'rbi', 'tb', 'k'
+    predicted     NUMERIC(5,2),  -- model projected value (e.g. 1.2 hits)
+    over_prob     NUMERIC(5,3),  -- P(over 0.5) for hits, P(over 0.5) for HR, etc.
+    actual        NUMERIC(5,2),  -- real box score value
+    hit           SMALLINT,      -- 1 = over hit, 0 = under
+    logged_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    settled_at    TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_prop_pred_gpk ON prop_predictions(game_pk);
+
 -- RLM alerts log
 CREATE TABLE IF NOT EXISTS rlm_alerts (
     id           BIGSERIAL PRIMARY KEY,

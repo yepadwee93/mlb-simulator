@@ -451,3 +451,195 @@ def detect_rlm(line_movement, public_betting):
             )
 
     return alerts
+
+
+def log_prop_predictions(game_pk, game_date, team, batter_props, pitcher_k_pred=None):
+    """
+    Log player prop predictions for a game so we can track accuracy later.
+    batter_props: list of dicts from predict_batter_props (with 'name' attached).
+    pitcher_k_pred: dict with projected_ks from predict_pitcher_ks (optional).
+    """
+    try:
+        existing = (
+            supa()
+            .table("prop_predictions")
+            .select("id")
+            .eq("game_pk", str(game_pk))
+            .eq("team", team)
+            .limit(1)
+            .execute()
+        )
+        if existing.data:
+            return
+
+        rows = []
+        for prop in batter_props:
+            name = prop.get("name", "")
+            if not name or name.startswith("Batter "):
+                continue
+            for prop_type, pred_key, prob_key in [
+                ("hits", "avg_hits", "hit_pct"),
+                ("hr", "avg_hr", "hr_pct"),
+                ("rbi", "avg_rbi", None),
+                ("tb", "avg_tb", "tb_pct_2plus"),
+            ]:
+                pred_val = prop.get(pred_key)
+                if pred_val is None:
+                    continue
+                prob = prop.get(prob_key, 0) if prob_key else None
+                rows.append(
+                    {
+                        "game_pk": str(game_pk),
+                        "game_date": str(game_date),
+                        "team": team,
+                        "player_name": name,
+                        "slot": prop.get("slot", 0),
+                        "prop_type": prop_type,
+                        "predicted": round(float(pred_val), 2),
+                        "over_prob": round(float(prob) / 100, 3) if prob else None,
+                    }
+                )
+
+        if pitcher_k_pred and pitcher_k_pred.get("projected_ks"):
+            rows.append(
+                {
+                    "game_pk": str(game_pk),
+                    "game_date": str(game_date),
+                    "team": team,
+                    "player_name": pitcher_k_pred.get("name", "Pitcher"),
+                    "slot": 0,
+                    "prop_type": "k",
+                    "predicted": round(float(pitcher_k_pred["projected_ks"]), 2),
+                    "over_prob": None,
+                }
+            )
+
+        if rows:
+            supa().table("prop_predictions").insert(rows).execute()
+    except Exception:
+        pass
+
+
+def settle_prop_predictions():
+    """
+    Settle unsettled prop predictions by checking actual box scores.
+    Returns count of settled rows.
+    """
+    unsettled = (
+        supa().table("prop_predictions").select("*").is_("actual", "null").limit(500).execute()
+    )
+    rows = unsettled.data or []
+    if not rows:
+        return 0
+
+    game_pks = list({r["game_pk"] for r in rows})
+    settled = 0
+
+    for gpk in game_pks:
+        try:
+            live = _get_nocache(f"/game/{gpk}/feed/live")
+            state = live.get("gameData", {}).get("status", {}).get("abstractGameState", "")
+            if state != "Final":
+                continue
+
+            box = live.get("liveData", {}).get("boxscore", {}).get("teams", {})
+            away_players = box.get("away", {}).get("players", {})
+            home_players = box.get("home", {}).get("players", {})
+
+            player_stats = {}
+            for side_players in [away_players, home_players]:
+                for pid, pdata in side_players.items():
+                    name = pdata.get("person", {}).get("fullName", "")
+                    if not name:
+                        continue
+                    batting = pdata.get("stats", {}).get("batting", {})
+                    pitching = pdata.get("stats", {}).get("pitching", {})
+                    player_stats[name.lower()] = {
+                        "hits": int(batting.get("hits", 0)),
+                        "hr": int(batting.get("homeRuns", 0)),
+                        "rbi": int(batting.get("rbi", 0)),
+                        "tb": int(batting.get("totalBases", 0)),
+                        "k": int(pitching.get("strikeOuts", 0)),
+                    }
+
+            game_rows = [r for r in rows if r["game_pk"] == gpk]
+            for r in game_rows:
+                pname = (r.get("player_name") or "").lower()
+                stats = player_stats.get(pname)
+                if not stats:
+                    for key in player_stats:
+                        if pname.split()[-1] in key:
+                            stats = player_stats[key]
+                            break
+                if not stats:
+                    continue
+
+                prop_type = r["prop_type"]
+                actual_val = stats.get(prop_type, 0)
+                predicted = float(r.get("predicted", 0))
+                hit = 1 if actual_val >= max(predicted, 0.5) else 0
+
+                supa().table("prop_predictions").update(
+                    {
+                        "actual": actual_val,
+                        "hit": hit,
+                        "settled_at": datetime.utcnow().isoformat(),
+                    }
+                ).eq("id", r["id"]).execute()
+                settled += 1
+
+        except Exception:
+            continue
+
+    return settled
+
+
+def get_prop_accuracy():
+    """
+    Returns prop prediction accuracy stats grouped by prop type.
+    """
+    res = (
+        supa()
+        .table("prop_predictions")
+        .select("*")
+        .not_.is_("actual", "null")
+        .order("game_date", desc=True)
+        .limit(1000)
+        .execute()
+    )
+    rows = res.data or []
+
+    by_type = {}
+    for r in rows:
+        pt = r.get("prop_type", "")
+        if pt not in by_type:
+            by_type[pt] = {"total": 0, "correct": 0, "avg_pred": 0, "avg_actual": 0}
+        by_type[pt]["total"] += 1
+        by_type[pt]["correct"] += int(r.get("hit", 0))
+        by_type[pt]["avg_pred"] += float(r.get("predicted", 0))
+        by_type[pt]["avg_actual"] += float(r.get("actual", 0))
+
+    type_stats = []
+    for pt in ["hits", "hr", "rbi", "tb", "k"]:
+        d = by_type.get(pt, {"total": 0, "correct": 0, "avg_pred": 0, "avg_actual": 0})
+        if d["total"] > 0:
+            d["avg_pred"] = round(d["avg_pred"] / d["total"], 2)
+            d["avg_actual"] = round(d["avg_actual"] / d["total"], 2)
+            d["pct"] = round(d["correct"] / d["total"] * 100, 1)
+        else:
+            d["pct"] = None
+            d["avg_pred"] = None
+            d["avg_actual"] = None
+        d["prop_type"] = pt
+        type_stats.append(d)
+
+    pending = (
+        supa().table("prop_predictions").select("id", count="exact").is_("actual", "null").execute()
+    )
+
+    return {
+        "by_type": type_stats,
+        "total_settled": len(rows),
+        "total_pending": pending.count if pending.count else 0,
+        "recent": rows[:30],
+    }
