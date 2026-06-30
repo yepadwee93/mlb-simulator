@@ -250,6 +250,86 @@
   </div>
 </div>
 
+<!-- ── Favorite Sports ── -->
+<div class="page">
+  <div class="card" style="margin-top:0;">
+    <h2>🏟️ My Sports</h2>
+    <p style="font-size:0.82rem;color:#9aa0b8;margin-bottom:16px;line-height:1.5;">
+      Pick your favorite sports. Your homepage will show these front and center.
+    </p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;" id="sport-toggles">
+
+      <label style="display:flex;align-items:center;gap:12px;background:#0d1120;border:2px solid #252836;border-radius:12px;padding:14px 16px;cursor:pointer;transition:border-color .2s;" id="sport-card-mlb">
+        <input type="checkbox" value="mlb" class="sport-check" style="display:none;" checked>
+        <span style="font-size:1.4rem;">⚾</span>
+        <div>
+          <div style="font-weight:700;font-size:0.9rem;">MLB</div>
+          <div style="font-size:0.68rem;color:#4caf50;font-weight:600;">LIVE NOW</div>
+        </div>
+      </label>
+
+      <label style="display:flex;align-items:center;gap:12px;background:#0d1120;border:2px solid #252836;border-radius:12px;padding:14px 16px;cursor:pointer;transition:border-color .2s;" id="sport-card-nfl">
+        <input type="checkbox" value="nfl" class="sport-check" style="display:none;">
+        <span style="font-size:1.4rem;">🏈</span>
+        <div>
+          <div style="font-weight:700;font-size:0.9rem;">NFL</div>
+          <div style="font-size:0.68rem;color:#7c3aed;font-weight:600;">COMING AUG 2026</div>
+        </div>
+      </label>
+
+      <label style="display:flex;align-items:center;gap:12px;background:#0d1120;border:2px solid #252836;border-radius:12px;padding:14px 16px;cursor:pointer;transition:border-color .2s;" id="sport-card-nba">
+        <input type="checkbox" value="nba" class="sport-check" style="display:none;">
+        <span style="font-size:1.4rem;">🏀</span>
+        <div>
+          <div style="font-weight:700;font-size:0.9rem;">NBA</div>
+          <div style="font-size:0.68rem;color:#7c3aed;font-weight:600;">COMING OCT 2026</div>
+        </div>
+      </label>
+
+      <label style="display:flex;align-items:center;gap:12px;background:#0d1120;border:2px solid #252836;border-radius:12px;padding:14px 16px;cursor:pointer;transition:border-color .2s;" id="sport-card-nhl">
+        <input type="checkbox" value="nhl" class="sport-check" style="display:none;">
+        <span style="font-size:1.4rem;">🏒</span>
+        <div>
+          <div style="font-weight:700;font-size:0.9rem;">NHL</div>
+          <div style="font-size:0.68rem;color:#7c3aed;font-weight:600;">COMING DEC 2026</div>
+        </div>
+      </label>
+
+    </div>
+    <div id="sports-saved" style="font-size:0.78rem;color:#81c784;margin-top:14px;display:none;">✓ Favorites saved — homepage updated</div>
+    <div style="font-size:0.72rem;color:#555870;margin-top:12px;line-height:1.5;">
+      Your homepage sport selector will highlight your picks. When a sport goes live, you'll see its games on your dashboard automatically.
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  var saved = [];
+  try { saved = JSON.parse(localStorage.getItem('fav_sports') || '["mlb"]'); } catch(e) { saved = ['mlb']; }
+
+  var checks = document.querySelectorAll('.sport-check');
+  checks.forEach(function(cb) {
+    if (saved.indexOf(cb.value) >= 0) {
+      cb.checked = true;
+      document.getElementById('sport-card-' + cb.value).style.borderColor = '#64b5f6';
+    }
+    cb.addEventListener('change', function() {
+      var favs = [];
+      checks.forEach(function(c) {
+        if (c.checked) favs.push(c.value);
+        document.getElementById('sport-card-' + c.value).style.borderColor = c.checked ? '#64b5f6' : '#252836';
+      });
+      if (favs.length === 0) { favs = ['mlb']; cb.checked = true; document.getElementById('sport-card-mlb').style.borderColor = '#64b5f6'; }
+      localStorage.setItem('fav_sports', JSON.stringify(favs));
+      var msg = document.getElementById('sports-saved');
+      msg.style.display = 'block';
+      setTimeout(function() { msg.style.display = 'none'; }, 2000);
+    });
+  });
+})();
+</script>
+
 <!-- ── Theme chooser ── -->
 <div class="page">
   <div class="card" style="margin-top:0;">

@@ -291,6 +291,50 @@ if (localStorage.getItem('email_nudge_dismissed') === '1') {
 </script>
 {% endif %}
 
+<!-- Sport Selector -->
+<div id="sport-selector" style="display:flex;gap:0;max-width:500px;margin:0 auto 20px auto;border-radius:10px;overflow:hidden;border:1px solid #353a52;">
+  <a href="/" id="sport-tab-mlb" data-sport="mlb" style="flex:1;padding:10px 0;text-align:center;background:linear-gradient(135deg,#1a3a5a,#0d2a4a);color:#64b5f6;font-weight:700;font-size:0.85rem;text-decoration:none;border-right:1px solid #353a52;">
+    ⚾ MLB
+  </a>
+  <div id="sport-tab-nfl" data-sport="nfl" style="flex:1;padding:10px 0;text-align:center;color:#555870;font-size:0.85rem;border-right:1px solid #353a52;cursor:default;position:relative;" title="Coming Aug 2026">
+    🏈 NFL
+    <span style="position:absolute;top:-1px;right:6px;font-size:0.55rem;background:#7c3aed;color:#fff;padding:1px 5px;border-radius:0 0 4px 4px;font-weight:700;">AUG</span>
+  </div>
+  <div id="sport-tab-nba" data-sport="nba" style="flex:1;padding:10px 0;text-align:center;color:#555870;font-size:0.85rem;border-right:1px solid #353a52;cursor:default;position:relative;" title="Coming Oct 2026">
+    🏀 NBA
+    <span style="position:absolute;top:-1px;right:6px;font-size:0.55rem;background:#7c3aed;color:#fff;padding:1px 5px;border-radius:0 0 4px 4px;font-weight:700;">OCT</span>
+  </div>
+  <div id="sport-tab-nhl" data-sport="nhl" style="flex:1;padding:10px 0;text-align:center;color:#555870;font-size:0.85rem;cursor:default;position:relative;" title="Coming Dec 2026">
+    🏒 NHL
+    <span style="position:absolute;top:-1px;right:6px;font-size:0.55rem;background:#7c3aed;color:#fff;padding:1px 5px;border-radius:0 0 4px 4px;font-weight:700;">DEC</span>
+  </div>
+</div>
+<script>
+(function() {
+  var favs = [];
+  try { favs = JSON.parse(localStorage.getItem('fav_sports') || '["mlb"]'); } catch(e) { favs = ['mlb']; }
+  var allSports = ['mlb','nfl','nba','nhl'];
+  var selector = document.getElementById('sport-selector');
+  if (!selector) return;
+
+  // Reorder: favorites first, then the rest
+  var ordered = favs.concat(allSports.filter(function(s) { return favs.indexOf(s) < 0; }));
+  var tabs = ordered.map(function(s) { return document.getElementById('sport-tab-' + s); }).filter(Boolean);
+  tabs.forEach(function(tab) { selector.appendChild(tab); });
+
+  // Dim non-favorites
+  allSports.forEach(function(s) {
+    var tab = document.getElementById('sport-tab-' + s);
+    if (!tab) return;
+    if (favs.indexOf(s) >= 0) {
+      tab.style.opacity = '1';
+    } else {
+      tab.style.opacity = '0.4';
+    }
+  });
+})();
+</script>
+
 <header>
   <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
     <h1>⚾ MLB Simulator</h1>
