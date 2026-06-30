@@ -1725,6 +1725,8 @@ function csrfFetch(url,opts){opts=opts||{};opts.headers=Object.assign({'X-CSRFTo
     if (done >= total) {
       var prog = document.getElementById('sim-progress');
       if (prog) prog.innerHTML = '<span style="color:#4caf50;">All ' + total + ' games simulated</span>';
+      buildBestBets();
+      buildBestParlay();
     }
   }
 
@@ -1838,6 +1840,120 @@ function csrfFetch(url,opts){opts=opts||{};opts.headers=Object.assign({'X-CSRFTo
     Promise.all(promises).then(function() {
       fetchBatch(pks, idx + 3);
     });
+  }
+
+  function buildBestBets() {
+    var bets = [];
+    results.forEach(function(d) {
+      if (d.error) return;
+      var awp = parseFloat(d.away_win_pct) || 0;
+      var hwp = parseFloat(d.home_win_pct) || 0;
+      if (awp >= 62) {
+        bets.push({team: d.away_team, opponent: d.home_team, venue: d.venue || '', win_pct: awp,
+          implied_pct: d.away_implied_pct, odds_str: d.away_avg_odds, edge: d.away_edge,
+          tier: awp >= 70 ? 'strong' : awp >= 65 ? 'good' : 'moderate'});
+      }
+      if (hwp >= 62) {
+        bets.push({team: d.home_team, opponent: d.away_team, venue: d.venue || '', win_pct: hwp,
+          implied_pct: d.home_implied_pct, odds_str: d.home_avg_odds, edge: d.home_edge,
+          tier: hwp >= 70 ? 'strong' : hwp >= 65 ? 'good' : 'moderate'});
+      }
+    });
+    bets.sort(function(a, b) { return b.win_pct - a.win_pct; });
+
+    var box = document.querySelector('.best-bets-box');
+    if (!box) return;
+    var title = '<div class="best-bets-title">🎯 Today\'s Best Bets</div>';
+
+    if (!bets.length) {
+      box.innerHTML = title + '<div class="no-bets">No game cleared 62% today — every matchup is too close to call. Consider sitting this slate out.</div>';
+      return;
+    }
+
+    var html = title;
+    var tiers = [
+      {key: 'strong', label: '🔥 Strong lean — 70%+', color: '#ef5350', badge: 'STRONG', cls: 'conf-strong'},
+      {key: 'good', label: '✅ Good value — 65-69%', color: '#4caf50', badge: 'GOOD', cls: 'conf-good'},
+      {key: 'moderate', label: '💛 Moderate edge — 62-64%', color: '#ffd54f', badge: 'MODERATE', cls: 'conf-moderate'}
+    ];
+    tiers.forEach(function(t) {
+      var tierBets = bets.filter(function(b) { return b.tier === t.key; });
+      if (!tierBets.length) return;
+      html += '<div class="bet-tier-group"><div class="bet-tier-label">' + t.label + '</div>';
+      tierBets.forEach(function(b) {
+        html += '<div class="bet-row"><div>';
+        html += '<div class="bet-team">' + b.team + '</div>';
+        html += '<div class="bet-opp">vs ' + b.opponent + ' \xb7 ' + b.venue + '</div>';
+        if (b.implied_pct) {
+          html += '<div class="vegas-line">Vegas: ' + b.implied_pct + '% implied \xb7 ' + (b.odds_str || 'N/A');
+          if (b.edge !== null && b.edge !== undefined) {
+            if (b.edge > 0) html += ' \xb7 <span class="edge-pos">+' + b.edge + '% edge ✓</span>';
+            else if (b.edge < 0) html += ' \xb7 <span class="edge-neg">' + b.edge + '% vs line</span>';
+            else html += ' \xb7 <span class="edge-flat">even with line</span>';
+          }
+          html += '</div>';
+        }
+        html += '</div><div style="display:flex;align-items:center;">';
+        html += '<div class="bet-pct" style="color:' + t.color + ';">' + b.win_pct + '%</div>';
+        html += '<span class="bet-badge ' + t.cls + '">' + t.badge + '</span>';
+        html += '</div></div>';
+      });
+      html += '</div>';
+    });
+    html += '<div class="bet-rule">💡 <strong>Betting guide:</strong> Focus on Strong and Good picks — skip anything below 62% (too close to call). Never bet more than you can afford to lose.</div>';
+    box.innerHTML = html;
+  }
+
+  function buildBestParlay() {
+    var picks = [];
+    results.forEach(function(d) {
+      if (d.error) return;
+      var awp = parseFloat(d.away_win_pct) || 0;
+      var hwp = parseFloat(d.home_win_pct) || 0;
+      var topPct = Math.max(awp, hwp);
+      if (topPct >= 60) {
+        var isAway = awp > hwp;
+        picks.push({
+          team: isAway ? d.away_team : d.home_team,
+          opponent: isAway ? d.home_team : d.away_team,
+          venue: d.venue || '',
+          win_pct: topPct
+        });
+      }
+    });
+    picks.sort(function(a, b) { return b.win_pct - a.win_pct; });
+
+    var box = document.querySelector('.parlay-box');
+    if (!box) return;
+
+    if (!picks.length) {
+      box.innerHTML = '<div class="parlay-header"><div><div class="parlay-title">🎯 Best Parlay — <span>Teams ≥ 60% to Win</span></div></div></div>' +
+        '<div class="no-parlay">No games cleared the 60% threshold today — too close to call across the board.</div>';
+      return;
+    }
+
+    var combined = 1;
+    picks.forEach(function(p) { combined *= p.win_pct / 100; });
+    var combinedPct = Math.round(combined * 10000) / 100;
+
+    var html = '<div class="parlay-header"><div>';
+    html += '<div class="parlay-title">🎯 Best Parlay — <span>Teams ≥ 60% to Win</span></div>';
+    html += '<div style="color:#b0b8cc;font-size:0.82rem;margin-top:6px;">' + picks.length + '-team parlay \xb7 all picks must win</div>';
+    html += '</div><div class="parlay-combined">';
+    html += '<div class="pct">' + combinedPct + '%</div>';
+    html += '<div class="lbl">combined probability</div>';
+    html += '</div></div>';
+
+    html += '<div class="parlay-picks">';
+    picks.forEach(function(p) {
+      html += '<div class="parlay-pick"><div>';
+      html += '<div class="pick-team">' + p.team + '</div>';
+      html += '<div class="pick-opp">vs ' + p.opponent + ' \xb7 ' + p.venue + '</div>';
+      html += '</div><div class="pick-pct">' + p.win_pct + '%</div></div>';
+    });
+    html += '</div>';
+    html += '<div class="disclaimer">⚠ For entertainment only. Probabilities are model estimates, not guaranteed outcomes.</div>';
+    box.innerHTML = html;
   }
 
   fetchBatch(gamePks, 0);
