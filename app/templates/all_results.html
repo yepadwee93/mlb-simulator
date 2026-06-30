@@ -141,6 +141,8 @@
       font-weight: 600;
     }
 
+    @keyframes spin { to { transform: rotate(360deg); } }
+
     .games-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
@@ -838,7 +840,41 @@
 </div>
 <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;">ALL GAMES TODAY <a href="/bets" style="font-size:0.78rem;font-weight:700;color:#4caf50;background:#14261a;border:1px solid #2a5a3a;border-radius:6px;padding:4px 10px;text-decoration:none;">💰 Bet Tracker</a></div>
 
+{% if progressive is defined and progressive %}
+<div style="text-align:center;margin-bottom:20px;">
+  <div id="sim-progress" style="font-size:0.9rem;color:#64b5f6;font-weight:700;">Simulating games... <span id="sim-count">0</span>/{{ games|length }}</div>
+  <div style="width:300px;margin:10px auto;background:#252836;border-radius:8px;height:6px;overflow:hidden;">
+    <div id="sim-bar" style="width:0%;height:100%;background:#64b5f6;border-radius:8px;transition:width 0.3s;"></div>
+  </div>
+</div>
+{% endif %}
+
 <div class="games-grid">
+  {% if progressive is defined and progressive %}
+    {% for g in games %}
+    <div class="game-card" id="card-{{ g.gamePk }}" data-game-pk="{{ g.gamePk }}"
+         data-away-pct="50" data-home-pct="50" data-top-pct="50" data-top-ev="0"
+         data-away-ev="0" data-home-ev="0" data-ou="0">
+      <div class="matchup-row">
+        <div class="team-block away">
+          <div class="team-name">{{ g.away_team }}</div>
+          <div class="team-pct away" id="awp-{{ g.gamePk }}">—</div>
+          <div class="team-label">win prob</div>
+        </div>
+        <div class="at-divider">@</div>
+        <div class="team-block home">
+          <div class="team-name">{{ g.home_team }}</div>
+          <div class="team-pct home" id="hwp-{{ g.gamePk }}">—</div>
+          <div class="team-label">win prob</div>
+        </div>
+      </div>
+      <div id="body-{{ g.gamePk }}" style="text-align:center;padding:20px 0;">
+        <div class="spinner" style="display:inline-block;width:24px;height:24px;border:3px solid #353a52;border-top:3px solid #64b5f6;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+        <div style="color:#b0b8cc;font-size:0.8rem;margin-top:8px;">Simulating...</div>
+      </div>
+    </div>
+    {% endfor %}
+  {% endif %}
   {% for r in results %}
     {% set is_parlay = false %}
     {% for pick in parlay_picks %}
@@ -1668,7 +1704,145 @@ function toggleMode() {
 <script>
 function getCsrfToken(){return document.cookie.split(';').map(function(c){return c.trim();}).find(function(c){return c.startsWith('csrf_token=');})?.split('=')[1]||'';}
 function csrfFetch(url,opts){opts=opts||{};opts.headers=Object.assign({'X-CSRFToken':getCsrfToken()},opts.headers||{});return fetch(url,opts);}
-</script></body>
+</script>
+
+{% if progressive is defined and progressive %}
+<script>
+(function() {
+  var gamePks = [{% for g in games %}{{ g.gamePk }}{% if not loop.last %},{% endif %}{% endfor %}];
+  var total = gamePks.length;
+  var done = 0;
+  var results = [];
+
+  function updateProgress() {
+    done++;
+    var el = document.getElementById('sim-count');
+    if (el) el.textContent = done;
+    var bar = document.getElementById('sim-bar');
+    if (bar) bar.style.width = Math.round(done / total * 100) + '%';
+    if (done >= total) {
+      var prog = document.getElementById('sim-progress');
+      if (prog) prog.innerHTML = '<span style="color:#4caf50;">All ' + total + ' games simulated</span>';
+    }
+  }
+
+  function fillCard(pk, d) {
+    var awp = document.getElementById('awp-' + pk);
+    var hwp = document.getElementById('hwp-' + pk);
+    var body = document.getElementById('body-' + pk);
+    var card = document.getElementById('card-' + pk);
+    if (!card) return;
+
+    if (d.error) {
+      if (body) body.innerHTML = '<div style="color:#ef5350;font-size:0.82rem;">Lineup not available</div>';
+      return;
+    }
+
+    if (awp) awp.textContent = d.away_win_pct + '%';
+    if (hwp) hwp.textContent = d.home_win_pct + '%';
+
+    card.dataset.awayPct = d.away_win_pct;
+    card.dataset.homePct = d.home_win_pct;
+    card.dataset.topPct = Math.max(d.away_win_pct, d.home_win_pct);
+    card.dataset.awayEv = d.away_ev || 0;
+    card.dataset.homeEv = d.home_ev || 0;
+    card.dataset.topEv = Math.max(d.away_ev || -999, d.home_ev || -999);
+    card.dataset.ou = d.ou_line || 0;
+
+    if (Math.max(d.away_win_pct, d.home_win_pct) >= 65) {
+      card.classList.add('best-bet-card');
+    }
+
+    var html = '';
+
+    // Pitcher info
+    html += '<div style="display:flex;justify-content:space-between;font-size:0.78rem;color:#b0b8cc;">';
+    html += '<span>' + (d.away_pitcher_name || 'TBD') + ' <span style="color:#555870;">' + (d.away_era || '') + ' ERA</span></span>';
+    html += '<span><span style="color:#555870;">' + (d.home_era || '') + ' ERA</span> ' + (d.home_pitcher_name || 'TBD') + '</span>';
+    html += '</div>';
+
+    // Runs
+    html += '<div style="display:flex;justify-content:space-between;font-size:0.78rem;color:#b0b8cc;border-top:1px solid #252836;padding-top:8px;margin-top:4px;">';
+    html += '<span>Avg Runs: <b style="color:#64b5f6;">' + (d.avg_away_runs || '—') + '</b></span>';
+    html += '<span>Total: <b style="color:#ffd54f;">' + (d.avg_total_runs || '—') + '</b></span>';
+    html += '<span>Avg Runs: <b style="color:#81c784;">' + (d.avg_home_runs || '—') + '</b></span>';
+    html += '</div>';
+
+    // Cover %
+    if (d.away_cover_pct !== undefined) {
+      html += '<div style="display:flex;justify-content:space-between;font-size:0.72rem;color:#b0b8cc;margin-top:4px;">';
+      html += '<span>-1.5: ' + d.away_cover_pct + '%</span>';
+      html += '<span>-1.5: ' + d.home_cover_pct + '%</span>';
+      html += '</div>';
+    }
+
+    // Vegas odds
+    if (d.away_avg_odds) {
+      html += '<div style="display:flex;justify-content:space-between;font-size:0.74rem;color:#b0b8cc;margin-top:8px;border-top:1px solid rgba(255,255,255,0.05);padding-top:7px;">';
+      html += '<div><div style="font-weight:600;color:#b0bec5;">Vegas ' + d.away_avg_odds + '</div>';
+      if (d.away_edge !== null && d.away_edge !== undefined) {
+        var ec = d.away_edge > 0 ? '#4caf50' : '#ef5350';
+        html += '<div style="color:' + ec + ';font-weight:700;font-size:0.72rem;">Edge ' + (d.away_edge > 0 ? '+' : '') + d.away_edge + '%</div>';
+      }
+      html += '</div>';
+      html += '<div style="text-align:right;"><div style="font-weight:600;color:#b0bec5;">Vegas ' + d.home_avg_odds + '</div>';
+      if (d.home_edge !== null && d.home_edge !== undefined) {
+        var ec2 = d.home_edge > 0 ? '#4caf50' : '#ef5350';
+        html += '<div style="color:' + ec2 + ';font-weight:700;font-size:0.72rem;">Edge ' + (d.home_edge > 0 ? '+' : '') + d.home_edge + '%</div>';
+      }
+      html += '</div></div>';
+    }
+
+    // O/U
+    if (d.ou_line) {
+      html += '<div style="display:flex;justify-content:space-between;font-size:0.72rem;color:#b0b8cc;margin-top:4px;">';
+      html += '<span>O/U ' + d.ou_line + '</span>';
+      html += '<span>Over ' + (d.model_over_pct || '—') + '%</span>';
+      html += '<span>Under ' + (d.model_under_pct || '—') + '%</span>';
+      html += '</div>';
+    }
+
+    // F5
+    if (d.f5) {
+      html += '<div style="display:flex;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid #252836;">';
+      html += '<div style="flex:1;background:#0d1120;border-radius:8px;padding:6px 8px;text-align:center;font-size:0.7rem;">';
+      html += '<div style="color:#b0b8cc;text-transform:uppercase;letter-spacing:.4px;font-size:0.62rem;">F5</div>';
+      html += '<div style="color:#64b5f6;font-weight:700;font-size:0.85rem;">' + d.f5.away_win_pct + '%</div>';
+      html += '<div style="color:#81c784;font-weight:700;font-size:0.85rem;">' + d.f5.home_win_pct + '%</div>';
+      html += '</div></div>';
+    }
+
+    // Link to full sim
+    html += '<div style="text-align:center;margin-top:8px;">';
+    html += '<a href="/simulate/' + pk + '" style="color:#64b5f6;font-size:0.78rem;text-decoration:none;font-weight:600;">View Full Analysis →</a>';
+    html += '</div>';
+
+    if (body) body.innerHTML = html;
+  }
+
+  // Fetch games 3 at a time to avoid overwhelming the server
+  function fetchBatch(pks, idx) {
+    if (idx >= pks.length) return;
+    var batch = pks.slice(idx, idx + 3);
+    var promises = batch.map(function(pk) {
+      return csrfFetch('/api/sim-card/' + pk)
+        .then(function(r) { return r.json(); })
+        .then(function(d) { fillCard(pk, d); updateProgress(); results.push(d); })
+        .catch(function() {
+          fillCard(pk, {error: true});
+          updateProgress();
+        });
+    });
+    Promise.all(promises).then(function() {
+      fetchBatch(pks, idx + 3);
+    });
+  }
+
+  fetchBatch(gamePks, 0);
+})();
+</script>
+{% endif %}
+</body>
 </html>
 
 

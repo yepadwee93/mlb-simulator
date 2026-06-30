@@ -1476,18 +1476,10 @@ def load_props(game_pk):
 @login_required
 def simulate_all():
     """
-    Simulate every active game on today's slate.
-
-    Speed strategy:
-      1. Fetch all lineups in parallel
-      2. Collect every unique player ID across all games
-      3. Fetch ALL player stats in one big parallel batch (no duplicates)
-      4. Run simulations (fast — pre-computed probs)
-
-    This way we make the minimum number of API calls and run them
-    all at the same time, cutting total time from 3+ minutes to ~20-30s.
+    Load the schedule instantly, then simulate each game via AJAX.
+    Each game is fetched individually by /api/sim-card/<game_pk>,
+    keeping every request well under Vercel's timeout.
     """
-    # Use date from query param (passed by index.html button) so UTC clock drift doesn't shift the date
     from datetime import datetime as _dt
 
     _date_str = request.args.get("date", _today_est().isoformat())
@@ -1498,7 +1490,6 @@ def simulate_all():
 
     all_games = get_today_schedule(game_date=_sim_date.isoformat())
 
-    # Skip finished games
     games = [
         g
         for g in all_games
@@ -1516,352 +1507,22 @@ def simulate_all():
             )
         )
 
-    # ── Step 1: Fetch all lineups in parallel ─────────────────────
-    lineups = {}
-
-    def fetch_lineup(game):
-        try:
-            lu = get_game_lineup(game["gamePk"])
-            if lu["away_batters"] and lu["home_batters"]:
-                return game["gamePk"], lu
-        except Exception:
-            pass
-        return game["gamePk"], None
-
-    with ThreadPoolExecutor(max_workers=9) as ex:
-        for gk, lu in ex.map(fetch_lineup, games):
-            if lu:
-                lineups[gk] = lu
-
-    # ── Step 2: Collect all unique player IDs ─────────────────────
-    batter_ids = set()
-    pitcher_ids = set()
-    for lu in lineups.values():
-        for b in lu["away_batters"] + lu["home_batters"]:
-            if b.get("id"):
-                batter_ids.add(b["id"])
-        for side in ("away_pitcher", "home_pitcher"):
-            p = lu.get(side)
-            if p and p.get("id"):
-                pitcher_ids.add(p["id"])
-
-    # ── Step 3: Fetch all stats in one parallel batch ─────────────
-    batter_cache = {}
-    pitcher_cache = {}
-
-    def _fetch_batter(pid):
-        try:
-            return pid, get_player_season_stats(pid, group="hitting")
-        except Exception:
-            return pid, {}
-
-    def _fetch_pitcher(pid):
-        try:
-            return pid, get_player_season_stats(pid, group="pitching")
-        except Exception:
-            return pid, {}
-
-    with ThreadPoolExecutor(max_workers=20) as ex:
-        for pid, stats in ex.map(_fetch_batter, batter_ids):
-            batter_cache[pid] = stats
-        for pid, stats in ex.map(_fetch_pitcher, pitcher_ids):
-            pitcher_cache[pid] = stats
-
-    # ── Step 4: Fetch weather for each venue ──────────────────────
-    venue_weather = {}
-    unique_venues = {g["venue"] for g in games}
-
-    def _fetch_weather(venue):
-        try:
-            return venue, get_ballpark_weather(venue)
-        except Exception:
-            return venue, {}
-
-    with ThreadPoolExecutor(max_workers=9) as ex:
-        for venue, w in ex.map(_fetch_weather, unique_venues):
-            venue_weather[venue] = w
-
-    # ── Step 5: Run simulations ───────────────────────────────────
-    results = []
-    for game in games:
-        lu = lineups.get(game["gamePk"])
-        if not lu:
-            continue
-
-        away_pitcher = lu.get("away_pitcher") or {}
-        home_pitcher = lu.get("home_pitcher") or {}
-        away_ps = pitcher_cache.get(away_pitcher.get("id"), {})
-        home_ps = pitcher_cache.get(home_pitcher.get("id"), {})
-        weather = venue_weather.get(game["venue"], {})
-
-        away_stats = [batter_cache.get(b["id"], {}) for b in lu["away_batters"]]
-        home_stats = [batter_cache.get(b["id"], {}) for b in lu["home_batters"]]
-
-        result = run_simulation(
-            away_team=game["away_team"],
-            home_team=game["home_team"],
-            away_lineup=away_stats,
-            home_lineup=home_stats,
-            away_pitcher=away_ps,
-            home_pitcher=home_ps,
-            weather=weather,
-            venue=game["venue"],
-            n=N_SIMS_ALL,
-        )
-        result.update(
-            {
-                "gamePk": game["gamePk"],
-                "venue": game["venue"],
-                "status": game["status"],
-                "away_pitcher_name": away_pitcher.get("name", "TBD"),
-                "home_pitcher_name": home_pitcher.get("name", "TBD"),
-                "away_pitcher_hand": "R",
-                "home_pitcher_hand": "R",
-                "away_era": away_ps.get("era", "N/A"),
-                "away_whip": away_ps.get("whip", "N/A"),
-                "away_wl": f"{away_ps.get('wins', 0)}-{away_ps.get('losses', 0)}",
-                "home_era": home_ps.get("era", "N/A"),
-                "home_whip": home_ps.get("whip", "N/A"),
-                "home_wl": f"{home_ps.get('wins', 0)}-{home_ps.get('losses', 0)}",
-                "away_batters": lu["away_batters"],
-                "home_batters": lu["home_batters"],
-                "weather": weather,
-                "game_time_utc": game.get("game_time", ""),
-            }
-        )
-        results.append(result)
-
-    results.sort(key=lambda r: r["gamePk"])
-
-    if not results:
-        from flask import redirect, url_for
-
-        return redirect(
-            url_for(
-                "index",
-                date=_sim_date.isoformat(),
-                error="Lineups not posted yet for remaining games — check back closer to game time.",
-            )
-        )
-
-    # ── Log predictions for accuracy tracking ─────────────────
-    try:
-        for r in results:
-            predicted_winner = (
-                r["away_team"] if r["away_win_pct"] >= r["home_win_pct"] else r["home_team"]
-            )
-            predicted_win_pct = max(r["away_win_pct"], r["home_win_pct"])
-            predicted_total = r.get("avg_away_runs", 0) + r.get("avg_home_runs", 0)
-            log_prediction(
-                game_pk=r["gamePk"],
-                game_date=_today_est().isoformat(),
-                away_team=r["away_team"],
-                home_team=r["home_team"],
-                away_win_pct=r["away_win_pct"],
-                home_win_pct=r["home_win_pct"],
-                away_avg_runs=r.get("avg_away_runs", 0),
-                home_avg_runs=r.get("avg_home_runs", 0),
-                n_sims=N_SIMS_ALL,
-            )
-    except Exception:
-        pass
-
-    # ── Build the Best Parlay ──────────────────────────────────
-    # A parlay is a bet where you pick multiple games and all must win.
-    # We pick games where one team has ≥60% win probability.
-    parlay_picks = []
-    for r in results:
-        if r["away_win_pct"] >= PARLAY_THRESHOLD:
-            parlay_picks.append(
-                {
-                    "team": r["away_team"],
-                    "opponent": r["home_team"],
-                    "win_pct": r["away_win_pct"],
-                    "avg_runs": r["away_avg_runs"],
-                    "venue": r["venue"],
-                }
-            )
-        elif r["home_win_pct"] >= PARLAY_THRESHOLD:
-            parlay_picks.append(
-                {
-                    "team": r["home_team"],
-                    "opponent": r["away_team"],
-                    "win_pct": r["home_win_pct"],
-                    "avg_runs": r["home_avg_runs"],
-                    "venue": r["venue"],
-                }
-            )
-
-    # Combined parlay probability = multiply all individual win chances
-    combined_prob = 1.0
-    for pick in parlay_picks:
-        combined_prob *= pick["win_pct"] / 100.0
-    combined_prob_pct = round(combined_prob * 100, 1)
-
-    # ── Parlay EV calculator ──────────────────────────────────────────
-    parlay_ev = None
-    parlay_true_odds = None
-    parlay_book_odds = None
-    if len(parlay_picks) >= 2:
-        true_decimal = 1.0
-        for pick in parlay_picks:
-            true_decimal *= 1.0 / (pick["win_pct"] / 100.0)
-        book_decimal = 1.909 ** len(parlay_picks)
-        parlay_ev = round(combined_prob * (book_decimal - 1) * 100 - (1 - combined_prob) * 100, 1)
-        if true_decimal >= 2.0:
-            parlay_true_odds = "+" + str(int((true_decimal - 1) * 100))
-        else:
-            parlay_true_odds = "-" + str(int(100 / (true_decimal - 1)))
-        if book_decimal >= 2.0:
-            parlay_book_odds = "+" + str(int((book_decimal - 1) * 100))
-        else:
-            parlay_book_odds = "-" + str(int(100 / (book_decimal - 1)))
-
-    # ── Confidence-tiered best bets ───────────────────────────────────
-    # Only show games where the model has enough conviction to matter.
-    # 62-64% = moderate edge, 65-69% = good, 70%+ = strong lean
-    best_bets = []
-    for r in results:
-        fav_team = None
-        fav_pct = None
-        fav_opp = None
-
-        if r["away_win_pct"] >= r["home_win_pct"] and r["away_win_pct"] >= BET_THRESHOLD:
-            fav_team, fav_pct, fav_opp = r["away_team"], r["away_win_pct"], r["home_team"]
-        elif r["home_win_pct"] > r["away_win_pct"] and r["home_win_pct"] >= BET_THRESHOLD:
-            fav_team, fav_pct, fav_opp = r["home_team"], r["home_win_pct"], r["away_team"]
-
-        if fav_team:
-            if fav_pct >= 70:
-                tier, tier_label, tier_color = "strong", "🔥 Strong (70%+)", "#ef5350"
-            elif fav_pct >= 65:
-                tier, tier_label, tier_color = "good", "✅ Good (65-69%)", "#4caf50"
-            else:
-                tier, tier_label, tier_color = "moderate", "💛 Moderate (62-64%)", "#ffd54f"
-
-            best_bets.append(
-                {
-                    "team": fav_team,
-                    "opponent": fav_opp,
-                    "win_pct": fav_pct,
-                    "tier": tier,
-                    "tier_label": tier_label,
-                    "tier_color": tier_color,
-                    "venue": r["venue"],
-                    "gamePk": r["gamePk"],
-                }
-            )
-
-    best_bets.sort(key=lambda b: b["win_pct"], reverse=True)
-
-    # ── Fetch Vegas odds and attach to each result ────────────────────────────
-    # Uses the same cached call as the single-game view (30-min cache).
-    # Matches by frozenset({away_team, home_team}) so order doesn't matter.
-    try:
-        all_odds = get_mlb_odds()
-    except Exception:
-        all_odds = {}
-
-    for r in results:
-        odds_key = frozenset([r["away_team"], r["home_team"]])
-        game_odds = all_odds.get(odds_key, {})
-        if game_odds:
-            r["away_implied_pct"] = game_odds["away_implied_pct"]
-            r["home_implied_pct"] = game_odds["home_implied_pct"]
-            r["away_avg_odds"] = format_odds(game_odds["away_avg_odds"])
-            r["home_avg_odds"] = format_odds(game_odds["home_avg_odds"])
-            r["away_edge"] = calc_edge(r["away_win_pct"], game_odds["away_implied_pct"])
-            r["home_edge"] = calc_edge(r["home_win_pct"], game_odds["home_implied_pct"])
-            r["away_ev"] = calc_ev(r["away_win_pct"], game_odds["away_avg_odds"])
-            r["home_ev"] = calc_ev(r["home_win_pct"], game_odds["home_avg_odds"])
-            r["away_kelly"] = calc_kelly(r["away_win_pct"], game_odds["away_avg_odds"])
-            r["home_kelly"] = calc_kelly(r["home_win_pct"], game_odds["home_avg_odds"])
-        else:
-            for k in (
-                "away_implied_pct",
-                "home_implied_pct",
-                "away_avg_odds",
-                "home_avg_odds",
-                "away_edge",
-                "home_edge",
-                "away_ev",
-                "home_ev",
-                "away_kelly",
-                "home_kelly",
-            ):
-                r[k] = None
-        # O/U + run line per game card
-        try:
-            all_totals = get_mlb_totals()
-            all_rl = get_mlb_runline()
-            ok = frozenset([r["away_team"], r["home_team"]])
-            ou = all_totals.get(ok, {})
-            if ou:
-                hist = r.get("total_runs_hist", {})
-                ns = r.get("simulations", 1)
-                oul = ou["line"]
-                oc = sum(cnt for tot, cnt in hist.items() if tot > oul)
-                mo = round(oc / ns * 100, 1)
-                r["ou_line"] = oul
-                r["model_over_pct"] = mo
-                r["model_under_pct"] = round(100 - mo, 1)
-                r["ou_over_implied"] = ou["over_implied"]
-                r["ou_under_implied"] = ou["under_implied"]
-                r["ou_over_odds"] = format_odds(ou["over_odds"])
-                r["ou_under_odds"] = format_odds(ou["under_odds"])
-                r["ou_over_edge"] = round(mo - ou["over_implied"], 1)
-                r["ou_under_edge"] = round((100 - mo) - ou["under_implied"], 1)
-                r["ou_over_ev"] = calc_ev(mo, ou["over_odds"])
-                r["ou_under_ev"] = calc_ev(100 - mo, ou["under_odds"])
-            rl = all_rl.get(ok, {})
-            if rl:
-                r["away_rl_odds"] = format_odds(rl["away_rl_odds"])
-                r["home_rl_odds"] = format_odds(rl["home_rl_odds"])
-                r["away_rl_implied"] = rl["away_rl_implied"]
-                r["home_rl_implied"] = rl["home_rl_implied"]
-                r["away_rl_edge"] = round(r.get("away_cover_pct", 0) - rl["away_rl_implied"], 1)
-                r["home_rl_edge"] = round(r.get("home_cover_pct", 0) - rl["home_rl_implied"], 1)
-                r["away_rl_ev"] = calc_ev(r.get("away_cover_pct", 0), rl["away_rl_odds"])
-                r["home_rl_ev"] = calc_ev(r.get("home_cover_pct", 0), rl["home_rl_odds"])
-        except Exception:
-            pass
-
-    # ── Line movement / sharp money signals ─────────────────────────
-    try:
-        movement = get_line_movement()
-        for r in results:
-            mv = movement.get(frozenset([r["away_team"], r["home_team"]]), {})
-            r["sharp_away"] = mv.get("sharp_away", False)
-            r["sharp_home"] = mv.get("sharp_home", False)
-            r["away_impl_move"] = mv.get("away_impl_move", 0)
-            r["home_impl_move"] = mv.get("home_impl_move", 0)
-            r["away_open_odds"] = format_odds(mv["away_open"]) if mv.get("away_open") else None
-            r["home_open_odds"] = format_odds(mv["home_open"]) if mv.get("home_open") else None
-    except Exception:
-        pass
-
-    # Also attach odds to best_bets entries
-    for b in best_bets:
-        r_match = next((r for r in results if r["gamePk"] == b["gamePk"]), {})
-        is_away = b["team"] == r_match.get("away_team")
-        b["implied_pct"] = r_match.get("away_implied_pct" if is_away else "home_implied_pct")
-        b["odds_str"] = r_match.get("away_avg_odds" if is_away else "home_avg_odds")
-        b["edge"] = r_match.get("away_edge" if is_away else "home_edge")
-
     today = _today_est().strftime("%A, %B %d %Y")
     return render_template(
         "all_results.html",
-        results=results,
-        parlay_picks=parlay_picks,
-        combined_prob=combined_prob_pct,
-        parlay_ev=parlay_ev,
-        parlay_true_odds=parlay_true_odds,
-        parlay_book_odds=parlay_book_odds,
-        best_bets=best_bets,
+        games=games,
+        results=[],
+        parlay_picks=[],
+        combined_prob=0,
+        parlay_ev=None,
+        parlay_true_odds=None,
+        parlay_book_odds=None,
+        best_bets=[],
         date=today,
         n_sims=N_SIMS_ALL,
         api_remaining=get_requests_remaining(),
         username=current_user.username,
+        progressive=True,
     )
 
 
@@ -2006,6 +1667,84 @@ def sgp_calc(game_pk):
             "uncorrelated_prob": round(uncorrelated_prob * 100, 2),
         }
     )
+
+
+@app.route("/api/sim-card/<int:game_pk>")
+@login_required
+def api_sim_card(game_pk):
+    """Simulate one game and return JSON for the all-games grid card."""
+    games = get_today_schedule()
+    game = next((g for g in games if g["gamePk"] == game_pk), None)
+    if game is None:
+        return jsonify({"error": "Game not found"}), 404
+
+    try:
+        result = build_game_result(game, n_sims=N_SIMS_ALL, use_splits=False)
+    except Exception:
+        result = None
+    if result is None:
+        return jsonify({"error": "Lineup not available"}), 404
+
+    result["gamePk"] = game_pk
+
+    # Attach Vegas odds
+    try:
+        all_odds = get_mlb_odds()
+        odds_key = frozenset([result["away_team"], result["home_team"]])
+        game_odds = all_odds.get(odds_key, {})
+        if game_odds:
+            result["away_implied_pct"] = game_odds["away_implied_pct"]
+            result["home_implied_pct"] = game_odds["home_implied_pct"]
+            result["away_avg_odds"] = format_odds(game_odds["away_avg_odds"])
+            result["home_avg_odds"] = format_odds(game_odds["home_avg_odds"])
+            result["away_edge"] = calc_edge(result["away_win_pct"], game_odds["away_implied_pct"])
+            result["home_edge"] = calc_edge(result["home_win_pct"], game_odds["home_implied_pct"])
+            result["away_ev"] = calc_ev(result["away_win_pct"], game_odds["away_avg_odds"])
+            result["home_ev"] = calc_ev(result["home_win_pct"], game_odds["home_avg_odds"])
+    except Exception:
+        pass
+
+    # Attach O/U
+    try:
+        all_totals = get_mlb_totals()
+        ok = frozenset([result["away_team"], result["home_team"]])
+        ou = all_totals.get(ok, {})
+        if ou:
+            hist = result.get("total_runs_hist", {})
+            ns = result.get("simulations", 1)
+            oul = ou["line"]
+            oc = sum(cnt for tot, cnt in hist.items() if tot > oul)
+            mo = round(oc / ns * 100, 1)
+            result["ou_line"] = oul
+            result["model_over_pct"] = mo
+            result["model_under_pct"] = round(100 - mo, 1)
+    except Exception:
+        pass
+
+    # Log prediction
+    try:
+        log_prediction(
+            game_pk=game_pk,
+            game_date=_today_est().isoformat(),
+            away_team=result["away_team"],
+            home_team=result["home_team"],
+            away_win_pct=result["away_win_pct"],
+            home_win_pct=result["home_win_pct"],
+            away_avg_runs=result.get("avg_away_runs", 0),
+            home_avg_runs=result.get("avg_home_runs", 0),
+            n_sims=N_SIMS_ALL,
+        )
+    except Exception:
+        pass
+
+    # Strip non-serializable data
+    for key in list(result.keys()):
+        if key == "score_pairs":
+            result[key] = {str(k): v for k, v in result[key].items()} if result[key] else {}
+        elif key == "total_runs_hist":
+            result[key] = {str(k): v for k, v in result[key].items()} if result[key] else {}
+
+    return jsonify(result)
 
 
 @app.route("/parlay")
