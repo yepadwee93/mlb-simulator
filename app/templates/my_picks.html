@@ -467,9 +467,27 @@ function submitPick() {
 // ── Check results ────────────────────────────────────────────────
 function clearAllPicks() {
   if (!confirm('Clear all picks? This cannot be undone.')) return;
-  csrfFetch('/my-picks/clear', { method: 'POST' })
+  csrfFetch('/my-picks/clear', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' }
+  })
     .then(function(r) { return r.json(); })
-    .then(function() { window.location.reload(); });
+    .then(function(data) {
+      var msg = document.getElementById('update-msg');
+      if (data.deleted > 0) {
+        msg.textContent = data.deleted + ' picks cleared!';
+        msg.style.color = '#4caf50';
+        setTimeout(function() { window.location.reload(); }, 800);
+      } else {
+        msg.textContent = data.error || 'No picks to clear (or delete blocked)';
+        msg.style.color = '#ef5350';
+      }
+    })
+    .catch(function(err) {
+      var msg = document.getElementById('update-msg');
+      msg.textContent = 'Error: ' + err.message;
+      msg.style.color = '#ef5350';
+    });
 }
 
 function checkResults() {
