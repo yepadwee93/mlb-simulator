@@ -242,35 +242,35 @@
 <div class="log-form">
   <h3>Log a Bet</h3>
   <div class="form-grid">
-    <div class="form-group">
-      <label>Game PK</label>
-      <input id="lb-gpk" type="number" placeholder="e.g. 745519">
+    <div class="form-group" style="grid-column:1/-1;">
+      <label>Pick a Game</label>
+      <select id="lb-game" onchange="onGamePick()" style="font-size:0.9rem;">
+        <option value="">Loading today's games...</option>
+      </select>
     </div>
+    <input id="lb-gpk" type="hidden">
+    <input id="lb-date" type="hidden" value="{{ today }}">
+    <input id="lb-away" type="hidden">
+    <input id="lb-home" type="hidden">
     <div class="form-group">
-      <label>Game Date</label>
-      <input id="lb-date" type="date" value="{{ today }}">
-    </div>
-    <div class="form-group">
-      <label>Away Team</label>
-      <input id="lb-away" type="text" placeholder="e.g. Dodgers">
-    </div>
-    <div class="form-group">
-      <label>Home Team</label>
-      <input id="lb-home" type="text" placeholder="e.g. Yankees">
+      <label>Bet Type</label>
+      <select id="lb-type" onchange="updateBetOnOptions()">
+        <option value="ML">Moneyline</option>
+        <option value="RL">Run Line</option>
+        <option value="OVER">Over</option>
+        <option value="UNDER">Under</option>
+        <option value="F5">First 5</option>
+      </select>
     </div>
     <div class="form-group">
       <label>Bet On</label>
-      <input id="lb-beton" type="text" placeholder="Team name / OVER 8.5">
+      <select id="lb-beton">
+        <option value="">Pick a game first</option>
+      </select>
     </div>
     <div class="form-group">
-      <label>Bet Type</label>
-      <select id="lb-type">
-        <option>ML</option>
-        <option>RL</option>
-        <option>OVER</option>
-        <option>UNDER</option>
-        <option>F5</option>
-      </select>
+      <label>O/U Line</label>
+      <input id="lb-ouline" type="number" step="0.5" value="8.5" placeholder="8.5" style="display:none;">
     </div>
     <div class="form-group">
       <label>Odds (American)</label>
@@ -367,21 +367,102 @@ function saveUnit() {
 }
 window.addEventListener('load', loadUnit);
 
+// ── Game picker logic ──
+var _todayGames = [];
+
+function loadTodayGames() {
+  fetch('/api/scores').then(function(r){return r.json();}).then(function(games){
+    _todayGames = games;
+    var sel = document.getElementById('lb-game');
+    sel.innerHTML = '<option value="">— Select a game —</option>';
+    games.forEach(function(g, i) {
+      var status = g.status || '';
+      var label = g.away + ' @ ' + g.home;
+      if (status) label += ' (' + status + ')';
+      var opt = document.createElement('option');
+      opt.value = i;
+      opt.textContent = label;
+      sel.appendChild(opt);
+    });
+  }).catch(function(){
+    var sel = document.getElementById('lb-game');
+    sel.innerHTML = '<option value="">Could not load games</option>';
+  });
+}
+
+function onGamePick() {
+  var idx = document.getElementById('lb-game').value;
+  if (idx === '') return;
+  var g = _todayGames[parseInt(idx)];
+  document.getElementById('lb-gpk').value = g.gamePk;
+  document.getElementById('lb-away').value = g.away;
+  document.getElementById('lb-home').value = g.home;
+  updateBetOnOptions();
+}
+
+function updateBetOnOptions() {
+  var away = document.getElementById('lb-away').value;
+  var home = document.getElementById('lb-home').value;
+  var type = document.getElementById('lb-type').value;
+  var sel = document.getElementById('lb-beton');
+  var ouLine = document.getElementById('lb-ouline');
+
+  sel.innerHTML = '';
+
+  if (!away || !home) {
+    sel.innerHTML = '<option value="">Pick a game first</option>';
+    ouLine.style.display = 'none';
+    return;
+  }
+
+  if (type === 'ML' || type === 'F5') {
+    sel.innerHTML = '<option value="' + away + '">' + away + '</option>'
+                  + '<option value="' + home + '">' + home + '</option>';
+    ouLine.style.display = 'none';
+  } else if (type === 'RL') {
+    sel.innerHTML = '<option value="' + away + ' -1.5">' + away + ' -1.5</option>'
+                  + '<option value="' + home + ' +1.5">' + home + ' +1.5</option>'
+                  + '<option value="' + away + ' +1.5">' + away + ' +1.5</option>'
+                  + '<option value="' + home + ' -1.5">' + home + ' -1.5</option>';
+    ouLine.style.display = 'none';
+  } else if (type === 'OVER' || type === 'UNDER') {
+    ouLine.style.display = '';
+    var line = ouLine.value || '8.5';
+    if (type === 'OVER') {
+      sel.innerHTML = '<option value="OVER ' + line + '">Over ' + line + '</option>';
+    } else {
+      sel.innerHTML = '<option value="UNDER ' + line + '">Under ' + line + '</option>';
+    }
+    ouLine.oninput = function() {
+      var l = ouLine.value;
+      if (type === 'OVER') {
+        sel.innerHTML = '<option value="OVER ' + l + '">Over ' + l + '</option>';
+      } else {
+        sel.innerHTML = '<option value="UNDER ' + l + '">Under ' + l + '</option>';
+      }
+    };
+  }
+}
+
+// Load games on page load
+loadTodayGames();
+
 async function logBet() {
   const msg = document.getElementById('lb-msg');
+  const betOn = document.getElementById('lb-beton');
   const payload = {
     game_pk:    document.getElementById('lb-gpk').value,
     game_date:  document.getElementById('lb-date').value,
     away_team:  document.getElementById('lb-away').value,
     home_team:  document.getElementById('lb-home').value,
-    bet_on:     document.getElementById('lb-beton').value,
+    bet_on:     betOn.value || betOn.options[betOn.selectedIndex]?.text || '',
     bet_type:   document.getElementById('lb-type').value,
     odds:       document.getElementById('lb-odds').value,
     amount:     document.getElementById('lb-amount').value,
     model_edge: document.getElementById('lb-edge').value,
   };
   if (!payload.game_pk || !payload.bet_on || !payload.odds || !payload.amount) {
-    msg.className = 'msg err'; msg.textContent = 'Fill in Game PK, Bet On, Odds, and Amount.'; return;
+    msg.className = 'msg err'; msg.textContent = 'Pick a game, bet type, odds, and amount.'; return;
   }
   try {
     const r = await csrfFetch('/bets/log', {
