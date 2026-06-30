@@ -272,6 +272,65 @@ def get_all_predictions():
     return res.data or []
 
 
+def get_team_trends(days=7):
+    """
+    Rolling accuracy by team over the last N days.
+    Returns list of {team, wins, losses, pct, streak} sorted by pct desc.
+    """
+    from datetime import timedelta
+
+    cutoff = (datetime.utcnow() - timedelta(days=days)).strftime("%Y-%m-%d")
+    res = (
+        supa()
+        .table("predictions")
+        .select("predicted_winner, correct_pick, away_team, home_team, game_date")
+        .not_.is_("correct_pick", "null")
+        .gte("game_date", cutoff)
+        .order("game_date", desc=True)
+        .execute()
+    )
+    rows = res.data or []
+
+    teams = {}
+    for r in rows:
+        pw = r.get("predicted_winner", "")
+        if not pw:
+            continue
+        correct = int(r.get("correct_pick", 0))
+        if pw not in teams:
+            teams[pw] = {"wins": 0, "losses": 0, "results": []}
+        if correct:
+            teams[pw]["wins"] += 1
+        else:
+            teams[pw]["losses"] += 1
+        teams[pw]["results"].append(correct)
+
+    out = []
+    for team, d in teams.items():
+        total = d["wins"] + d["losses"]
+        if total < 2:
+            continue
+        streak = 0
+        for r in d["results"]:
+            if r == d["results"][0]:
+                streak += 1
+            else:
+                break
+        streak_label = f"W{streak}" if d["results"][0] == 1 else f"L{streak}"
+        out.append(
+            {
+                "team": team,
+                "wins": d["wins"],
+                "losses": d["losses"],
+                "pct": round(d["wins"] / total * 100, 1),
+                "streak": streak_label,
+            }
+        )
+
+    out.sort(key=lambda x: x["pct"], reverse=True)
+    return out
+
+
 def get_single_game_predictions():
     """Returns only manually-run (single-game) predictions, newest first."""
     res = (

@@ -409,6 +409,27 @@ if (localStorage.getItem('email_nudge_dismissed') === '1') {
 </div>
 {% endif %}
 
+<!-- Trending Teams (7-day model accuracy) -->
+{% if team_trends %}
+<div style="background:#1a2a1a;border:1px solid #2a5a3a;border-radius:12px;padding:14px 20px;margin-bottom:20px;">
+  <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#4caf50;margin-bottom:10px;">
+    Model Hot Picks (Last 7 Days)
+  </div>
+  <div style="display:flex;gap:10px;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;">
+    {% for t in team_trends[:8] %}
+    <div style="flex-shrink:0;background:#0d1120;border:1px solid {% if t.pct >= 70 %}#2a5a3a{% else %}#252836{% endif %};border-radius:10px;padding:8px 14px;min-width:100px;text-align:center;">
+      <div style="font-size:0.82rem;font-weight:700;color:#e8eaf0;">{{ t.team.split(' ')[-1] }}</div>
+      <div style="font-size:1.1rem;font-weight:800;color:{% if t.pct >= 70 %}#4caf50{% elif t.pct >= 50 %}#ffa726{% else %}#ef5350{% endif %};">{{ t.pct }}%</div>
+      <div style="font-size:0.65rem;color:#9aa0b8;">{{ t.wins }}-{{ t.losses }} · {{ t.streak }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  <div style="font-size:0.63rem;color:#2a5a3a;margin-top:8px;">
+    Teams where our model has been most accurate picking winners recently
+  </div>
+</div>
+{% endif %}
+
 <!-- Games grid -->
 {% if games %}
 <div class="games-grid">
@@ -498,8 +519,24 @@ if (localStorage.getItem('email_nudge_dismissed') === '1') {
 
         {% if pub.sharp_indicator %}
         <div style="margin-top:4px; color:#ffd54f; font-size:0.68rem; font-weight:600;">
-          ⚡ Sharp money: {{ home_team if pub.sharp_indicator == 'home' else away_team }}
+          ⚡ Sharp money: {{ game.home_team if pub.sharp_indicator == 'home' else game.away_team }}
         </div>
+        {% endif %}
+
+        {# Money vs public divergence badge #}
+        {% if pub.away_money_pct is defined and pub.away_money_pct %}
+          {% set bet_diff = (pub.away_bet_pct - pub.away_money_pct)|abs %}
+          {% if bet_diff >= 15 %}
+          <div style="margin-top:5px;padding:4px 8px;background:#2a1a0a;border:1px solid #ff8f00;border-radius:6px;font-size:0.68rem;font-weight:700;color:#ffd54f;display:flex;align-items:center;gap:5px;">
+            💰 Sharp Split —
+            {% if pub.away_money_pct > pub.away_bet_pct %}
+              {{ (pub.away_money_pct)|round(0)|int }}% money on {{ game.away_team.split(' ')[-1] }} vs {{ pub.away_bet_pct|round(0)|int }}% bets
+            {% else %}
+              {{ (pub.home_money_pct|default(100 - pub.away_money_pct))|round(0)|int }}% money on {{ game.home_team.split(' ')[-1] }} vs {{ pub.home_bet_pct|round(0)|int }}% bets
+            {% endif %}
+            <span style="color:#ffab40;font-weight:400;">({{ bet_diff|round(0)|int }}pt gap)</span>
+          </div>
+          {% endif %}
         {% endif %}
       </div>
       {% endif %}

@@ -97,6 +97,7 @@ from data.tracker import (
     get_game_notes,
     get_odds_history,
     get_prop_accuracy,
+    get_team_trends,
     log_odds,
     log_prediction,
     log_prop_predictions,
@@ -1068,6 +1069,13 @@ def index():
     except Exception:
         pass
 
+    # Team trends (rolling 7-day accuracy)
+    team_trends = []
+    try:
+        team_trends = get_team_trends(days=7)
+    except Exception:
+        pass
+
     return render_template(
         "index.html",
         games=games,
@@ -1080,6 +1088,7 @@ def index():
         line_movement=line_movement,
         rlm_alerts=rlm_alerts,
         multi_day=multi_day,
+        team_trends=team_trends,
         game_notes=get_game_notes(current_user.id) if current_user.is_authenticated else {},
         api_remaining=get_requests_remaining(),
         show_email_nudge=show_email_nudge,
@@ -1432,7 +1441,9 @@ def simulate(game_pk):
     except Exception:
         pass
 
-    return render_template("result.html", game_pk=game_pk, n_sims=n_sims, **result)
+    return render_template(
+        "result.html", game_pk=game_pk, n_sims=n_sims, game_date=_today_est().isoformat(), **result
+    )
 
 
 def _build_stadium_profile(venue, away_batters, home_batters):

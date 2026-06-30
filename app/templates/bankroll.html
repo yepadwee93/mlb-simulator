@@ -201,7 +201,7 @@ function recalculate(startBR) {
   fetchBets().then(bets => {
     // Filter settled bets only, sort by date
     const settled = bets
-      .filter(b => b.result === 'WIN' || b.result === 'LOSS' || b.result === 'PUSH')
+      .filter(b => { var r = (b.result||'').toLowerCase(); return r === 'win' || r === 'loss' || r === 'push'; })
       .sort((a, b) => a.game_date > b.game_date ? 1 : -1);
 
     // Build balance curve
@@ -213,7 +213,7 @@ function recalculate(startBR) {
     const balances = [startBR];
 
     settled.forEach(b => {
-      const pl = parseFloat(b.profit_loss) || 0;
+      const pl = parseFloat(b.payout) || parseFloat(b.profit_loss) || 0;
       const amt = parseFloat(b.amount) || 0;
       balance += pl;
       totalWagered += amt;
@@ -226,8 +226,8 @@ function recalculate(startBR) {
 
     const totalPL = balance - startBR;
     const roi = totalWagered > 0 ? totalPL / totalWagered * 100 : 0;
-    const wins = settled.filter(b => b.result === 'WIN').length;
-    const losses = settled.filter(b => b.result === 'LOSS').length;
+    const wins = settled.filter(b => (b.result||'').toLowerCase() === 'win').length;
+    const losses = settled.filter(b => (b.result||'').toLowerCase() === 'loss').length;
 
     // Update summary cards
     document.getElementById('br-stats').innerHTML = `
@@ -279,6 +279,38 @@ function recalculate(startBR) {
         plugins: { legend: { labels: { color: '#b0b8cc' } } }
       }
     });
+
+    // CLV stats
+    const clvBets = bets.filter(b => b.clv != null && b.clv !== '');
+    const avgClv = clvBets.length > 0 ? clvBets.reduce((s,b) => s + parseFloat(b.clv||0), 0) / clvBets.length : null;
+    const clvPositive = clvBets.filter(b => parseFloat(b.clv||0) > 0).length;
+    const clvHtml = avgClv !== null
+      ? `<div class="stat-card"><div class="stat-label">Avg CLV</div>
+          <div class="stat-val ${avgClv >= 0 ? 'green' : 'red'}">${avgClv >= 0 ? '+' : ''}${avgClv.toFixed(1)}%</div>
+          <div style="font-size:0.7rem;color:#9aa0b8;margin-top:3px;">${clvPositive}/${clvBets.length} beat close</div></div>`
+      : '';
+    document.getElementById('br-stats').innerHTML += clvHtml;
+
+    // Daily P&L breakdown
+    const dailyPL = {};
+    settled.forEach(b => {
+      const d = b.game_date || 'unknown';
+      if (!dailyPL[d]) dailyPL[d] = {pl: 0, w: 0, l: 0};
+      dailyPL[d].pl += parseFloat(b.payout||b.profit_loss||0);
+      if ((b.result||'').toLowerCase() === 'win') dailyPL[d].w++;
+      if ((b.result||'').toLowerCase() === 'loss') dailyPL[d].l++;
+    });
+    const dailyKeys = Object.keys(dailyPL).sort();
+    if (dailyKeys.length > 0) {
+      let dailyHtml = '<div class="section"><div class="section-title">📅 Daily P&L</div><div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:0.8rem;"><thead><tr><th style="text-align:left;color:#9aa0b8;padding:6px 10px;border-bottom:1px solid #252836;">Date</th><th style="text-align:center;color:#9aa0b8;padding:6px 10px;border-bottom:1px solid #252836;">Record</th><th style="text-align:right;color:#9aa0b8;padding:6px 10px;border-bottom:1px solid #252836;">P&L</th></tr></thead><tbody>';
+      dailyKeys.reverse().forEach(d => {
+        const day = dailyPL[d];
+        const plColor = day.pl >= 0 ? '#4caf50' : '#ef5350';
+        dailyHtml += '<tr><td style="padding:6px 10px;border-bottom:1px solid #1a1e2e;color:#b0b8cc;">' + d + '</td><td style="text-align:center;padding:6px 10px;border-bottom:1px solid #1a1e2e;">' + day.w + '-' + day.l + '</td><td style="text-align:right;padding:6px 10px;border-bottom:1px solid #1a1e2e;font-weight:700;color:' + plColor + ';">' + (day.pl >= 0 ? '+' : '') + '$' + day.pl.toFixed(2) + '</td></tr>';
+      });
+      dailyHtml += '</tbody></table></div></div>';
+      document.getElementById('projections').parentElement.insertAdjacentHTML('afterend', dailyHtml);
+    }
 
     // Projections
     const betsPerMonth = settled.length > 0 ? settled.length / Math.max(1, (settled.length / 10)) * 30 : 30;
