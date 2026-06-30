@@ -108,7 +108,11 @@ from data.tracker import (
 )
 from simulation.engine import (
     compute_accuracy_breakdown,
+    compute_elo_prediction,
+    compute_log5_prediction,
+    compute_markov_prediction,
     compute_model_confidence,
+    compute_multi_model_consensus,
     compute_odds_edge_by_book,
     compute_ou_edge,
     detect_pitcher_form,
@@ -1396,6 +1400,45 @@ def simulate(game_pk):
         result.get("home_lineup", []),
     )
 
+    # ── Multi-model predictions (Elo, Markov, Log5) ────────────────
+    try:
+        from data.mlb_api import get_team_records
+
+        records = get_team_records()
+        away_rec = records.get(result["away_team"], {})
+        home_rec = records.get(result["home_team"], {})
+
+        result["elo_prediction"] = compute_elo_prediction(
+            away_rec.get("wins", 40),
+            away_rec.get("losses", 40),
+            away_rec.get("run_diff_per_game", 0),
+            home_rec.get("wins", 40),
+            home_rec.get("losses", 40),
+            home_rec.get("run_diff_per_game", 0),
+        )
+        result["log5_prediction"] = compute_log5_prediction(
+            away_rec.get("win_pct", 0.500),
+            home_rec.get("win_pct", 0.500),
+        )
+        result["markov_prediction"] = compute_markov_prediction(
+            result.get("away_lineup", []),
+            result.get("home_lineup", []),
+            away_pitcher,
+            home_pitcher,
+            venue=game.get("venue"),
+        )
+        result["consensus"] = compute_multi_model_consensus(
+            result,
+            result["elo_prediction"],
+            result["markov_prediction"],
+            result["log5_prediction"],
+        )
+    except Exception:
+        result["elo_prediction"] = {}
+        result["log5_prediction"] = {}
+        result["markov_prediction"] = {}
+        result["consensus"] = {}
+
     # ── Model confidence scoring ─────────────────────────────────────
     try:
         result["confidence"] = compute_model_confidence(result)
@@ -1828,6 +1871,41 @@ def api_sim_card(game_pk):
             result["ou_line"] = oul
             result["model_over_pct"] = mo
             result["model_under_pct"] = round(100 - mo, 1)
+    except Exception:
+        pass
+
+    # Multi-model predictions for sim-all cards
+    try:
+        from data.mlb_api import get_team_records
+
+        records = get_team_records()
+        away_rec = records.get(result["away_team"], {})
+        home_rec = records.get(result["home_team"], {})
+        result["elo_prediction"] = compute_elo_prediction(
+            away_rec.get("wins", 40),
+            away_rec.get("losses", 40),
+            away_rec.get("run_diff_per_game", 0),
+            home_rec.get("wins", 40),
+            home_rec.get("losses", 40),
+            home_rec.get("run_diff_per_game", 0),
+        )
+        result["log5_prediction"] = compute_log5_prediction(
+            away_rec.get("win_pct", 0.500),
+            home_rec.get("win_pct", 0.500),
+        )
+        result["markov_prediction"] = compute_markov_prediction(
+            result.get("away_lineup", []),
+            result.get("home_lineup", []),
+            None,
+            None,
+            venue=game.get("venue"),
+        )
+        result["consensus"] = compute_multi_model_consensus(
+            result,
+            result["elo_prediction"],
+            result["markov_prediction"],
+            result["log5_prediction"],
+        )
     except Exception:
         pass
 

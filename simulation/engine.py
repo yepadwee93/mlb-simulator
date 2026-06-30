@@ -6187,6 +6187,417 @@ def run_simulation(
     }
 
 
+# ── ELO RATING SYSTEM ────────────────────────────────────────────────────────
+#
+# A chess-style power ranking for MLB teams. Each team starts at 1500.
+# After each game, winners gain points and losers lose points proportional
+# to how surprising the result was. Then we use the Elo gap between two
+# teams to compute head-to-head win probability.
+#
+# We bootstrap Elo from each team's current W/L record + run differential
+# rather than tracking game-by-game (we don't store historical results).
+
+
+def _elo_from_record(wins, losses, run_diff_per_game=0.0):
+    """Estimate a team's Elo from season W/L record and run differential."""
+    games = wins + losses
+    if games == 0:
+        return 1500.0
+    win_pct = wins / games
+    # Pythagorean expectation → true talent, then map to Elo scale
+    # A .600 team is ~1570, a .400 team is ~1430
+    elo = 1500 + (win_pct - 0.500) * 700
+    # Run differential bonus: each +0.5 R/G ≈ +25 Elo points
+    elo += run_diff_per_game * 50
+    return round(elo, 1)
+
+
+def _elo_win_prob(elo_a, elo_b, home_advantage=24.0):
+    """P(A wins) given Elo ratings. home_advantage added to B (home team)."""
+    diff = elo_a - (elo_b + home_advantage)
+    return 1.0 / (1.0 + 10 ** (-diff / 400))
+
+
+def compute_elo_prediction(
+    away_wins,
+    away_losses,
+    away_rdiff,
+    home_wins,
+    home_losses,
+    home_rdiff,
+):
+    """
+    Compute Elo-based win probability for a matchup.
+    rdiff = average run differential per game (runs scored - runs allowed) / games.
+    """
+    away_elo = _elo_from_record(away_wins, away_losses, away_rdiff)
+    home_elo = _elo_from_record(home_wins, home_losses, home_rdiff)
+    away_wp = _elo_win_prob(away_elo, home_elo, home_advantage=24.0)
+    return {
+        "away_elo": away_elo,
+        "home_elo": home_elo,
+        "away_win_pct": round(away_wp * 100, 1),
+        "home_win_pct": round((1 - away_wp) * 100, 1),
+        "elo_diff": round(away_elo - home_elo, 1),
+    }
+
+
+# ── LOG5 METHOD (BILL JAMES) ────────────────────────────────────────────────
+#
+# Classic formula: given team A's true win% and team B's true win%,
+# P(A beats B) = (pA - pA*pB) / (pA + pB - 2*pA*pB)
+
+
+def _log5(p_a, p_b):
+    """Bill James Log5: P(A beats B) given true talent win percentages."""
+    denom = p_a + p_b - 2 * p_a * p_b
+    if denom == 0:
+        return 0.5
+    return (p_a - p_a * p_b) / denom
+
+
+def compute_log5_prediction(away_win_pct, home_win_pct):
+    """
+    Compute Log5 head-to-head probability.
+    away_win_pct / home_win_pct are season win percentages (0-1 scale).
+    Includes a 4% home field advantage bump for the home team.
+    """
+    home_adj = min(0.75, home_win_pct + 0.020)
+    away_adj = max(0.25, away_win_pct - 0.020)
+    away_wp = _log5(away_adj, home_adj)
+    return {
+        "away_win_pct": round(away_wp * 100, 1),
+        "home_win_pct": round((1 - away_wp) * 100, 1),
+    }
+
+
+# ── MARKOV CHAIN GAME MODEL ─────────────────────────────────────────────────
+#
+# Models a baseball half-inning as transitions between 25 states:
+#   24 base/out states (8 runner combos × 3 out counts) + "3 outs" absorbing.
+#
+# Given batter outcome probabilities, we build a transition matrix and compute
+# the expected runs scored per inning analytically (no random sampling).
+# Then multiply by 9 innings for expected game total.
+
+_BASE_STATES = [
+    (),  # bases empty
+    (1,),  # runner on 1st
+    (2,),  # runner on 2nd
+    (3,),  # runner on 3rd
+    (1, 2),  # 1st and 2nd
+    (1, 3),  # 1st and 3rd
+    (2, 3),  # 2nd and 3rd
+    (1, 2, 3),  # bases loaded
+]
+
+
+def _advance_runners(bases, outcome):
+    """
+    Given runners on base (tuple of occupied bases) and a batting outcome,
+    return (new_bases, runs_scored, outs_added).
+    Simplified runner advancement rules.
+    """
+    runners = set(bases)
+    runs = 0
+    outs = 0
+
+    if outcome == "home_run":
+        runs = len(runners) + 1
+        return (), runs, 0
+
+    if outcome == "triple":
+        runs = len(runners)
+        return (3,), runs, 0
+
+    if outcome == "double":
+        runs += 1 if 2 in runners or 3 in runners else 0
+        runs += 1 if 3 in runners and 2 in runners else 0
+        new = {2}
+        if 1 in runners:
+            new.add(3)
+        return tuple(sorted(new)), runs, 0
+
+    if outcome == "single":
+        if 3 in runners:
+            runs += 1
+        if 2 in runners:
+            runs += 1
+        new = {1}
+        if 1 in runners:
+            new.add(2)
+        return tuple(sorted(new)), runs, 0
+
+    if outcome == "walk":
+        if runners == {1, 2, 3}:
+            runs = 1
+            return (1, 2, 3), runs, 0
+        new = set(runners)
+        if 1 in new:
+            if 2 in new:
+                if 3 in new:
+                    runs = 1
+                else:
+                    new.add(3)
+            else:
+                new.add(2)
+        new.add(1)
+        return tuple(sorted(new)), runs, 0
+
+    if outcome in ("strikeout", "out"):
+        return tuple(sorted(runners)), 0, 1
+
+    return tuple(sorted(runners)), 0, 1
+
+
+def _expected_runs_per_inning(batting_probs):
+    """
+    Compute expected runs per half-inning using Markov chain state transitions.
+
+    batting_probs: dict with keys matching OUTCOME_ORDER
+        e.g. {"walk": 0.08, "strikeout": 0.22, "single": 0.16, ...}
+    """
+    outcomes = ["walk", "single", "double", "triple", "home_run", "strikeout", "out"]
+
+    probs = {}
+    total = sum(batting_probs.get(o, 0) for o in outcomes)
+    if total == 0:
+        return 0.0
+    for o in outcomes:
+        probs[o] = batting_probs.get(o, 0) / total
+
+    # States: (base_index, outs) where base_index ∈ 0..7, outs ∈ 0..2
+    # Plus absorbing state (3 outs)
+    n_states = 24 + 1
+    absorbing = 24
+
+    expected_runs = [0.0] * n_states
+
+    # Work backwards from 2 outs to 0 outs using dynamic programming
+    # For each state, compute expected runs to end of inning
+    for _ in range(50):
+        new_er = [0.0] * n_states
+        for bi in range(8):
+            for outs in range(3):
+                si = bi * 3 + outs
+                er = 0.0
+                for outcome in outcomes:
+                    p = probs[outcome]
+                    new_bases, runs, outs_added = _advance_runners(_BASE_STATES[bi], outcome)
+                    new_outs = outs + outs_added
+                    if new_outs >= 3:
+                        er += p * runs
+                    else:
+                        new_bi = (
+                            _BASE_STATES.index(tuple(sorted(new_bases)))
+                            if tuple(sorted(new_bases)) in _BASE_STATES
+                            else 0
+                        )
+                        new_si = new_bi * 3 + new_outs
+                        er += p * (runs + expected_runs[new_si])
+                new_er[si] = er
+        if max(abs(new_er[i] - expected_runs[i]) for i in range(24)) < 0.0001:
+            expected_runs = new_er
+            break
+        expected_runs = new_er
+
+    # Start state: bases empty, 0 outs
+    return expected_runs[0]
+
+
+def compute_markov_prediction(
+    away_lineup,
+    home_lineup,
+    away_pitcher,
+    home_pitcher,
+    venue=None,
+):
+    """
+    Compute expected runs per team using Markov chain inning model,
+    then derive win probability from run differential using a Pythagorean formula.
+
+    away_lineup / home_lineup: list of batter stat dicts
+    away_pitcher / home_pitcher: pitcher stat dicts with era, whip, etc.
+    """
+
+    def _lineup_avg_probs(lineup, opp_pitcher):
+        """Average batting outcome probabilities across lineup, adjusted for pitcher."""
+        if not lineup:
+            return {
+                "walk": 0.085,
+                "strikeout": 0.225,
+                "single": 0.155,
+                "double": 0.045,
+                "triple": 0.005,
+                "home_run": 0.030,
+                "out": 0.455,
+            }
+
+        totals = {
+            "walk": 0,
+            "strikeout": 0,
+            "single": 0,
+            "double": 0,
+            "triple": 0,
+            "home_run": 0,
+            "out": 0,
+        }
+        count = 0
+        for b in lineup:
+            if not b:
+                continue
+            avg = float(b.get("avg", 0.250) or 0.250)
+            obp = float(b.get("obp", 0.320) or 0.320)
+            slg = float(b.get("slg", 0.400) or 0.400)
+
+            bb_rate = max(0.02, obp - avg)
+            k_rate = float(b.get("strikeoutRate", 0.22) or 0.22)
+            hr_rate = float(b.get("homeRunRate", 0.03) or 0.03)
+            iso = max(0, slg - avg)
+            xbh_rate = max(0, iso - hr_rate)
+            double_rate = xbh_rate * 0.75
+            triple_rate = xbh_rate * 0.25
+            single_rate = max(0.05, avg - double_rate - triple_rate - hr_rate)
+            out_rate = max(
+                0.2, 1 - bb_rate - k_rate - single_rate - double_rate - triple_rate - hr_rate
+            )
+
+            totals["walk"] += bb_rate
+            totals["strikeout"] += k_rate
+            totals["single"] += single_rate
+            totals["double"] += double_rate
+            totals["triple"] += triple_rate
+            totals["home_run"] += hr_rate
+            totals["out"] += out_rate
+            count += 1
+
+        if count == 0:
+            return {
+                "walk": 0.085,
+                "strikeout": 0.225,
+                "single": 0.155,
+                "double": 0.045,
+                "triple": 0.005,
+                "home_run": 0.030,
+                "out": 0.455,
+            }
+
+        for k in totals:
+            totals[k] /= count
+
+        # Pitcher adjustment: scale K rate and hit rates by pitcher quality
+        if opp_pitcher:
+            era = float(opp_pitcher.get("era", 4.0) or 4.0)
+            whip = float(opp_pitcher.get("whip", 1.28) or 1.28)
+            era_factor = LEAGUE_AVG_ERA / max(era, 1.0)
+            whip_factor = LEAGUE_AVG_WHIP / max(whip, 0.5)
+            hit_adj = (era_factor + whip_factor) / 2
+            totals["single"] *= hit_adj
+            totals["double"] *= hit_adj
+            totals["triple"] *= hit_adj
+            totals["home_run"] *= hit_adj
+            # Good pitchers get more K's
+            totals["strikeout"] *= (1 / hit_adj) ** 0.5
+            # Rebalance
+            total_sum = sum(totals.values())
+            for k in totals:
+                totals[k] /= total_sum
+
+        # Park factor
+        if venue:
+            park = BALLPARK_FACTORS.get(venue, DEFAULT_PARK_FACTOR)
+            totals["home_run"] *= park.get("hr", 1.0)
+            totals["single"] *= park.get("hit", 1.0)
+            totals["double"] *= park.get("hit", 1.0)
+            total_sum = sum(totals.values())
+            for k in totals:
+                totals[k] /= total_sum
+
+        return totals
+
+    away_probs = _lineup_avg_probs(away_lineup, home_pitcher)
+    home_probs = _lineup_avg_probs(home_lineup, away_pitcher)
+
+    away_rpg = _expected_runs_per_inning(away_probs) * 9
+    home_rpg = _expected_runs_per_inning(home_probs) * 9
+
+    # Home field advantage: +0.15 runs
+    home_rpg += 0.15
+
+    # Pythagorean win expectation (exponent 1.83 is standard for MLB)
+    exp = 1.83
+    if away_rpg + home_rpg == 0:
+        away_wp = 50.0
+    else:
+        away_wp = (away_rpg**exp) / (away_rpg**exp + home_rpg**exp) * 100
+
+    return {
+        "away_expected_runs": round(away_rpg, 2),
+        "home_expected_runs": round(home_rpg, 2),
+        "away_win_pct": round(away_wp, 1),
+        "home_win_pct": round(100 - away_wp, 1),
+    }
+
+
+# ── MULTI-MODEL CONSENSUS ───────────────────────────────────────────────────
+
+
+def compute_multi_model_consensus(monte_carlo, elo, markov, log5):
+    """
+    Blend predictions from Monte Carlo, Elo, Markov Chain, and Log5 models.
+    Returns consensus win probability and agreement metrics.
+
+    Weights: Monte Carlo 50%, Markov 20%, Elo 15%, Log5 15%
+    (Monte Carlo uses the most data; Elo/Log5 are simpler baseline models)
+    """
+    mc_away = monte_carlo.get("away_win_pct", 50)
+    elo_away = elo.get("away_win_pct", 50)
+    markov_away = markov.get("away_win_pct", 50)
+    log5_away = log5.get("away_win_pct", 50)
+
+    # Weighted consensus
+    consensus_away = mc_away * 0.50 + markov_away * 0.20 + elo_away * 0.15 + log5_away * 0.15
+
+    models = {
+        "monte_carlo": mc_away,
+        "elo": elo_away,
+        "markov": markov_away,
+        "log5": log5_away,
+    }
+
+    # Which side does each model favor?
+    fav_away = sum(1 for v in models.values() if v > 50)
+    fav_home = sum(1 for v in models.values() if v < 50)
+    agreement = max(fav_away, fav_home)
+
+    # Spread: how much do models disagree?
+    vals = list(models.values())
+    spread = round(max(vals) - min(vals), 1)
+
+    return {
+        "consensus_away_pct": round(consensus_away, 1),
+        "consensus_home_pct": round(100 - consensus_away, 1),
+        "models_agree": agreement,
+        "total_models": 4,
+        "spread": spread,
+        "all_agree": agreement == 4,
+        "models": {
+            "monte_carlo": {
+                "away_pct": mc_away,
+                "home_pct": round(100 - mc_away, 1),
+                "weight": "50%",
+            },
+            "elo": {"away_pct": elo_away, "home_pct": round(100 - elo_away, 1), "weight": "15%"},
+            "markov": {
+                "away_pct": markov_away,
+                "home_pct": round(100 - markov_away, 1),
+                "weight": "20%",
+            },
+            "log5": {"away_pct": log5_away, "home_pct": round(100 - log5_away, 1), "weight": "15%"},
+        },
+    }
+
+
 # ── MODEL CONFIDENCE SCORING ──────────────────────────────────────────────────
 
 
@@ -6265,6 +6676,15 @@ def compute_model_confidence(result: dict) -> dict:
         signals.append(("rest_advantage", "away", 1.0))
     elif home_rest == "normal" and away_rest == "short":
         signals.append(("rest_advantage", "home", 1.0))
+
+    # 9. Multi-model consensus (Elo, Markov, Log5 all agree with Monte Carlo)
+    consensus = result.get("consensus")
+    if consensus:
+        agree = consensus.get("models_agree", 0)
+        if agree == 4:
+            signals.append(("all_models_agree", fav, 3.0))
+        elif agree == 3:
+            signals.append(("3_models_agree", fav, 1.5))
 
     # Score each side
     away_score = sum(w for _, side, w in signals if side == "away")
