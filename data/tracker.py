@@ -82,7 +82,12 @@ def update_results():
         if not game_pk:
             continue
         try:
-            live = _get_nocache(f"/game/{game_pk}/feed/live")
+            import requests as _req
+
+            live = _req.get(
+                f"https://statsapi.mlb.com/api/v1.1/game/{game_pk}/feed/live",
+                timeout=10,
+            ).json()
             state = live.get("gameData", {}).get("status", {}).get("abstractGameState", "")
             if state != "Final":
                 continue
