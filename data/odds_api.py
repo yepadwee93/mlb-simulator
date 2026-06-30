@@ -164,6 +164,8 @@ def get_mlb_odds() -> dict:
         best_home_odds = None
         best_away_book = ""
         best_home_book = ""
+        away_by_book = {}
+        home_by_book = {}
 
         for book in game.get("bookmakers", []):
             book_name = book.get("title", book.get("key", ""))
@@ -174,12 +176,13 @@ def get_mlb_odds() -> dict:
                     price = outcome["price"]
                     if outcome["name"] == away:
                         away_odds_list.append(price)
-                        # Best away odds = highest American odds (most favorable to bettor)
+                        away_by_book[book_name] = price
                         if best_away_odds is None or price > best_away_odds:
                             best_away_odds = price
                             best_away_book = book_name
                     elif outcome["name"] == home:
                         home_odds_list.append(price)
+                        home_by_book[book_name] = price
                         if best_home_odds is None or price > best_home_odds:
                             best_home_odds = price
                             best_home_book = book_name
@@ -214,6 +217,8 @@ def get_mlb_odds() -> dict:
             "best_away_book": best_away_book,
             "best_home_odds": best_home_odds or avg_home,
             "best_home_book": best_home_book,
+            "away_by_book": away_by_book,
+            "home_by_book": home_by_book,
         }
 
     # Store in cache with current timestamp

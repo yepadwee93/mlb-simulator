@@ -1152,6 +1152,18 @@ def simulate(game_pk):
         )
         result["best_away_book"] = game_odds.get("best_away_book", "")
         result["best_home_book"] = game_odds.get("best_home_book", "")
+
+        # Per-book edge comparison
+        away_by_book = game_odds.get("away_by_book", {})
+        home_by_book = game_odds.get("home_by_book", {})
+        if away_by_book:
+            result["away_odds_by_book"] = compute_odds_edge_by_book(
+                result["away_win_pct"], away_by_book
+            )
+        if home_by_book:
+            result["home_odds_by_book"] = compute_odds_edge_by_book(
+                result["home_win_pct"], home_by_book
+            )
     else:
         result["away_implied_pct"] = None
         result["home_implied_pct"] = None
