@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>!function(){var t=localStorage.getItem("mlb_theme")||"dark",m={dark:{"--bg":"#0d1120","--bg2":"#1a1e2e","--bg3":"#252836","--border":"#252836","--text":"#e8eaf0","--text2":"#b0b8cc","--text3":"#9aa0b8","--accent":"#64b5f6","--card-bg":"#1a1e2e"},medium:{"--bg":"#1a1528","--bg2":"#241d38","--bg3":"#302848","--border":"#3a2f5a","--text":"#ede8f5","--text2":"#c0b8d8","--text3":"#a098c0","--accent":"#b39ddb","--card-bg":"#241d38"},light:{"--bg":"#f0f2f8","--bg2":"#ffffff","--bg3":"#e8eaf6","--border":"#d0d4e8","--text":"#1a1a2e","--text2":"#444466","--text3":"#6666aa","--accent":"#3949ab","--card-bg":"#ffffff"}}[t]||{};Object.entries(m).forEach(function(e){document.documentElement.style.setProperty(e[0],e[1])});document.addEventListener("DOMContentLoaded",function(){document.body.style.background=m["--bg"];document.body.style.color=m["--text"]})}();</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Confidence History — MLB Simulator</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0d1120; color: #e8eaf0; font-family: 'Segoe UI', Arial, sans-serif; padding: 32px 20px; }
+    a { color: #64b5f6; text-decoration: none; }
+    .back { display: inline-block; margin-bottom: 24px; font-size: 0.9rem; }
+    h1 { font-size: 1.6rem; font-weight: 800; margin-bottom: 6px; }
+    .subtitle { color: #b0b8cc; font-size: 0.9rem; margin-bottom: 28px; }
+    .green { color: #4caf50; } .red { color: #ef5350; } .blue { color: #64b5f6; } .gold { color: #ffa726; }
+    .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 28px; }
+    .stat-card { background: #1a1e2e; border: 1px solid #252836; border-radius: 12px; padding: 14px 16px; }
+    .stat-label { font-size: 0.68rem; color: #b0b8cc; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
+    .stat-val { font-size: 1.5rem; font-weight: 800; }
+    .card { background: #1a1e2e; border: 1px solid #252836; border-radius: 14px; padding: 20px 24px; margin-bottom: 24px; }
+    .section-title { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: #b0b8cc; margin-bottom: 14px; }
+  </style>
+</head>
+<body>
+
+<a href="/" class="back">&larr; Back to Games</a>
+<h1>Confidence History</h1>
+<p class="subtitle">How our A/B/C/D confidence grades correlate with actual outcomes</p>
+
+<!-- Grade Summary Cards -->
+<div class="summary-grid">
+  {% set grade_colors = {'A': '#4caf50', 'B': '#64b5f6', 'C': '#ffa726', 'D': '#ef5350'} %}
+  {% for g in by_grade %}
+  <div class="stat-card">
+    <div class="stat-label">Grade {{ g.grade }}</div>
+    <div class="stat-val" style="color:{{ grade_colors.get(g.grade, '#b0b8cc') }};">
+      {% if g.pct is not none %}{{ g.pct }}%{% else %}—{% endif %}
+    </div>
+    <div style="font-size:0.72rem;color:#9aa0b8;margin-top:4px;">
+      {{ g.correct }}/{{ g.total }} correct
+    </div>
+  </div>
+  {% endfor %}
+  <div class="stat-card">
+    <div class="stat-label">Total Graded</div>
+    <div class="stat-val blue">{{ total_graded }}</div>
+  </div>
+</div>
+
+<!-- Grade Bars -->
+<div class="card">
+  <div class="section-title">Win Rate by Confidence Grade</div>
+  <p style="font-size:0.72rem;color:#9aa0b8;margin-bottom:16px;">
+    Higher grades should have higher win rates. A's are our strongest picks.
+  </p>
+  {% for g in by_grade %}
+  {% if g.total > 0 %}
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
+    <div style="width:30px;font-size:1.1rem;font-weight:900;color:{{ grade_colors.get(g.grade, '#b0b8cc') }};">{{ g.grade }}</div>
+    <div style="flex:1;background:#0d1120;border-radius:4px;height:24px;overflow:hidden;">
+      <div style="height:100%;width:{{ g.pct or 0 }}%;background:{{ grade_colors.get(g.grade, '#b0b8cc') }};border-radius:4px;transition:width 0.3s;"></div>
+    </div>
+    <div style="width:100px;text-align:right;font-size:0.82rem;">
+      <span style="color:{{ grade_colors.get(g.grade, '#b0b8cc') }};font-weight:700;">{{ g.pct }}%</span>
+      <span style="color:#9aa0b8;"> ({{ g.correct }}/{{ g.total }})</span>
+    </div>
+  </div>
+  {% endif %}
+  {% endfor %}
+  {% if total_graded == 0 %}
+  <p style="color:#555870;text-align:center;padding:20px;">No graded predictions yet. Simulate some games to build history.</p>
+  {% endif %}
+</div>
+
+<!-- Daily Accuracy Chart -->
+{% if daily|length > 1 %}
+<div class="card">
+  <div class="section-title">Daily Accuracy Trend</div>
+  <canvas id="daily-chart" height="200"></canvas>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script>
+var dailyData = {{ daily | tojson }};
+var ctx = document.getElementById('daily-chart').getContext('2d');
+new Chart(ctx, {
+  type: 'line',
+  data: {
+    labels: dailyData.map(function(d){ return d.date; }),
+    datasets: [
+      {
+        label: 'Win %',
+        data: dailyData.map(function(d){ return d.pct; }),
+        borderColor: '#64b5f6',
+        backgroundColor: 'rgba(100,181,246,0.1)',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 4,
+        pointBackgroundColor: '#64b5f6',
+      },
+      {
+        label: 'Games',
+        data: dailyData.map(function(d){ return d.total; }),
+        borderColor: '#555870',
+        borderDash: [4,4],
+        fill: false,
+        tension: 0.3,
+        pointRadius: 2,
+        yAxisID: 'y1',
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    scales: {
+      y: {
+        beginAtZero: true, max: 100,
+        title: { display: true, text: 'Win %', color: '#9aa0b8' },
+        ticks: { color: '#9aa0b8' },
+        grid: { color: '#252836' }
+      },
+      y1: {
+        position: 'right',
+        beginAtZero: true,
+        title: { display: true, text: 'Games', color: '#555870' },
+        ticks: { color: '#555870' },
+        grid: { display: false }
+      },
+      x: {
+        ticks: { color: '#9aa0b8', maxRotation: 45 },
+        grid: { color: '#252836' }
+      }
+    },
+    plugins: {
+      legend: { labels: { color: '#b0b8cc' } }
+    }
+  }
+});
+</script>
+{% endif %}
+
+<div style="text-align:center;margin-top:20px;">
+  <a href="/accuracy" style="color:#64b5f6;font-size:0.85rem;">View Full Accuracy Page &rarr;</a>
+</div>
+
+</body>
+</html>

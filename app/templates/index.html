@@ -296,6 +296,7 @@ if (localStorage.getItem('email_nudge_dismissed') === '1') {
     <h1>⚾ MLB Simulator</h1>
     <div style="display:flex; gap:16px; font-size:0.85rem; align-items:center;">
       <a href="/accuracy" style="color:#64b5f6; text-decoration:none; font-weight:600;">📊 Accuracy</a>
+      <a href="/confidence-history" style="color:#c084fc;text-decoration:none;font-weight:600;">📈 Confidence</a>
       <a href="/odds-history" style="color:#ffd54f;text-decoration:none;font-weight:600;">📋 Odds</a>
       <span class="nav-dropdown"><a href="/bets">&#128176; My Bets &#9660;</a><div class="nav-dropdown-menu"><a href="/bets">&#128176; My Bets</a><a href="/bankroll">&#128200; Bankroll</a><a href="/calculator">&#129518; Calculator</a><a href="/parlay">&#127920; Parlay</a><a href="/my-picks">&#127919; My Picks</a></div></span>
       {% if current_user.is_authenticated %}
@@ -379,6 +380,33 @@ if (localStorage.getItem('email_nudge_dismissed') === '1') {
     </div>
   {% endif %}
 </header>
+
+<!-- Live Scores Bar -->
+<div id="live-scores-bar" style="background:#12162a;border-bottom:1px solid #252836;padding:0;overflow-x:auto;display:flex;align-items:center;margin-bottom:16px;border-radius:8px;scrollbar-width:none;-ms-overflow-style:none;"></div>
+
+<!-- RLM Alerts -->
+{% if rlm_alerts %}
+<div style="background:#1a1230;border:1px solid #3a2a6a;border-radius:12px;padding:14px 20px;margin-bottom:20px;">
+  <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#c084fc;margin-bottom:10px;">
+    Reverse Line Movement Detected
+  </div>
+  {% for a in rlm_alerts %}
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;font-size:0.82rem;">
+    <span style="color:#c084fc;font-weight:800;font-size:0.9rem;">RLM</span>
+    <span style="color:#e8eaf0;">
+      Sharp money on <strong>{% if a.direction == 'away' %}{{ a.away_team }}{% else %}{{ a.home_team }}{% endif %}</strong>
+      ({{ a.away_team }} @ {{ a.home_team }})
+    </span>
+    <span style="color:#ffd54f;font-size:0.75rem;">
+      {{ a.bet_pct|round(0)|int }}% public on other side · Line moved {{ a.shift }} pts opposite
+    </span>
+  </div>
+  {% endfor %}
+  <div style="font-size:0.65rem;color:#8070a0;margin-top:6px;">
+    RLM = line moves opposite of public betting %, suggesting sharp/pro money on the other side
+  </div>
+</div>
+{% endif %}
 
 <!-- Games grid -->
 {% if games %}
@@ -641,6 +669,51 @@ function deleteNote(gk) {
 <script>
 function getCsrfToken(){return document.cookie.split(';').map(function(c){return c.trim();}).find(function(c){return c.startsWith('csrf_token=');})?.split('=')[1]||'';}
 function csrfFetch(url,opts){opts=opts||{};opts.headers=Object.assign({'X-CSRFToken':getCsrfToken()},opts.headers||{});return fetch(url,opts);}
+
+// ── Live score auto-refresh (every 30s) ──
+(function(){
+  var liveBar = document.getElementById('live-scores-bar');
+  if (!liveBar) return;
+
+  function abbr(name) {
+    if (!name) return '?';
+    var parts = name.split(' ');
+    return parts[parts.length - 1].substring(0, 3).toUpperCase();
+  }
+
+  function renderLive(games) {
+    var html = '<span style="color:#555870;font-size:0.65rem;padding:0 10px;white-space:nowrap;">LIVE</span>';
+    var hasLive = false;
+    games.forEach(function(g) {
+      var status = (g.status || '').toLowerCase();
+      var isLive = status.indexOf('in progress') >= 0 || (g.inning && status.indexOf('final') < 0);
+      var isFinal = status.indexOf('final') >= 0 || status.indexOf('game over') >= 0;
+      if (!isLive && !isFinal) return;
+      if (isLive) hasLive = true;
+      var stLabel = isFinal ? '<span style="color:#ef5350;">F</span>' :
+        '<span style="color:#4caf50;">' + (g.inning_half === 'top' ? '▲' : '▼') + g.inning + '</span>';
+      html += '<div style="display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-right:1px solid #252836;white-space:nowrap;font-size:0.75rem;">'
+        + '<span style="color:#b0b8cc;">' + abbr(g.away) + '</span>'
+        + '<span style="font-weight:800;color:#e8eaf0;">' + (g.away_score || 0) + '</span>'
+        + '<span style="color:#555870;">-</span>'
+        + '<span style="font-weight:800;color:#e8eaf0;">' + (g.home_score || 0) + '</span>'
+        + '<span style="color:#b0b8cc;">' + abbr(g.home) + '</span>'
+        + '<span style="font-size:0.65rem;">' + stLabel + '</span>'
+        + '</div>';
+    });
+    liveBar.innerHTML = html;
+    if (!hasLive && games.length > 0) {
+      liveBar.querySelector('span').textContent = 'SCORES';
+    }
+  }
+
+  function refresh() {
+    fetch('/api/scores').then(function(r){ return r.json(); }).then(renderLive).catch(function(){});
+  }
+
+  refresh();
+  setInterval(refresh, 30000);
+})();
 </script></body>
 </html>
 
