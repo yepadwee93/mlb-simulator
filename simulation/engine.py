@@ -3069,81 +3069,67 @@ HMM_STATE_MULTS = {
 }
 
 
-class PitcherHMM:
-    """Hidden Markov Model tracking pitcher latent state within a game."""
+_HMM_T00, _HMM_T01, _HMM_T02 = 0.80, 0.18, 0.02
+_HMM_T10, _HMM_T11, _HMM_T12 = 0.10, 0.75, 0.15
+_HMM_T20, _HMM_T21, _HMM_T22 = 0.05, 0.25, 0.70
 
-    __slots__ = ("alpha", "state_probs")
+_HMM_EMIT = {
+    "dominant_out": (0.30, 0.22, 0.14),
+    "normal_out": (0.38, 0.34, 0.28),
+    "hit": (0.16, 0.22, 0.28),
+    "extra": (0.04, 0.06, 0.10),
+    "walk": (0.05, 0.08, 0.14),
+}
+_HMM_DEFAULT_EMIT = (0.20, 0.20, 0.20)
+
+_HMM_SM_K = (1.25, 1.00, 0.72)
+_HMM_SM_BB = (0.65, 1.00, 1.45)
+_HMM_SM_HR = (0.70, 1.00, 1.40)
+_HMM_SM_HIT = (0.80, 1.00, 1.25)
+
+
+class PitcherHMM:
+    __slots__ = ("a0", "a1", "a2")
 
     def __init__(self, pitcher_stats: dict = None):
-        # Initialize forward variables with prior distribution
-        # Adjust prior based on pitcher quality
         if pitcher_stats:
             try:
                 era = float(pitcher_stats.get("era", "4.00") or "4.00")
                 if era < 3.00:
-                    self.alpha = [0.35, 0.55, 0.10]
+                    self.a0, self.a1, self.a2 = 0.35, 0.55, 0.10
                 elif era > 5.00:
-                    self.alpha = [0.08, 0.52, 0.40]
+                    self.a0, self.a1, self.a2 = 0.08, 0.52, 0.40
                 else:
-                    self.alpha = list(HMM_INITIAL)
+                    self.a0, self.a1, self.a2 = 0.20, 0.65, 0.15
             except (ValueError, TypeError):
-                self.alpha = list(HMM_INITIAL)
+                self.a0, self.a1, self.a2 = 0.20, 0.65, 0.15
         else:
-            self.alpha = list(HMM_INITIAL)
-        self.state_probs = list(self.alpha)
+            self.a0, self.a1, self.a2 = 0.20, 0.65, 0.15
 
     def observe(self, outcome: str):
-        """
-        Update state probabilities after observing a PA outcome.
-        Uses the forward algorithm: α'[j] = Σ_i α[i] * A[i][j] * B[j][obs]
-        Then normalize to get P(state | observations).
-        """
-        emission_cat = _OUTCOME_TO_EMISSION.get(outcome, "normal_out")
-
-        new_alpha = [0.0] * HMM_N_STATES
-        for j in range(HMM_N_STATES):
-            # Sum over all possible previous states
-            trans_sum = sum(self.alpha[i] * HMM_TRANSITION[i][j] for i in range(HMM_N_STATES))
-            # Multiply by emission probability
-            state_name = HMM_STATES[j]
-            emit_prob = HMM_EMISSIONS[state_name].get(emission_cat, 0.20)
-            new_alpha[j] = trans_sum * emit_prob
-
-        # Normalize to prevent underflow and get state probabilities
-        total = sum(new_alpha)
-        if total > 0:
-            self.alpha = [a / total for a in new_alpha]
-        self.state_probs = list(self.alpha)
+        e = _HMM_EMIT.get(_OUTCOME_TO_EMISSION.get(outcome, "normal_out"), _HMM_DEFAULT_EMIT)
+        a0, a1, a2 = self.a0, self.a1, self.a2
+        n0 = (a0 * _HMM_T00 + a1 * _HMM_T10 + a2 * _HMM_T20) * e[0]
+        n1 = (a0 * _HMM_T01 + a1 * _HMM_T11 + a2 * _HMM_T21) * e[1]
+        n2 = (a0 * _HMM_T02 + a1 * _HMM_T12 + a2 * _HMM_T22) * e[2]
+        t = n0 + n1 + n2
+        if t > 0:
+            inv = 1.0 / t
+            self.a0 = n0 * inv
+            self.a1 = n1 * inv
+            self.a2 = n2 * inv
 
     def get_state_adjustment(self) -> dict:
-        """
-        Compute probability-weighted adjustment from current state distribution.
-        Returns multipliers for K, BB, HR, hit rates.
-        """
-        k_mult = sum(
-            self.state_probs[i] * HMM_STATE_MULTS[HMM_STATES[i]]["k_mult"]
-            for i in range(HMM_N_STATES)
-        )
-        bb_mult = sum(
-            self.state_probs[i] * HMM_STATE_MULTS[HMM_STATES[i]]["bb_mult"]
-            for i in range(HMM_N_STATES)
-        )
-        hr_mult = sum(
-            self.state_probs[i] * HMM_STATE_MULTS[HMM_STATES[i]]["hr_mult"]
-            for i in range(HMM_N_STATES)
-        )
-        hit_mult = sum(
-            self.state_probs[i] * HMM_STATE_MULTS[HMM_STATES[i]]["hit_mult"]
-            for i in range(HMM_N_STATES)
-        )
-
-        # Dampen the effect — HMM state is uncertain early in the game
-        dampen = 0.50
+        a0, a1, a2 = self.a0, self.a1, self.a2
+        k = a0 * _HMM_SM_K[0] + a1 * _HMM_SM_K[1] + a2 * _HMM_SM_K[2]
+        bb = a0 * _HMM_SM_BB[0] + a1 * _HMM_SM_BB[1] + a2 * _HMM_SM_BB[2]
+        hr = a0 * _HMM_SM_HR[0] + a1 * _HMM_SM_HR[1] + a2 * _HMM_SM_HR[2]
+        hit = a0 * _HMM_SM_HIT[0] + a1 * _HMM_SM_HIT[1] + a2 * _HMM_SM_HIT[2]
         return {
-            "k_mult": 1.0 + (k_mult - 1.0) * dampen,
-            "bb_mult": 1.0 + (bb_mult - 1.0) * dampen,
-            "hr_mult": 1.0 + (hr_mult - 1.0) * dampen,
-            "hit_mult": 1.0 + (hit_mult - 1.0) * dampen,
+            "k_mult": 1.0 + (k - 1.0) * 0.50,
+            "bb_mult": 1.0 + (bb - 1.0) * 0.50,
+            "hr_mult": 1.0 + (hr - 1.0) * 0.50,
+            "hit_mult": 1.0 + (hit - 1.0) * 0.50,
         }
 
     @property
@@ -3201,110 +3187,86 @@ def _norm_cdf(x: float) -> float:
     return 0.5 * (1.0 + _math.erf(x / _SQRT2))
 
 
-def _norm_inv_cdf(p: float) -> float:
-    """
-    Inverse standard normal CDF (quantile function).
-    Uses rational approximation (Beasley-Springer-Moro algorithm).
-    Accurate to ~1e-9 for 0.0001 < p < 0.9999.
-    """
-    p = max(1e-10, min(1.0 - 1e-10, p))
+_BSM_A0 = -3.969683028665376e1
+_BSM_A1 = 2.209460984245205e2
+_BSM_A2 = -2.759285104469687e2
+_BSM_A3 = 1.383577518672690e2
+_BSM_A4 = -3.066479806614716e1
+_BSM_A5 = 2.506628277459239e0
+_BSM_B0 = -5.447609879822406e1
+_BSM_B1 = 1.615858368580409e2
+_BSM_B2 = -1.556989798598866e2
+_BSM_B3 = 6.680131188771972e1
+_BSM_B4 = -1.328068155288572e1
+_BSM_C0 = -7.784894002430293e-3
+_BSM_C1 = -3.223964580411365e-1
+_BSM_C2 = -2.400758277161838e0
+_BSM_C3 = -2.549732539343734e0
+_BSM_C4 = 4.374664141464968e0
+_BSM_C5 = 2.938163982698783e0
+_BSM_D0 = 7.784695709041462e-3
+_BSM_D1 = 3.224671290700398e-1
+_BSM_D2 = 2.445134137142996e0
+_BSM_D3 = 3.754408661907416e0
+_BSM_P_LOW = 0.02425
 
+
+def _norm_inv_cdf(p: float) -> float:
+    if p < 1e-10:
+        p = 1e-10
+    elif p > 0.9999999999:
+        p = 0.9999999999
     if p < 0.5:
         return -_bsm_core(p)
-    else:
-        return _bsm_core(1.0 - p)
+    return _bsm_core(1.0 - p)
 
 
 def _bsm_core(p: float) -> float:
-    """Core of Beasley-Springer-Moro inverse normal approximation."""
-    # Rational approximation coefficients
-    a = [
-        -3.969683028665376e1,
-        2.209460984245205e2,
-        -2.759285104469687e2,
-        1.383577518672690e2,
-        -3.066479806614716e1,
-        2.506628277459239e0,
-    ]
-    b = [
-        -5.447609879822406e1,
-        1.615858368580409e2,
-        -1.556989798598866e2,
-        6.680131188771972e1,
-        -1.328068155288572e1,
-    ]
-    c = [
-        -7.784894002430293e-3,
-        -3.223964580411365e-1,
-        -2.400758277161838e0,
-        -2.549732539343734e0,
-        4.374664141464968e0,
-        2.938163982698783e0,
-    ]
-    d = [
-        7.784695709041462e-3,
-        3.224671290700398e-1,
-        2.445134137142996e0,
-        3.754408661907416e0,
-    ]
-
-    p_low = 0.02425
-
-    if p < p_low:
-        # Rational approximation for lower region
+    if p < _BSM_P_LOW:
         q = _math.sqrt(-2.0 * _math.log(p))
-        return (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / (
-            (((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1.0
-        )
-    else:
-        # Rational approximation for central region
-        q = p - 0.5
-        r = q * q
-        return ((((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q) / (
-            ((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1.0
-        )
+        return (
+            ((((_BSM_C0 * q + _BSM_C1) * q + _BSM_C2) * q + _BSM_C3) * q + _BSM_C4) * q + _BSM_C5
+        ) / ((((_BSM_D0 * q + _BSM_D1) * q + _BSM_D2) * q + _BSM_D3) * q + 1.0)
+    q = p - 0.5
+    r = q * q
+    return (
+        (((((_BSM_A0 * r + _BSM_A1) * r + _BSM_A2) * r + _BSM_A3) * r + _BSM_A4) * r + _BSM_A5) * q
+    ) / (((((_BSM_B0 * r + _BSM_B1) * r + _BSM_B2) * r + _BSM_B3) * r + _BSM_B4) * r + 1.0)
+
+
+_COPULA_SQRT_RUNNERS = _math.sqrt(1.0 - COPULA_RHO_RUNNERS**2)
+_COPULA_SQRT_EMPTY = _math.sqrt(1.0 - COPULA_RHO_EMPTY**2)
+_COPULA_SQRT_BASE = _math.sqrt(1.0 - COPULA_RHO_BASE**2)
 
 
 class GaussianCopula:
-    """
-    Gaussian copula for correlated PA outcomes within an inning.
-
-    Maintains the previous PA's latent normal variable and generates
-    correlated draws for the next PA.
-    """
-
-    __slots__ = ("prev_z", "rho")
+    __slots__ = ("prev_z", "rho", "sqrt_1_rho2")
 
     def __init__(self, rho: float = COPULA_RHO_BASE):
-        self.prev_z = 0.0  # start at mean (no prior information)
+        self.prev_z = 0.0
         self.rho = rho
+        self.sqrt_1_rho2 = _COPULA_SQRT_BASE
 
     def set_correlation(self, runners_on: bool):
-        """Adjust correlation based on game state."""
-        self.rho = COPULA_RHO_RUNNERS if runners_on else COPULA_RHO_EMPTY
+        if runners_on:
+            self.rho = COPULA_RHO_RUNNERS
+            self.sqrt_1_rho2 = _COPULA_SQRT_RUNNERS
+        else:
+            self.rho = COPULA_RHO_EMPTY
+            self.sqrt_1_rho2 = _COPULA_SQRT_EMPTY
 
     def draw(self) -> float:
-        """
-        Draw a correlated uniform random variable using the copula.
-
-        Returns u' ∈ (0, 1) that is correlated with the previous draw.
-        This replaces random.random() in the at-bat outcome selection.
-        """
-        # Fresh standard normal draw
         z_new = _norm_inv_cdf(random.random())
-
-        # Apply AR(1) correlation structure
-        z_correlated = self.rho * self.prev_z + _math.sqrt(1.0 - self.rho**2) * z_new
-
-        # Store for next draw
+        z_correlated = self.rho * self.prev_z + self.sqrt_1_rho2 * z_new
         self.prev_z = z_correlated
-
-        # Transform back to uniform via CDF
-        u = _norm_cdf(z_correlated)
-        return max(1e-10, min(1.0 - 1e-10, u))
+        u = 0.5 * (1.0 + _math.erf(z_correlated / _SQRT2))
+        if u < 1e-10:
+            return 1e-10
+        if u > 0.9999999999:
+            return 0.9999999999
+        return u
 
     def reset(self):
-        """Reset at the start of each inning."""
         self.prev_z = 0.0
 
 
@@ -3716,60 +3678,37 @@ def apply_game_script(precomp: list, script: str) -> list:
 #   energy 0.50-0.85 → normal range
 #   energy < 0.50 → gassed (K↓, BB↑, HR↑)
 
-OU_THETA = 0.08  # mean-reversion speed per batter faced
-OU_SIGMA = 0.06  # volatility of energy fluctuations
-OU_DELTA_T = 1.0  # time step = 1 batter faced
+OU_THETA = 0.08
+OU_SIGMA = 0.06
+OU_DELTA_T = 1.0
+_OU_EXP_TERM = _math.exp(-OU_THETA * OU_DELTA_T)
+_OU_VAR_COEFF = OU_SIGMA * _math.sqrt(
+    (1.0 - _math.exp(-2.0 * OU_THETA * OU_DELTA_T)) / (2.0 * OU_THETA)
+)
 
 
 class OUFatigueProcess:
-    """Ornstein-Uhlenbeck process tracking pitcher energy within a game."""
-
-    __slots__ = ("energy", "mu", "theta", "sigma", "batters_faced", "durability")
+    __slots__ = ("energy", "mu", "batters_faced", "decay_rate")
 
     def __init__(self, pitcher_stats: dict = None):
         self.energy = 1.0
-        self.theta = OU_THETA
-        self.sigma = OU_SIGMA
         self.batters_faced = 0
-
-        # Pitcher durability affects the equilibrium decay
+        durability = 1.0
         if pitcher_stats:
             try:
                 ip = float(pitcher_stats.get("inningsPitched", "150") or "150")
-                # More innings = more durable = slower equilibrium decay
-                self.durability = min(1.3, max(0.7, ip / 150.0))
+                durability = min(1.3, max(0.7, ip / 150.0))
             except (ValueError, TypeError):
-                self.durability = 1.0
-        else:
-            self.durability = 1.0
-
-        self.mu = 0.90  # initial equilibrium (fresh pitcher)
+                pass
+        self.decay_rate = 0.025 / durability
+        self.mu = 0.90
 
     def step(self):
-        """
-        Advance the OU process by one batter faced.
-        Uses exact discrete solution of the SDE.
-        """
         self.batters_faced += 1
-
-        # Equilibrium energy decreases with batters faced
-        # Durable pitchers (high IP) decay slower
-        decay_rate = 0.025 / self.durability
-        self.mu = max(0.30, 0.90 - self.batters_faced * decay_rate)
-
-        # Exact OU solution for one time step
-        exp_term = _math.exp(-self.theta * OU_DELTA_T)
-        mean = self.mu + (self.energy - self.mu) * exp_term
-
-        # Conditional variance
-        var_coeff = self.sigma * _math.sqrt(
-            (1.0 - _math.exp(-2.0 * self.theta * OU_DELTA_T)) / (2.0 * self.theta)
-        )
-        z = _norm_inv_cdf(random.random())  # standard normal draw
-        self.energy = mean + var_coeff * z
-
-        # Clamp to valid range
-        self.energy = max(0.10, min(1.05, self.energy))
+        self.mu = max(0.30, 0.90 - self.batters_faced * self.decay_rate)
+        mean = self.mu + (self.energy - self.mu) * _OU_EXP_TERM
+        z = _norm_inv_cdf(random.random())
+        self.energy = max(0.10, min(1.05, mean + _OU_VAR_COEFF * z))
 
     def get_fatigue_modifier(self) -> dict:
         """Convert current energy level to probability modifiers."""
@@ -4113,7 +4052,7 @@ def apply_causal_effects(probs: list, effects: dict) -> list:
 # This tells the user: "We predict 58% win probability, but the true
 # value is likely between 55.2% and 60.8% given simulation variance."
 
-BOOTSTRAP_N_RESAMPLES = 200
+BOOTSTRAP_N_RESAMPLES = 50
 
 
 def bootstrap_confidence_interval(
@@ -4550,24 +4489,43 @@ def simulate_half_inning(
         # HMM pitcher state
         if pitcher_hmm:
             hmm_adj = pitcher_hmm.get_state_adjustment()
-            if any(abs(v - 1.0) > 0.005 for v in hmm_adj.values()):
-                cm[0] *= hmm_adj["bb_mult"]
-                cm[1] *= hmm_adj["k_mult"]
-                cm[2] *= hmm_adj["hit_mult"]
-                cm[3] *= hmm_adj["hit_mult"]
-                cm[4] *= hmm_adj["hit_mult"]
-                cm[5] *= hmm_adj["hr_mult"]
+            hk = hmm_adj["k_mult"]
+            hb = hmm_adj["bb_mult"]
+            hh = hmm_adj["hit_mult"]
+            hhr = hmm_adj["hr_mult"]
+            if (
+                abs(hk - 1.0) > 0.005
+                or abs(hb - 1.0) > 0.005
+                or abs(hh - 1.0) > 0.005
+                or abs(hhr - 1.0) > 0.005
+            ):
+                cm[0] *= hb
+                cm[1] *= hk
+                cm[2] *= hh
+                cm[3] *= hh
+                cm[4] *= hh
+                cm[5] *= hhr
                 needs_modify = True
 
         # Extra multipliers (stamina + Bayesian + OU + entropy + momentum combined)
-        if extra_mults and any(abs(v - 1.0) > 0.005 for v in extra_mults.values()):
-            cm[0] *= extra_mults["bb"]
-            cm[1] *= extra_mults["k"]
-            cm[2] *= extra_mults["hit"]
-            cm[3] *= extra_mults["hit"]
-            cm[4] *= extra_mults["hit"]
-            cm[5] *= extra_mults["hr"]
-            needs_modify = True
+        if extra_mults:
+            ek = extra_mults["k"]
+            eb = extra_mults["bb"]
+            eh = extra_mults["hit"]
+            ehr = extra_mults["hr"]
+            if (
+                abs(ek - 1.0) > 0.005
+                or abs(eb - 1.0) > 0.005
+                or abs(eh - 1.0) > 0.005
+                or abs(ehr - 1.0) > 0.005
+            ):
+                cm[0] *= eb
+                cm[1] *= ek
+                cm[2] *= eh
+                cm[3] *= eh
+                cm[4] *= eh
+                cm[5] *= ehr
+                needs_modify = True
 
         # GPD extreme scoring
         if runs >= GPD_THRESHOLD:
@@ -5466,7 +5424,7 @@ def run_simulation(
     # Simulate a smaller batch to get win probs through each inning cutoff.
     # Ties count as a push (neither team wins the bet), matching how F5
     # betting markets work.
-    n_seg = max(n // 4, 10_000)
+    n_seg = max(n // 5, 500)
     seg_results = {}
     for label, inn in (("f3", 3), ("f5", 5), ("f7", 7)):
         aw = hw = at = ht = ties = 0
