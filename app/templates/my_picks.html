@@ -259,10 +259,6 @@
           <option value="under">Under</option>
         </select>
       </div>
-      <div class="full-width">
-        <label>Notes (optional — e.g. "bullpen edge", "starter is struggling")</label>
-        <input type="text" id="my-notes" placeholder="Why are you picking this team?">
-      </div>
       <div class="full-width" id="sim-preview" style="display:none; padding:12px; background:#0d1120; border-radius:8px;">
         <div style="font-size:0.75rem; color:#b0b8cc; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">Simulator says</div>
         <div id="sim-preview-text" style="font-size:0.9rem;"></div>
@@ -280,8 +276,9 @@
 <div class="card">
   <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
     <div class="section-title" style="margin-bottom:0;">All Picks</div>
-    <div>
+    <div style="display:flex;align-items:center;gap:8px;">
       <button class="update-btn" id="update-btn" onclick="checkResults()">🔄 Check Results</button>
+      <button class="update-btn" onclick="clearAllPicks()" style="background:#2a1520;border-color:#5a2535;color:#ef9a9a;">🗑 Clear All</button>
       <span id="update-msg" style="font-size:0.78rem; color:#b0b8cc; margin-left:8px;"></span>
     </div>
   </div>
@@ -421,7 +418,7 @@ function submitPick() {
   var home    = opt.getAttribute('data-home') || '';
   var gameDate = opt.getAttribute('data-date') || new Date().toISOString().slice(0,10);
   var myPick   = document.getElementById('my-pick-select').value;
-  var notes    = document.getElementById('my-notes').value;
+  var notes    = '';
   var betType  = document.getElementById('bet-type-select').value;
   var msg      = document.getElementById('form-msg');
 
@@ -468,6 +465,13 @@ function submitPick() {
 }
 
 // ── Check results ────────────────────────────────────────────────
+function clearAllPicks() {
+  if (!confirm('Clear all picks? This cannot be undone.')) return;
+  csrfFetch('/my-picks/clear', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function() { window.location.reload(); });
+}
+
 function checkResults() {
   var btn = document.getElementById('update-btn');
   var msg = document.getElementById('update-msg');

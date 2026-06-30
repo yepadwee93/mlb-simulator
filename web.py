@@ -2039,6 +2039,14 @@ def update_my_picks():
     return jsonify({"updated": updated, "my_pct": stats["my_pct"], "sim_pct": stats["sim_pct"]})
 
 
+@app.route("/my-picks/clear", methods=["POST"])
+@login_required
+def clear_my_picks():
+    uid = _uid()
+    supa().table("picks").delete().eq("user_id", int(uid)).execute()
+    return jsonify({"status": "ok"})
+
+
 @app.route("/odds-history")
 @login_required
 def odds_history_page():
