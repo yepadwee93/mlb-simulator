@@ -696,6 +696,25 @@
 
 <div style="padding: 32px 20px 0;">
 
+<!-- Sport Selector -->
+<div style="display:flex;gap:0;max-width:500px;margin:0 auto 20px auto;border-radius:10px;overflow:hidden;border:1px solid #353a52;">
+  <a href="/" style="flex:1;padding:10px 0;text-align:center;background:linear-gradient(135deg,#1a3a5a,#0d2a4a);color:#64b5f6;font-weight:700;font-size:0.85rem;text-decoration:none;border-right:1px solid #353a52;">
+    ⚾ MLB
+  </a>
+  <div style="flex:1;padding:10px 0;text-align:center;color:#555870;font-size:0.85rem;border-right:1px solid #353a52;cursor:default;position:relative;" title="Coming Aug 2026">
+    🏈 NFL
+    <span style="position:absolute;top:-1px;right:6px;font-size:0.55rem;background:#7c3aed;color:#fff;padding:1px 5px;border-radius:0 0 4px 4px;font-weight:700;">AUG</span>
+  </div>
+  <div style="flex:1;padding:10px 0;text-align:center;color:#555870;font-size:0.85rem;border-right:1px solid #353a52;cursor:default;position:relative;" title="Coming Oct 2026">
+    🏀 NBA
+    <span style="position:absolute;top:-1px;right:6px;font-size:0.55rem;background:#7c3aed;color:#fff;padding:1px 5px;border-radius:0 0 4px 4px;font-weight:700;">OCT</span>
+  </div>
+  <div style="flex:1;padding:10px 0;text-align:center;color:#555870;font-size:0.85rem;cursor:default;position:relative;" title="Coming Dec 2026">
+    🏒 NHL
+    <span style="position:absolute;top:-1px;right:6px;font-size:0.55rem;background:#7c3aed;color:#fff;padding:1px 5px;border-radius:0 0 4px 4px;font-weight:700;">DEC</span>
+  </div>
+</div>
+
 <header>
   <h1>⚾ Today's Predictions</h1>
   <p>{{ date }} · {{ results|length }} games · {{ n_sims|int // 1000 }}k simulations each</p>
