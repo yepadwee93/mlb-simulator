@@ -371,22 +371,33 @@ window.addEventListener('load', loadUnit);
 var _todayGames = [];
 
 function loadTodayGames() {
-  fetch('/api/scores').then(function(r){return r.json();}).then(function(games){
+  fetch('/api/today-games').then(function(r){return r.json();}).then(function(games){
     _todayGames = games;
     var sel = document.getElementById('lb-game');
-    sel.innerHTML = '<option value="">— Select a game —</option>';
+    sel.innerHTML = '<option value="">— Select a game (' + games.length + ' today) —</option>';
     games.forEach(function(g, i) {
       var status = g.status || '';
+      var time = '';
+      if (g.game_time) {
+        try {
+          var d = new Date(g.game_time);
+          time = d.toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
+        } catch(e) {}
+      }
       var label = g.away + ' @ ' + g.home;
-      if (status) label += ' (' + status + ')';
+      if (time) label += ' — ' + time;
+      if (status && status !== 'Preview' && status !== 'Scheduled') label += ' (' + status + ')';
       var opt = document.createElement('option');
       opt.value = i;
       opt.textContent = label;
       sel.appendChild(opt);
     });
-  }).catch(function(){
+    if (games.length === 0) {
+      sel.innerHTML = '<option value="">No games scheduled today</option>';
+    }
+  }).catch(function(e){
     var sel = document.getElementById('lb-game');
-    sel.innerHTML = '<option value="">Could not load games</option>';
+    sel.innerHTML = '<option value="">Could not load games — try refreshing</option>';
   });
 }
 
