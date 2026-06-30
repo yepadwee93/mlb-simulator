@@ -374,9 +374,9 @@ def build_game_result(game, n_sims, use_splits=True, fresh_lineup=False):
     home_recent = []
     away_display_extra = []  # list of dicts with vs_lhp/vs_rhp/vs_sp/vs_rp stats
     home_display_extra = []
+    day_night = _get_day_night(game.get("game_time", ""))
 
     if use_splits:
-        day_night = _get_day_night(game.get("game_time", ""))
 
         def _fetch_all_batter_data(batter, opp_pitcher_id=None, is_home=False):
             """Fetch recent form + all split types + matchup history + day/night + home/away for one batter.
