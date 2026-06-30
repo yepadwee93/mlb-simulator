@@ -257,13 +257,12 @@
       <select id="lb-type" onchange="updateBetOnOptions()">
         <option value="ML">Moneyline</option>
         <option value="RL">Run Line</option>
-        <option value="OVER">Over</option>
-        <option value="UNDER">Under</option>
+        <option value="OU">Over/Under</option>
         <option value="F5">First 5</option>
       </select>
     </div>
     <div class="form-group">
-      <label>Bet On</label>
+      <label id="lb-beton-label">Bet On</label>
       <select id="lb-beton">
         <option value="">Pick a game first</option>
       </select>
@@ -420,6 +419,7 @@ function updateBetOnOptions() {
   var home = document.getElementById('lb-home').value;
   var type = document.getElementById('lb-type').value;
   var sel = document.getElementById('lb-beton');
+  var betonLabel = document.getElementById('lb-beton-label');
   var lineGroup = document.getElementById('lb-line-group');
   var lineSel = document.getElementById('lb-line-select');
   var lineLabel = document.getElementById('lb-line-label');
@@ -428,31 +428,34 @@ function updateBetOnOptions() {
   lineSel.innerHTML = '';
 
   if (!away || !home) {
+    betonLabel.textContent = 'Bet On';
     sel.innerHTML = '<option value="">Pick a game first</option>';
     lineGroup.style.display = 'none';
     return;
   }
 
   if (type === 'ML' || type === 'F5') {
+    betonLabel.textContent = 'Team';
     sel.innerHTML = '<option value="' + away + '">' + away + '</option>'
                   + '<option value="' + home + '">' + home + '</option>';
     lineGroup.style.display = 'none';
   } else if (type === 'RL') {
+    betonLabel.textContent = 'Team';
     sel.innerHTML = '<option value="' + away + '">' + away + '</option>'
                   + '<option value="' + home + '">' + home + '</option>';
     lineGroup.style.display = '';
-    lineLabel.textContent = 'Run Line';
-    var rlLines = ['-1.5', '+1.5', '-2.5', '+2.5', '-3.5', '+3.5'];
+    lineLabel.textContent = 'Line';
+    var rlLines = ['-1.5', '-2.5', '-3.5', '+1.5', '+2.5', '+3.5'];
     rlLines.forEach(function(l) {
       lineSel.innerHTML += '<option value="' + l + '">' + l + '</option>';
     });
-  } else if (type === 'OVER' || type === 'UNDER') {
+  } else if (type === 'OU') {
+    betonLabel.textContent = 'Side';
     sel.innerHTML = '<option value="OVER">Over</option>'
                   + '<option value="UNDER">Under</option>';
-    if (type === 'UNDER') sel.value = 'UNDER';
     lineGroup.style.display = '';
-    lineLabel.textContent = 'Total Line';
-    for (var n = 4.5; n <= 15.5; n += 0.5) {
+    lineLabel.textContent = 'Total';
+    for (var n = 4.5; n <= 12.5; n += 0.5) {
       var selected = (n === 8.5) ? ' selected' : '';
       lineSel.innerHTML += '<option value="' + n + '"' + selected + '>' + n + '</option>';
     }
@@ -468,12 +471,13 @@ async function logBet() {
   var betType = document.getElementById('lb-type').value;
   var lineGroup = document.getElementById('lb-line-group');
   var lineSel = document.getElementById('lb-line-select');
-  // Combine bet_on with line for RL and O/U
+  var savedType = betType;
   if (lineGroup.style.display !== 'none' && lineSel.value) {
     if (betType === 'RL') {
       betOnVal = betOnVal + ' ' + lineSel.value;
-    } else if (betType === 'OVER' || betType === 'UNDER') {
+    } else if (betType === 'OU') {
       betOnVal = betOnVal + ' ' + lineSel.value;
+      savedType = betOnVal.startsWith('OVER') ? 'OVER' : 'UNDER';
     }
   }
   const payload = {
@@ -482,7 +486,7 @@ async function logBet() {
     away_team:  document.getElementById('lb-away').value,
     home_team:  document.getElementById('lb-home').value,
     bet_on:     betOnVal,
-    bet_type:   betType,
+    bet_type:   savedType,
     odds:       document.getElementById('lb-odds').value,
     amount:     document.getElementById('lb-amount').value,
     model_edge: document.getElementById('lb-edge').value,
