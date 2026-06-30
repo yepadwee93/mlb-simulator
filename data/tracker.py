@@ -82,7 +82,12 @@ def update_results():
         if not game_pk:
             continue
         try:
-            live = _get_nocache(f"/game/{game_pk}/feed/live")
+            import requests as _req
+
+            live = _req.get(
+                f"https://statsapi.mlb.com/api/v1.1/game/{game_pk}/feed/live",
+                timeout=10,
+            ).json()
             state = live.get("gameData", {}).get("status", {}).get("abstractGameState", "")
             if state != "Final":
                 continue
@@ -98,15 +103,32 @@ def update_results():
             actual_total = away_runs + home_runs
             run_diff_err = round(abs(pred_total - actual_total), 2)
 
-            supa().table("predictions").update(
-                {
-                    "actual_away_runs": away_runs,
-                    "actual_home_runs": home_runs,
-                    "actual_winner": actual_winner,
-                    "correct_pick": correct,
-                    "run_diff_error": run_diff_err,
-                }
-            ).eq("game_pk", str(game_pk)).execute()
+            update_data = {
+                "actual_away_runs": away_runs,
+                "actual_home_runs": home_runs,
+                "actual_winner": actual_winner,
+                "correct_pick": correct,
+                "run_diff_error": run_diff_err,
+            }
+
+            if not row.get("confidence_grade"):
+                away_wp = float(row.get("away_win_pct") or 50)
+                home_wp = float(row.get("home_win_pct") or 50)
+                margin = abs(away_wp - home_wp)
+                if margin >= 20:
+                    update_data["confidence_grade"] = "A"
+                    update_data["confidence_score"] = round(margin / 2, 1)
+                elif margin >= 12:
+                    update_data["confidence_grade"] = "B"
+                    update_data["confidence_score"] = round(margin / 2, 1)
+                elif margin >= 6:
+                    update_data["confidence_grade"] = "C"
+                    update_data["confidence_score"] = round(margin / 2, 1)
+                else:
+                    update_data["confidence_grade"] = "D"
+                    update_data["confidence_score"] = round(margin / 2, 1)
+
+            supa().table("predictions").update(update_data).eq("game_pk", str(game_pk)).execute()
             updated += 1
 
         except Exception:
@@ -416,15 +438,14 @@ def get_confidence_history():
     Groups settled predictions by grade (A/B/C/D) and computes win rate for each.
     Also returns daily data for charting.
     """
-    rows = (
-        supa()
-        .table("predictions")
-        .select("*")
-        .not_.is_("confidence_grade", "null")
-        .not_.is_("correct_pick", "null")
-        .order("game_date", desc=False)
-        .execute()
-    ).data or []
+    all_preds = supa().table("predictions").select("*").execute()
+    rows = [
+        r
+        for r in (all_preds.data or [])
+        if r.get("confidence_grade")
+        and r.get("correct_pick") is not None
+        and r.get("correct_pick") != ""
+    ]
 
     by_grade = {}
     daily = {}
