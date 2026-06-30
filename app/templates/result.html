@@ -518,6 +518,34 @@
     For entertainment only — not financial advice.
   </p>
 
+  <!-- Per-book odds comparison -->
+  {% if away_odds_by_book is defined and away_odds_by_book %}
+  <div style="border-top:1px solid #252836; margin-top:14px; padding-top:14px;">
+    <div style="font-size:0.72rem; color:#9aa0b8; text-transform:uppercase; letter-spacing:.5px; margin-bottom:10px;">
+      Line Shopping — Best Odds by Book
+    </div>
+    {% for side, team, books in [('away', away_team, away_odds_by_book), ('home', home_team, home_odds_by_book)] %}
+    {% if books %}
+    <div style="margin-bottom:10px;">
+      <div style="font-size:0.78rem;font-weight:700;color:{% if side=='away' %}#64b5f6{% else %}#81c784{% endif %};margin-bottom:6px;">{{ team }}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;">
+        {% for b in books %}
+        <div style="background:{% if loop.index == 1 and b.edge_pct > 3 %}#1b3a2a{% else %}var(--bg, #0d1120){% endif %};border:1px solid {% if loop.index == 1 and b.edge_pct > 3 %}#2a5a3a{% elif loop.index == 1 %}#1a3a5a{% else %}var(--border, #252836){% endif %};border-radius:8px;padding:6px 10px;min-width:90px;">
+          <div style="font-size:0.65rem;color:var(--text3, #9aa0b8);margin-bottom:2px;">{{ b.book }}</div>
+          <div style="font-size:0.95rem;font-weight:800;color:var(--text, #e8eaf0);">{{ b.odds_str }}</div>
+          <div style="font-size:0.68rem;font-weight:700;color:{% if b.edge_pct > 3 %}#4caf50{% elif b.edge_pct < -3 %}#ef5350{% else %}var(--text2, #b0b8cc){% endif %};">
+            {% if b.edge_pct > 0 %}+{% endif %}{{ b.edge_pct }}% edge
+          </div>
+          <div style="font-size:0.62rem;color:var(--text3, #9aa0b8);">EV: {% if b.ev_per_100 > 0 %}+{% endif %}${{ b.ev_per_100 }}/100</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+  </div>
+  {% endif %}
+
   <!-- Public betting % -->
   {% if away_bet_pct is not none %}
   <div style="border-top:1px solid #252836; margin-top:14px; padding-top:14px;">
