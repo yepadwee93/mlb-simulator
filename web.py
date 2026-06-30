@@ -2021,25 +2021,43 @@ def confidence_history_page():
 @app.route("/prop-accuracy")
 @login_required
 def prop_accuracy_page():
-    settle_prop_predictions()
-    data = get_prop_accuracy()
+    try:
+        settle_prop_predictions()
+        data = get_prop_accuracy()
+    except Exception:
+        data = {
+            "by_type": [],
+            "total_settled": 0,
+            "total_pending": 0,
+            "recent": [],
+        }
     return render_template("prop_accuracy.html", **data, username=current_user.username)
 
 
 @app.route("/api/auto-settle", methods=["POST"])
 @login_required
 def api_auto_settle():
-    """Auto-settle predictions, bets, odds, and props when games go final."""
+    """Auto-settle predictions, bets, odds, props, and picks when games go final."""
     pred_count = update_results()
     bet_count = settle_bets(current_user.id)
     odds_count = settle_odds_history()
-    prop_count = settle_prop_predictions()
+    prop_count = 0
+    try:
+        prop_count = settle_prop_predictions()
+    except Exception:
+        pass
+    pick_count = 0
+    try:
+        pick_count = update_pick_results(user_id=_uid())
+    except Exception:
+        pass
     return jsonify(
         {
             "predictions": pred_count,
             "bets": bet_count,
             "odds": odds_count,
             "props": prop_count,
+            "picks": pick_count,
         }
     )
 
