@@ -371,9 +371,15 @@ window.addEventListener('load', loadUnit);
 var _todayGames = [];
 
 function loadTodayGames() {
-  fetch('/api/today-games').then(function(r){return r.json();}).then(function(games){
+  fetch('/api/today-games').then(function(r){return r.json();}).then(function(data){
+    var games = Array.isArray(data) ? data : (data.games || []);
+    if (data.error) { console.error('[bet-picker] API error:', data.error); }
     _todayGames = games;
     var sel = document.getElementById('lb-game');
+    if (games.length === 0) {
+      sel.innerHTML = '<option value="">No games found today' + (data.error ? ' (API error)' : '') + '</option>';
+      return;
+    }
     sel.innerHTML = '<option value="">— Select a game (' + games.length + ' today) —</option>';
     games.forEach(function(g, i) {
       var status = g.status || '';
@@ -392,10 +398,8 @@ function loadTodayGames() {
       opt.textContent = label;
       sel.appendChild(opt);
     });
-    if (games.length === 0) {
-      sel.innerHTML = '<option value="">No games scheduled today</option>';
-    }
   }).catch(function(e){
+    console.error('[bet-picker] fetch failed:', e);
     var sel = document.getElementById('lb-game');
     sel.innerHTML = '<option value="">Could not load games — try refreshing</option>';
   });
