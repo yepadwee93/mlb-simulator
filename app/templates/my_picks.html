@@ -280,8 +280,9 @@
 <div class="card">
   <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
     <div class="section-title" style="margin-bottom:0;">All Picks</div>
-    <div>
+    <div style="display:flex;align-items:center;gap:8px;">
       <button class="update-btn" id="update-btn" onclick="checkResults()">🔄 Check Results</button>
+      <button class="update-btn" onclick="clearAllPicks()" style="background:#2a1520;border-color:#5a2535;color:#ef9a9a;">🗑 Clear All</button>
       <span id="update-msg" style="font-size:0.78rem; color:#b0b8cc; margin-left:8px;"></span>
     </div>
   </div>
@@ -468,6 +469,13 @@ function submitPick() {
 }
 
 // ── Check results ────────────────────────────────────────────────
+function clearAllPicks() {
+  if (!confirm('Clear all picks? This cannot be undone.')) return;
+  csrfFetch('/my-picks/clear', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function() { window.location.reload(); });
+}
+
 function checkResults() {
   var btn = document.getElementById('update-btn');
   var msg = document.getElementById('update-msg');
