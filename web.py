@@ -2043,8 +2043,12 @@ def update_my_picks():
 @login_required
 def clear_my_picks():
     uid = _uid()
-    supa().table("picks").delete().eq("user_id", int(uid)).execute()
-    return jsonify({"status": "ok"})
+    rows = supa().table("picks").select("id").eq("user_id", int(uid)).execute()
+    deleted = 0
+    for r in rows.data or []:
+        supa().table("picks").delete().eq("id", r["id"]).execute()
+        deleted += 1
+    return jsonify({"status": "ok", "deleted": deleted})
 
 
 @app.route("/odds-history")
