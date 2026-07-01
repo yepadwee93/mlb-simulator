@@ -10,8 +10,8 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      background: #141010;
-      color: #f0ece4;
+      background: var(--bg);
+      color: var(--text);
       font-family: 'Segoe UI', Arial, sans-serif;
       min-height: 100vh;
       padding: 40px 20px;
@@ -23,7 +23,7 @@
     header h1 {
       font-size: 2.4rem;
       font-weight: 800;
-      color: #ffffff;
+      color: var(--text);
     }
 
     /* ── Date navigator ── */
@@ -41,15 +41,15 @@
       align-items: center;
       justify-content: center;
       width: 36px; height: 36px;
-      background: #1e1616;
-      border: 1px solid #2a1a1a;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
       border-radius: 8px;
-      color: #999;
+      color: var(--text2);
       text-decoration: none;
       font-size: 1.1rem;
       transition: border-color 0.2s, color 0.2s;
     }
-    .date-arrow:hover { border-color: #e53935; color: #fff; }
+    .date-arrow:hover { border-color: #e53935; color: var(--text); }
 
     .date-picker-wrap {
       flex: 1;
@@ -59,10 +59,10 @@
     .date-picker-wrap input[type="date"] {
       width: 100%;
       padding: 8px 12px;
-      background: #1e1616;
-      border: 1px solid #2a1a1a;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
       border-radius: 8px;
-      color: #f0ece4;
+      color: var(--text);
       font-size: 0.95rem;
       font-family: inherit;
       cursor: pointer;
@@ -77,7 +77,7 @@
     .today-badge {
       font-size: 0.7rem;
       background: #e53935;
-      color: #fff;
+      color: var(--text);
       padding: 2px 8px;
       border-radius: 10px;
       font-weight: 700;
@@ -90,7 +90,7 @@
       margin: 4px auto 24px auto;
       padding: 13px 30px;
       background: linear-gradient(135deg, #e53935, #ffc107);
-      color: #fff;
+      color: var(--text);
       font-weight: 700;
       font-size: 1rem;
       border-radius: 10px;
@@ -101,7 +101,7 @@
     .simulate-all-btn:hover { opacity: 0.88; }
     .simulate-all-btn.disabled {
       background: #2a1a1a;
-      color: #777;
+      color: var(--text3);
       pointer-events: none;
     }
 
@@ -118,8 +118,8 @@
     }
 
     .game-card {
-      background: #1e1616;
-      border: 1px solid #2a1a1a;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
       border-radius: 12px;
       padding: 20px 22px;
       display: flex;
@@ -144,12 +144,12 @@
     .team-name {
       font-size: 1rem;
       font-weight: 700;
-      color: #ffffff;
+      color: var(--text);
     }
 
     .probable-pitcher {
       font-size: 0.75rem;
-      color: #999;
+      color: var(--text2);
       margin-top: 3px;
     }
 
@@ -158,7 +158,7 @@
       font-weight: 600;
     }
 
-    .vs { color: #999; font-size: 0.85rem; font-weight: 600; padding: 0 6px; }
+    .vs { color: var(--text2); font-size: 0.85rem; font-weight: 600; padding: 0 6px; }
 
     /* Meta row */
     .meta {
@@ -177,18 +177,18 @@
     }
     .status.final   { background: #1a2a1a; color: #4caf50; }
     .status.live    { background: #3a1e1e; color: #f44336; }
-    .status.pregame { background: #1a1028; color: #e53935; }
+    .status.pregame { background: var(--bg3); color: #e53935; }
     .status.delayed { background: #3a2e1e; color: #ffa726; }
-    .status.other   { background: #2a1a1a; color: #999; }
+    .status.other   { background: #2a1a1a; color: var(--text2); }
 
     .game-time {
       font-size: 0.75rem;
-      color: #999;
+      color: var(--text2);
     }
 
     .venue {
       font-size: 0.73rem;
-      color: #777;
+      color: var(--text3);
     }
 
     /* Sim picker */
@@ -200,7 +200,7 @@
 
     .sim-label {
       font-size: 0.75rem;
-      color: #999;
+      color: var(--text2);
       flex-shrink: 0;
     }
 
@@ -209,7 +209,7 @@
       text-align: center;
       padding: 9px 4px;
       background: #e53935;
-      color: #fff;
+      color: var(--text);
       font-size: 0.82rem;
       font-weight: 700;
       border-radius: 7px;
@@ -222,8 +222,8 @@
       display: block;
       width: 100%;
       padding: 10px;
-      background: #1e1616;
-      color: #777;
+      background: var(--card-bg);
+      color: var(--text3);
       font-size: 0.82rem;
       border-radius: 7px;
       text-align: center;
@@ -233,7 +233,7 @@
     /* No games */
     .no-games {
       text-align: center;
-      color: #999;
+      color: var(--text2);
       padding: 60px 0;
       font-size: 1rem;
     }
@@ -241,7 +241,7 @@
     footer {
       text-align: center;
       margin-top: 50px;
-      color: #777;
+      color: var(--text3);
       font-size: 0.78rem;
     }
 
@@ -266,13 +266,13 @@
 {% include "_navbar.html" %}
 
 {% if show_email_nudge and current_user.is_authenticated %}
-<div id="email-nudge" style="background:#1e1616;border-bottom:1px solid #2a1a1a;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+<div id="email-nudge" style="background: var(--card-bg);border-bottom: 1px solid var(--border);padding:10px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
   <div style="display:flex;align-items:center;gap:10px;font-size:0.85rem;">
     <span style="font-size:1.1rem;">📬</span>
-    <span style="color:#999;">Get daily top play picks sent to your inbox every morning.</span>
+    <span style="color: var(--text2);">Get daily top play picks sent to your inbox every morning.</span>
     <a href="/settings" style="background:#e53935;color:#fff;padding:5px 14px;border-radius:6px;font-size:0.8rem;font-weight:700;text-decoration:none;white-space:nowrap;">Sign up for alerts</a>
   </div>
-  <button onclick="dismissNudge()" style="background:none;border:none;color:#555;font-size:1.2rem;cursor:pointer;padding:0 4px;line-height:1;" title="Dismiss">✕</button>
+  <button onclick="dismissNudge()" style="background:none;border:none;color:var(--text3);font-size:1.2rem;cursor:pointer;padding:0 4px;line-height:1;" title="Dismiss">✕</button>
 </div>
 <script>
 function dismissNudge() {
@@ -287,19 +287,19 @@ if (localStorage.getItem('email_nudge_dismissed') === '1') {
 {% endif %}
 
 <!-- Sport Selector -->
-<div id="sport-selector" style="display:flex;gap:0;max-width:500px;margin:0 auto 20px auto;border-radius:10px;overflow:hidden;border:1px solid #2a1a1a;">
-  <a href="/mlb" id="sport-tab-mlb" data-sport="mlb" style="flex:1;padding:10px 0;text-align:center;background:linear-gradient(135deg,#1a1028,#141010);color:#e53935;font-weight:700;font-size:0.85rem;text-decoration:none;border-right:1px solid #2a1a1a;">
+<div id="sport-selector" style="display:flex;gap:0;max-width:500px;margin:0 auto 20px auto;border-radius:10px;overflow:hidden;border: 1px solid var(--border);">
+  <a href="/mlb" id="sport-tab-mlb" data-sport="mlb" style="flex:1;padding:10px 0;text-align:center;background:linear-gradient(135deg,#1a1028,#141010);color:#e53935;font-weight:700;font-size:0.85rem;text-decoration:none;border-right: 1px solid var(--border);">
     ⚾ MLB
   </a>
-  <div id="sport-tab-nfl" data-sport="nfl" style="flex:1;padding:10px 0;text-align:center;color:#555;font-size:0.85rem;border-right:1px solid #2a1a1a;cursor:default;position:relative;" title="Coming Aug 2026">
+  <div id="sport-tab-nfl" data-sport="nfl" style="flex:1;padding:10px 0;text-align:center;color:var(--text3);font-size:0.85rem;border-right: 1px solid var(--border);cursor:default;position:relative;" title="Coming Aug 2026">
     🏈 NFL
     <span style="position:absolute;top:-1px;right:6px;font-size:0.55rem;background:#e53935;color:#fff;padding:1px 5px;border-radius:0 0 4px 4px;font-weight:700;">AUG</span>
   </div>
-  <div id="sport-tab-nba" data-sport="nba" style="flex:1;padding:10px 0;text-align:center;color:#555;font-size:0.85rem;border-right:1px solid #2a1a1a;cursor:default;position:relative;" title="Coming Oct 2026">
+  <div id="sport-tab-nba" data-sport="nba" style="flex:1;padding:10px 0;text-align:center;color:var(--text3);font-size:0.85rem;border-right: 1px solid var(--border);cursor:default;position:relative;" title="Coming Oct 2026">
     🏀 NBA
     <span style="position:absolute;top:-1px;right:6px;font-size:0.55rem;background:#e53935;color:#fff;padding:1px 5px;border-radius:0 0 4px 4px;font-weight:700;">OCT</span>
   </div>
-  <div id="sport-tab-nhl" data-sport="nhl" style="flex:1;padding:10px 0;text-align:center;color:#555;font-size:0.85rem;cursor:default;position:relative;" title="Coming Dec 2026">
+  <div id="sport-tab-nhl" data-sport="nhl" style="flex:1;padding:10px 0;text-align:center;color:var(--text3);font-size:0.85rem;cursor:default;position:relative;" title="Coming Dec 2026">
     🏒 NHL
     <span style="position:absolute;top:-1px;right:6px;font-size:0.55rem;background:#e53935;color:#fff;padding:1px 5px;border-radius:0 0 4px 4px;font-weight:700;">DEC</span>
   </div>
@@ -406,18 +406,18 @@ if (localStorage.getItem('email_nudge_dismissed') === '1') {
 </header>
 
 <!-- Live Scores Bar -->
-<div id="live-scores-bar" style="background:#100c0c;border-bottom:1px solid #241818;padding:0;overflow-x:auto;display:flex;align-items:center;margin-bottom:16px;border-radius:8px;scrollbar-width:none;-ms-overflow-style:none;"></div>
+<div id="live-scores-bar" style="background:var(--bg);border-bottom: 1px solid var(--border);padding:0;overflow-x:auto;display:flex;align-items:center;margin-bottom:16px;border-radius:8px;scrollbar-width:none;-ms-overflow-style:none;"></div>
 
 <!-- RLM Alerts -->
 {% if rlm_alerts %}
-<div style="background:#120a1e;border:1px solid #2a1838;border-radius:12px;padding:14px 20px;margin-bottom:20px;">
+<div style="background:var(--bg3);border:1px solid #2a1838;border-radius:12px;padding:14px 20px;margin-bottom:20px;">
   <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#4a9eff;margin-bottom:10px;">
     Reverse Line Movement Detected
   </div>
   {% for a in rlm_alerts %}
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;font-size:0.82rem;">
     <span style="color:#4a9eff;font-weight:800;font-size:0.9rem;">RLM</span>
-    <span style="color:#f0ece4;">
+    <span style="color: var(--text);">
       Sharp money on <strong>{% if a.direction == 'away' %}{{ a.away_team }}{% else %}{{ a.home_team }}{% endif %}</strong>
       ({{ a.away_team }} @ {{ a.home_team }})
     </span>
@@ -440,10 +440,10 @@ if (localStorage.getItem('email_nudge_dismissed') === '1') {
   </div>
   <div style="display:flex;gap:10px;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;">
     {% for t in team_trends[:8] %}
-    <div style="flex-shrink:0;background:#141010;border:1px solid {% if t.pct >= 70 %}#1a2838{% else %}#241818{% endif %};border-radius:10px;padding:8px 14px;min-width:100px;text-align:center;">
-      <div style="font-size:0.82rem;font-weight:700;color:#f0ece4;">{{ t.team.split(' ')[-1] }}</div>
+    <div style="flex-shrink:0;background: var(--bg);border:1px solid {% if t.pct >= 70 %}#1a2838{% else %}#241818{% endif %};border-radius:10px;padding:8px 14px;min-width:100px;text-align:center;">
+      <div style="font-size:0.82rem;font-weight:700;color: var(--text);">{{ t.team.split(' ')[-1] }}</div>
       <div style="font-size:1.1rem;font-weight:800;color:{% if t.pct >= 70 %}#4caf50{% elif t.pct >= 50 %}#ffa726{% else %}#ef5350{% endif %};">{{ t.pct }}%</div>
-      <div style="font-size:0.65rem;color:#777;">{{ t.wins }}-{{ t.losses }} · {{ t.streak }}</div>
+      <div style="font-size:0.65rem;color: var(--text3);">{{ t.wins }}-{{ t.losses }} · {{ t.streak }}</div>
     </div>
     {% endfor %}
   </div>
@@ -487,7 +487,7 @@ if (localStorage.getItem('email_nudge_dismissed') === '1') {
         <div style="text-align:center;flex-shrink:0;">
           <span class="vs">@</span>
           {% if game.game_time %}
-          <div style="font-size:0.68rem;color:#777;margin-top:4px;" class="game-time-utc" data-utc="{{ game.game_time }}">
+          <div style="font-size:0.68rem;color: var(--text3);margin-top:4px;" class="game-time-utc" data-utc="{{ game.game_time }}">
             {{ game.game_time[11:16] }} UTC
           </div>
           {% endif %}
@@ -512,13 +512,13 @@ if (localStorage.getItem('email_nudge_dismissed') === '1') {
       {% set pub = pub_pcts.get((_teams[0], _teams[1])) %}
       {% set lm  = line_movement.get((_teams[0], _teams[1])) %}
       {% if pub %}
-      <div style="margin:6px 0 4px 0; font-size:0.72rem; color:#777;">
+      <div style="margin:6px 0 4px 0; font-size:0.72rem; color: var(--text3);">
         <div style="display:flex; justify-content:space-between; margin-bottom:3px;">
           <span>{{ game.away_team.split(' ')[-1] }} <b style="color:#e53935;">{{ pub.away_bet_pct }}%</b></span>
-          <span style="color:#555; font-size:0.65rem;">public bets</span>
+          <span style="color:var(--text3); font-size:0.65rem;">public bets</span>
           <span><b style="color:#81c784;">{{ pub.home_bet_pct }}%</b> {{ game.home_team.split(' ')[-1] }}</span>
         </div>
-        <div style="height:5px; background:#1e1616; border-radius:3px; overflow:hidden; display:flex;">
+        <div style="height:5px; background: var(--card-bg); border-radius:3px; overflow:hidden; display:flex;">
           <div style="width:{{ pub.away_bet_pct }}%; background:#e53935; border-radius:3px 0 0 3px;"></div>
           <div style="width:{{ pub.home_bet_pct }}%; background:#81c784; border-radius:0 3px 3px 0;"></div>
         </div>
@@ -528,13 +528,13 @@ if (localStorage.getItem('email_nudge_dismissed') === '1') {
           {# RLM on home: public heavily on away BUT line moved toward home #}
           {% if pub.away_bet_pct >= 60 and lm.home_impl_move >= 2 %}
           <div style="margin-top:5px;padding:4px 8px;background:#1a1228;border:1px solid #e53935;border-radius:6px;color:#c4b5fd;font-size:0.68rem;font-weight:700;display:flex;align-items:center;gap:5px;">
-            🔀 RLM — {{ pub.away_bet_pct }}% public on {{ game.away_team.split(' ')[-1] }} but line moving toward <b style="color:#fff;">{{ game.home_team.split(' ')[-1] }}</b>
+            🔀 RLM — {{ pub.away_bet_pct }}% public on {{ game.away_team.split(' ')[-1] }} but line moving toward <b style="color:var(--text);">{{ game.home_team.split(' ')[-1] }}</b>
             <span style="color:#a78bfa;font-weight:400;">(sharp signal)</span>
           </div>
           {# RLM on away: public heavily on home BUT line moved toward away #}
           {% elif pub.home_bet_pct >= 60 and lm.away_impl_move >= 2 %}
           <div style="margin-top:5px;padding:4px 8px;background:#1a1228;border:1px solid #e53935;border-radius:6px;color:#c4b5fd;font-size:0.68rem;font-weight:700;display:flex;align-items:center;gap:5px;">
-            🔀 RLM — {{ pub.home_bet_pct }}% public on {{ game.home_team.split(' ')[-1] }} but line moving toward <b style="color:#fff;">{{ game.away_team.split(' ')[-1] }}</b>
+            🔀 RLM — {{ pub.home_bet_pct }}% public on {{ game.home_team.split(' ')[-1] }} but line moving toward <b style="color:var(--text);">{{ game.away_team.split(' ')[-1] }}</b>
             <span style="color:#a78bfa;font-weight:400;">(sharp signal)</span>
           </div>
           {% endif %}
@@ -585,24 +585,24 @@ if (localStorage.getItem('email_nudge_dismissed') === '1') {
       {% set existing_note = game_notes.get(gk) %}
       <div class="game-note-section" style="margin-top:10px;">
         {% if existing_note %}
-        <div class="note-display" id="note-display-{{ gk }}" style="background:#1e1616;border:1px solid #2a1a1a;border-radius:8px;padding:8px 10px;font-size:0.78rem;color:#f0ece4;position:relative;">
+        <div class="note-display" id="note-display-{{ gk }}" style="background: var(--card-bg);border: 1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:0.78rem;color: var(--text);position:relative;">
           <span style="color:#ffd54f;font-weight:700;font-size:0.65rem;display:block;margin-bottom:3px;">📝 MY NOTE</span>
           <span id="note-text-{{ gk }}">{{ existing_note.note }}</span>
           <div style="display:flex;gap:8px;margin-top:6px;">
-            <button onclick="editNote('{{ gk }}','{{ game.away_team | replace("'","\\'")|replace('"','\\"') }}','{{ game.home_team | replace("'","\\'")|replace('"','\\"') }}')" style="font-size:0.68rem;background:none;border:1px solid #555;color:#777;padding:2px 8px;border-radius:4px;cursor:pointer;">Edit</button>
+            <button onclick="editNote('{{ gk }}','{{ game.away_team | replace("'","\\'")|replace('"','\\"') }}','{{ game.home_team | replace("'","\\'")|replace('"','\\"') }}')" style="font-size:0.68rem;background:none;border:1px solid #555;color: var(--text3);padding:2px 8px;border-radius:4px;cursor:pointer;">Edit</button>
             <button onclick="deleteNote('{{ gk }}')" style="font-size:0.68rem;background:none;border:1px solid #5a2a2a;color:#ef9a9a;padding:2px 8px;border-radius:4px;cursor:pointer;">Delete</button>
           </div>
         </div>
         {% endif %}
         <div id="note-form-{{ gk }}" style="{% if existing_note %}display:none;{% endif %}">
           {% if not existing_note %}
-          <button onclick="showNoteForm('{{ gk }}')" id="note-add-btn-{{ gk }}" style="font-size:0.7rem;background:none;border:1px solid #2a1a1a;color:#777;padding:4px 10px;border-radius:6px;cursor:pointer;margin-top:2px;width:100%;">+ Add note</button>
+          <button onclick="showNoteForm('{{ gk }}')" id="note-add-btn-{{ gk }}" style="font-size:0.7rem;background:none;border: 1px solid var(--border);color: var(--text3);padding:4px 10px;border-radius:6px;cursor:pointer;margin-top:2px;width:100%;">+ Add note</button>
           {% endif %}
           <div id="note-input-area-{{ gk }}" style="display:none;">
-            <textarea id="note-ta-{{ gk }}" placeholder="Your notes on this game…" style="width:100%;background:#1e1616;border:1px solid #2a1a1a;color:#f0ece4;border-radius:8px;padding:8px;font-size:0.78rem;resize:vertical;min-height:60px;margin-top:4px;box-sizing:border-box;"></textarea>
+            <textarea id="note-ta-{{ gk }}" placeholder="Your notes on this game…" style="width:100%;background: var(--card-bg);border: 1px solid var(--border);color: var(--text);border-radius:8px;padding:8px;font-size:0.78rem;resize:vertical;min-height:60px;margin-top:4px;box-sizing:border-box;"></textarea>
             <div style="display:flex;gap:6px;margin-top:4px;">
               <button onclick="saveNote('{{ gk }}','{{ game.away_team | replace("'","\\'")|replace('"','\\"') }}','{{ game.home_team | replace("'","\\'")|replace('"','\\"') }}','{{ game.game_date }}')" style="font-size:0.72rem;background:#1b3a2a;border:1px solid #1a2838;color:#81c784;padding:4px 12px;border-radius:6px;cursor:pointer;">Save</button>
-              <button onclick="cancelNote('{{ gk }}')" style="font-size:0.72rem;background:none;border:1px solid #2a1a1a;color:#777;padding:4px 10px;border-radius:6px;cursor:pointer;">Cancel</button>
+              <button onclick="cancelNote('{{ gk }}')" style="font-size:0.72rem;background:none;border: 1px solid var(--border);color: var(--text3);padding:4px 10px;border-radius:6px;cursor:pointer;">Cancel</button>
             </div>
           </div>
         </div>
@@ -673,7 +673,7 @@ function saveNote(gk, away, home, gameDate) {
         var div = document.createElement('div');
         div.className = 'note-display';
         div.id = 'note-display-' + gk;
-        div.style.cssText = 'background:#1e1616;border:1px solid #2a1a1a;border-radius:8px;padding:8px 10px;font-size:0.78rem;color:#f0ece4;';
+        div.style.cssText = 'background: var(--card-bg);border: 1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:0.78rem;color: var(--text);';
         var noteLabel = document.createElement('span');
         noteLabel.style.cssText = 'color:#ffd54f;font-weight:700;font-size:0.65rem;display:block;margin-bottom:3px;';
         noteLabel.textContent = '📝 MY NOTE';
@@ -683,7 +683,7 @@ function saveNote(gk, away, home, gameDate) {
         var btnRow = document.createElement('div');
         btnRow.style.cssText = 'display:flex;gap:8px;margin-top:6px;';
         var editBtn = document.createElement('button');
-        editBtn.style.cssText = 'font-size:0.68rem;background:none;border:1px solid #555;color:#777;padding:2px 8px;border-radius:4px;cursor:pointer;';
+        editBtn.style.cssText = 'font-size:0.68rem;background:none;border:1px solid #555;color: var(--text3);padding:2px 8px;border-radius:4px;cursor:pointer;';
         editBtn.textContent = 'Edit';
         editBtn.onclick = function(){ editNote(gk, away, home); };
         var delBtn = document.createElement('button');
@@ -718,7 +718,7 @@ function deleteNote(gk) {
           var btn = document.createElement('button');
           btn.id = 'note-add-btn-' + gk;
           btn.onclick = function() { showNoteForm(gk); };
-          btn.style.cssText = 'font-size:0.7rem;background:none;border:1px solid #2a1a1a;color:#777;padding:4px 10px;border-radius:6px;cursor:pointer;margin-top:2px;width:100%;';
+          btn.style.cssText = 'font-size:0.7rem;background:none;border: 1px solid var(--border);color: var(--text3);padding:4px 10px;border-radius:6px;cursor:pointer;margin-top:2px;width:100%;';
           btn.textContent = '+ Add note';
           form.insertBefore(btn, area);
         }
@@ -743,7 +743,7 @@ function csrfFetch(url,opts){opts=opts||{};opts.headers=Object.assign({'X-CSRFTo
   }
 
   function renderLive(games) {
-    var html = '<span style="color:#555;font-size:0.65rem;padding:0 10px;white-space:nowrap;">LIVE</span>';
+    var html = '<span style="color:var(--text3);font-size:0.65rem;padding:0 10px;white-space:nowrap;">LIVE</span>';
     var hasLive = false;
     games.forEach(function(g) {
       var status = (g.status || '').toLowerCase();
@@ -753,12 +753,12 @@ function csrfFetch(url,opts){opts=opts||{};opts.headers=Object.assign({'X-CSRFTo
       if (isLive) hasLive = true;
       var stLabel = isFinal ? '<span style="color:#ef5350;">F</span>' :
         '<span style="color:#4caf50;">' + (g.inning_half === 'top' ? '▲' : '▼') + g.inning + '</span>';
-      html += '<div style="display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-right:1px solid #241818;white-space:nowrap;font-size:0.75rem;">'
-        + '<span style="color:#999;">' + abbr(g.away) + '</span>'
-        + '<span style="font-weight:800;color:#f0ece4;">' + (g.away_score || 0) + '</span>'
-        + '<span style="color:#555;">-</span>'
-        + '<span style="font-weight:800;color:#f0ece4;">' + (g.home_score || 0) + '</span>'
-        + '<span style="color:#999;">' + abbr(g.home) + '</span>'
+      html += '<div style="display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-right:1px solid var(--border);white-space:nowrap;font-size:0.75rem;">'
+        + '<span style="color: var(--text2);">' + abbr(g.away) + '</span>'
+        + '<span style="font-weight:800;color: var(--text);">' + (g.away_score || 0) + '</span>'
+        + '<span style="color:var(--text3);">-</span>'
+        + '<span style="font-weight:800;color: var(--text);">' + (g.home_score || 0) + '</span>'
+        + '<span style="color: var(--text2);">' + abbr(g.home) + '</span>'
         + '<span style="font-size:0.65rem;">' + stLabel + '</span>'
         + '</div>';
     });

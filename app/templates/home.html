@@ -1,14 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script>!function(){var t=localStorage.getItem("mlb_theme")||"dark",m={dark:{"--bg":"#141010","--bg2":"#1a1212","--bg3":"#241818","--border":"#2a1a1a","--text":"#f0ece4","--text2":"#999","--text3":"#777","--accent":"#e53935","--card-bg":"#1a1212"},medium:{"--bg":"#1c1614","--bg2":"#262020","--bg3":"#302624","--border":"#3a2e2c","--text":"#f0ece4","--text2":"#c0b0a8","--text3":"#998880","--accent":"#ffc107","--card-bg":"#262020"},light:{"--bg":"#f5f0e8","--bg2":"#faf7f2","--bg3":"#ebe4d8","--border":"#d8cfc0","--text":"#2a1a14","--text2":"#5a4a40","--text3":"#8a7a6a","--accent":"#c62828","--card-bg":"#faf7f2"}}[t]||{};Object.entries(m).forEach(function(e){document.documentElement.style.setProperty(e[0],e[1])});document.addEventListener("DOMContentLoaded",function(){document.body.style.background=m["--bg"];document.body.style.color=m["--text"]})}();</script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sports Simulator — Your Edge Starts Here</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      background: #141010;
-      color: #f0ece4;
+      background: var(--bg);
+      color: var(--text);
       font-family: 'Segoe UI', Arial, sans-serif;
       min-height: 100vh;
     }
@@ -19,7 +20,7 @@
       justify-content: space-between;
       align-items: center;
       padding: 16px 28px;
-      border-bottom: 1px solid #241818;
+      border-bottom: 1px solid var(--border);
     }
     .logo {
       font-size: 1.3rem;
@@ -33,7 +34,7 @@
     .gear-btn {
       background: none;
       border: none;
-      color: #999;
+      color: var(--text2);
       font-size: 1.2rem;
       cursor: pointer;
       padding: 4px 8px;
@@ -42,13 +43,13 @@
       line-height: 1;
       position: relative;
     }
-    .gear-btn:hover { background: #2a1a1a; color: #f0ece4; }
+    .gear-btn:hover { background: var(--bg3); color: var(--text); }
     .gear-dropdown {
       position: absolute;
       top: calc(100% + 8px);
       right: 0;
-      background: #221a1a;
-      border: 1px solid #2a1a1a;
+      background: var(--bg2);
+      border: 1px solid var(--border);
       border-radius: 10px;
       min-width: 180px;
       z-index: 1500;
@@ -63,13 +64,13 @@
       font-size: 0.83rem;
       font-weight: 600;
       text-decoration: none;
-      color: #ddd;
+      color: var(--text);
     }
-    .gear-dropdown a:hover { background: #241818; }
+    .gear-dropdown a:hover { background: var(--bg3); }
     .gear-user {
       color: #ffc107;
       font-weight: 700;
-      border-bottom: 1px solid #241818;
+      border-bottom: 1px solid var(--border);
       padding-bottom: 10px;
       margin-bottom: 4px;
     }
@@ -141,12 +142,12 @@
       gap: 16px;
     }
     .sport-card {
-      background: #1e1616;
-      border: 1px solid #2a1a1a;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
       border-radius: 16px;
       padding: 28px 24px;
       text-decoration: none;
-      color: #f0ece4;
+      color: var(--text);
       transition: border-color 0.2s, transform 0.15s, box-shadow 0.2s;
       position: relative;
       overflow: hidden;
@@ -159,7 +160,7 @@
     .sport-card.live { border-color: #e5393533; }
     .sport-card.live:hover { border-color: #e53935; }
     .sport-card.coming { opacity: 0.6; cursor: default; }
-    .sport-card.coming:hover { transform: none; box-shadow: none; border-color: #2a1a1a; }
+    .sport-card.coming:hover { transform: none; box-shadow: none; border-color: var(--border); }
 
     .sport-icon { font-size: 2.4rem; margin-bottom: 12px; }
     .sport-name { font-size: 1.2rem; font-weight: 800; margin-bottom: 4px; }
@@ -173,7 +174,7 @@
     .sport-status.coming { color: #555; }
     .sport-desc {
       font-size: 0.82rem;
-      color: #777;
+      color: var(--text3);
       margin-top: 10px;
       line-height: 1.5;
     }
@@ -219,7 +220,7 @@
     .model-tag.coming-tag {
       background: #ffffff06;
       color: #444;
-      border: 1px solid #2a1a1a;
+      border: 1px solid var(--border);
     }
 
     /* ── Bottom features ── */
@@ -234,8 +235,8 @@
       gap: 16px;
     }
     .feature-card {
-      background: #1e1616;
-      border: 1px solid #2a1a1a;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
       border-radius: 12px;
       padding: 20px;
     }

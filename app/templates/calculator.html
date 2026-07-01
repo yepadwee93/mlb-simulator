@@ -8,27 +8,27 @@
   <title>Bet Calculator — MLB Simulator</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #141010; color: #f0ece4; font-family: 'Segoe UI', Arial, sans-serif; padding: 32px 20px; }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', Arial, sans-serif; padding: 32px 20px; }
     a { color: #e53935; text-decoration: none; } a:hover { text-decoration: underline; }
     .back { display: inline-block; margin-bottom: 24px; font-size: 0.9rem; }
     h1 { font-size: 1.6rem; font-weight: 800; margin-bottom: 6px; }
-    .subtitle { color: #999; font-size: 0.9rem; margin-bottom: 28px; }
+    .subtitle { color: var(--text2); font-size: 0.9rem; margin-bottom: 28px; }
     nav { display: flex; gap: 16px; margin-bottom: 28px; flex-wrap: wrap; }
-    nav a { font-size: 0.82rem; color: #999; padding: 5px 12px; border-radius: 6px; border: 1px solid #241818; }
-    nav a:hover { color: #f0ece4; border-color: #777; text-decoration: none; }
-    .card { background: #1e1616; border: 1px solid #241818; border-radius: 14px; padding: 24px 28px; margin-bottom: 24px; max-width: 600px; }
-    .card h2 { font-size: 1rem; font-weight: 700; margin-bottom: 18px; color: #ddd; }
+    nav a { font-size: 0.82rem; color: var(--text2); padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border); }
+    nav a:hover { color: var(--text); border-color: var(--text3); text-decoration: none; }
+    .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 14px; padding: 24px 28px; margin-bottom: 24px; max-width: 600px; }
+    .card h2 { font-size: 1rem; font-weight: 700; margin-bottom: 18px; color: var(--text); }
     .row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
-    label { display: block; font-size: 0.68rem; color: #999; text-transform: uppercase; letter-spacing: .4px; margin-bottom: 5px; }
-    input { width: 100%; background: #141010; border: 1px solid #2a1c1c; border-radius: 8px; color: #f0ece4; padding: 9px 12px; font-size: 0.9rem; }
+    label { display: block; font-size: 0.68rem; color: var(--text2); text-transform: uppercase; letter-spacing: .4px; margin-bottom: 5px; }
+    input { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 9px 12px; font-size: 0.9rem; }
     input:focus { outline: none; border-color: #e53935; }
     .results-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-top: 18px; }
-    .res-card { background: #141010; border-radius: 10px; padding: 14px; text-align: center; }
-    .res-label { font-size: 0.65rem; color: #999; text-transform: uppercase; letter-spacing: .4px; margin-bottom: 6px; }
+    .res-card { background: var(--bg); border-radius: 10px; padding: 14px; text-align: center; }
+    .res-label { font-size: 0.65rem; color: var(--text2); text-transform: uppercase; letter-spacing: .4px; margin-bottom: 6px; }
     .res-val { font-size: 1.2rem; font-weight: 800; }
     .green { color: #4caf50; } .red { color: #ef5350; } .blue { color: #e53935; } .gold { color: #ffa726; }
     .divider { border: none; border-top: 1px solid #241818; margin: 20px 0; }
-    .hint { font-size: 0.72rem; color: #777; margin-top: 8px; }
+    .hint { font-size: 0.72rem; color: var(--text3); margin-top: 8px; }
   
 </style>
 
@@ -51,7 +51,7 @@
     var inner = document.getElementById('scoreboard-inner');
     if (!inner) return;
     if (!games.length) { document.getElementById('scoreboard-bar').style.display='none'; return; }
-    var html = '<div style="padding:7px 14px;font-size:0.7rem;color:#555;white-space:nowrap;align-self:center;flex-shrink:0;">TODAY</div>';
+    var html = '<div style="padding:7px 14px;font-size:0.7rem;color:var(--text3);white-space:nowrap;align-self:center;flex-shrink:0;">TODAY</div>';
     games.forEach(function(g) {
       var s = (g.status||'').toLowerCase();
       var isLive = s.includes('progress')||s.includes('live');
@@ -64,15 +64,15 @@
       } else if (isFinal) {
         timeStr = 'Final';
       }
-      var scoreAway = (isLive||isFinal) ? '<b style="color:#fff;">'+esc(g.away_score)+'</b>' : '';
-      var scoreHome = (isLive||isFinal) ? '<b style="color:#fff;">'+esc(g.home_score)+'</b>' : '';
+      var scoreAway = (isLive||isFinal) ? '<b style="color:var(--text);">'+esc(g.away_score)+'</b>' : '';
+      var scoreHome = (isLive||isFinal) ? '<b style="color:var(--text);">'+esc(g.home_score)+'</b>' : '';
       var dot = '<span style="width:6px;height:6px;border-radius:50%;background:'+statusColor(g.status)+';display:inline-block;margin-right:5px;vertical-align:middle;'+(isLive?'animation:pulse 1.2s infinite;':'')+'" ></span>';
       var link = g.gamePk ? '/simulate/'+g.gamePk+'?sims=100000' : '#';
-      html += '<a href="'+link+'" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:5px 14px;border-left:1px solid #111;text-decoration:none;flex-shrink:0;min-width:110px;">'
+      html += '<a href="'+link+'" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:5px 14px;border-left:1px solid var(--border);text-decoration:none;flex-shrink:0;min-width:110px;">'
         + '<div style="display:flex;align-items:center;gap:6px;font-size:0.72rem;white-space:nowrap;">'
-        + '<span style="color:#999;">'+esc(abbr(g.away))+' '+scoreAway+'</span>'
-        + '<span style="color:#555;font-size:0.65rem;">@</span>'
-        + '<span style="color:#999;">'+scoreHome+' '+esc(abbr(g.home))+'</span>'
+        + '<span style="color: var(--text2);">'+esc(abbr(g.away))+' '+scoreAway+'</span>'
+        + '<span style="color:var(--text3);font-size:0.65rem;">@</span>'
+        + '<span style="color: var(--text2);">'+scoreHome+' '+esc(abbr(g.home))+'</span>'
         + '</div>'
         + '<div style="font-size:0.63rem;margin-top:2px;">'+dot+'<span style="color:'+statusColor(g.status)+';">'+timeStr+'</span></div>'
         + '</a>';
@@ -127,12 +127,12 @@
 
 <div class="card">
   <h2>Parlay Calculator</h2>
-  <p style="font-size:0.82rem;color:#999;margin-bottom:16px;">Add up to 8 legs. Paste American odds for each.</p>
+  <p style="font-size:0.82rem;color: var(--text2);margin-bottom:16px;">Add up to 8 legs. Paste American odds for each.</p>
   <div id="legs">
     <div class="row" style="grid-template-columns:1fr 1fr auto;gap:10px;margin-bottom:10px;">
       <div><label>Leg 1 Odds</label><input class="leg-odds" type="number" value="-110" oninput="calcParlay()"></div>
       <div><label>Leg 1 Win %</label><input class="leg-pct" type="number" step="0.1" value="55" oninput="calcParlay()"></div>
-      <div style="display:flex;align-items:flex-end;"><button onclick="addLeg()" style="background:#1a1028;color:#e53935;border:1px solid #c62828;border-radius:6px;padding:8px 12px;cursor:pointer;font-size:0.8rem;">+ Leg</button></div>
+      <div style="display:flex;align-items:flex-end;"><button onclick="addLeg()" style="background:var(--bg3);color:#e53935;border:1px solid #c62828;border-radius:6px;padding:8px 12px;cursor:pointer;font-size:0.8rem;">+ Leg</button></div>
     </div>
   </div>
   <div class="results-grid" id="parlay-results"></div>
@@ -202,7 +202,7 @@ function calc() {
     <div class="res-card"><div class="res-label">Flat (1 unit)</div>
       <div class="res-val">$${flatBet.toFixed(0)}</div></div>
     <div class="res-card"><div class="res-label">½ Unit</div>
-      <div class="res-val" style="color:#999;">$${fractionalBet.toFixed(0)}</div></div>
+      <div class="res-val" style="color: var(--text2);">$${fractionalBet.toFixed(0)}</div></div>
   `;
 
   document.getElementById('ev-note').textContent = ev > 0
