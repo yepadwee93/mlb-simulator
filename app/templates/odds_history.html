@@ -101,6 +101,7 @@ function csrfFetch(url,opts={}){opts.headers=Object.assign({'X-CSRFToken':getCsr
       {% endif %}
     </form>
     <span class="count" id="row-count">{{ rows | length }} games</span>
+    <a href="/export/odds.csv" style="font-size:0.75rem;color:#ffc107;border:1px solid var(--border);padding:5px 12px;border-radius:8px;text-decoration:none;font-weight:600;margin-left:auto;">Export CSV</a>
   </div>
 
   {% if rows %}

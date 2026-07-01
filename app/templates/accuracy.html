@@ -39,7 +39,10 @@
     nav { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
     nav a { font-size: 0.82rem; color: var(--text2); padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border); }
     nav a:hover { color: var(--text); border-color: var(--text3); text-decoration: none; }
-  
+    .date-quick-btn { display:inline-block;font-size:0.78rem;color:var(--text2);padding:6px 14px;border-radius:8px;border:1px solid var(--border);text-decoration:none;font-weight:600;transition:all 0.15s; }
+    .date-quick-btn:hover { color:var(--text);border-color:var(--text3);text-decoration:none; }
+    .date-quick-btn.active { background:#c62828;color:#fff;border-color:#c62828; }
+
 </style>
 
 <body>
@@ -109,6 +112,61 @@
 </style>
 <h1>📊 Model Accuracy</h1>
 <p class="subtitle">Track how well the Monte Carlo model predicts real game outcomes.</p>
+
+<!-- Date Filter Bar -->
+<div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;align-items:center;">
+  <a href="/accuracy?from={{ today }}&to={{ today }}" class="date-quick-btn{% if date_from == today and date_to == today %} active{% endif %}">Today</a>
+  <a href="/accuracy?from={{ yesterday }}&to={{ yesterday }}" class="date-quick-btn{% if date_from == yesterday and date_to == yesterday %} active{% endif %}">Yesterday</a>
+  <a href="/accuracy?from={{ last_7 }}&to={{ today }}" class="date-quick-btn{% if date_from == last_7 and date_to == today %} active{% endif %}">Last 7 Days</a>
+  <a href="/accuracy?from={{ last_30 }}&to={{ today }}" class="date-quick-btn{% if date_from == last_30 and date_to == today %} active{% endif %}">Last 30 Days</a>
+  <a href="/accuracy" class="date-quick-btn{% if not date_from and not date_to %} active{% endif %}">All Time</a>
+  <span style="color:var(--text3);font-size:0.75rem;margin:0 4px;">|</span>
+  <form method="get" action="/accuracy" style="display:flex;gap:6px;align-items:center;">
+    <input type="date" name="from" value="{{ date_from }}" style="background:var(--card-bg);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:8px;font-size:0.8rem;">
+    <span style="color:var(--text3);font-size:0.8rem;">to</span>
+    <input type="date" name="to" value="{{ date_to }}" style="background:var(--card-bg);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:8px;font-size:0.8rem;">
+    <button type="submit" style="background:var(--bg3);border:1px solid #c62828;color:#e53935;padding:6px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;">Filter</button>
+    {% if date_from or date_to %}
+    <a href="/accuracy" style="font-size:0.78rem;color:#ef9a9a;">Clear</a>
+    {% endif %}
+  </form>
+</div>
+{% if date_from or date_to %}
+<div style="font-size:0.78rem;color:var(--text2);margin-bottom:14px;">
+  Showing: {% if date_from and date_to and date_from == date_to %}{{ date_from }}{% elif date_from and date_to %}{{ date_from }} to {{ date_to }}{% elif date_from %}From {{ date_from }}{% else %}Through {{ date_to }}{% endif %}
+</div>
+{% endif %}
+
+<!-- Daily Recap Cards -->
+{% if not date_from and not date_to %}
+{% macro recap_card(recap) %}
+{% if recap %}
+<div style="background:var(--card-bg);border:1px solid var(--border);border-radius:14px;padding:16px 20px;flex:1;min-width:280px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+    <span style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);">{{ recap.label }} · {{ recap.date }}</span>
+    <span style="font-size:1.3rem;font-weight:900;color:{% if recap.pct >= 60 %}#4caf50{% elif recap.pct >= 50 %}#ffa726{% else %}#ef5350{% endif %};">{{ recap.pct }}%</span>
+  </div>
+  <div style="font-size:1.6rem;font-weight:900;color:var(--text);margin-bottom:8px;">{{ recap.correct }}-{{ recap.wrong }}</div>
+  <div style="font-size:0.75rem;color:var(--text2);margin-bottom:4px;">
+    Best: <span style="font-weight:700;color:{% if recap.best_correct %}#4caf50{% else %}#ef5350{% endif %};">{{ recap.best_pick }}</span>
+    <span style="color:var(--text3);">({{ recap.best_conf }}%) · {{ recap.best_matchup }}</span>
+    {% if recap.best_correct %}<span style="color:#4caf50;">&#10003;</span>{% else %}<span style="color:#ef5350;">&#10007;</span>{% endif %}
+  </div>
+  <div style="font-size:0.75rem;color:var(--text2);">
+    Lowest: <span style="font-weight:700;color:{% if recap.worst_correct %}#4caf50{% else %}#ef5350{% endif %};">{{ recap.worst_pick }}</span>
+    <span style="color:var(--text3);">({{ recap.worst_conf }}%) · {{ recap.worst_matchup }}</span>
+    {% if recap.worst_correct %}<span style="color:#4caf50;">&#10003;</span>{% else %}<span style="color:#ef5350;">&#10007;</span>{% endif %}
+  </div>
+</div>
+{% endif %}
+{% endmacro %}
+{% if today_recap or yesterday_recap %}
+<div style="display:flex;gap:14px;margin-bottom:24px;flex-wrap:wrap;">
+  {{ recap_card(today_recap) }}
+  {{ recap_card(yesterday_recap) }}
+</div>
+{% endif %}
+{% endif %}
 
 <div class="summary-grid">
   <div class="stat-card">
@@ -304,7 +362,10 @@
 {% endif %}
 {% endif %}
 
-<div class="section-title" style="margin-bottom:10px;">My Simulations</div>
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+  <div class="section-title" style="margin-bottom:0;">My Simulations</div>
+  <a href="/export/accuracy.csv" style="font-size:0.75rem;color:#ffc107;border:1px solid var(--border);padding:5px 12px;border-radius:8px;text-decoration:none;font-weight:600;">Export CSV</a>
+</div>
 {% if all_single %}
 <div class="section" style="padding:0;overflow-x:auto;">
 <table class="pred-table">

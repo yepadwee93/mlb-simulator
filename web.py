@@ -2132,17 +2132,85 @@ def odds_history_page():
 @app.route("/accuracy")
 @login_required
 def accuracy_page():
+    from datetime import timedelta
+
     update_results()
-    stats = get_accuracy_stats()
-    return render_template("accuracy.html", **stats, username=current_user.username)
+    date_from = request.args.get("from")
+    date_to = request.args.get("to")
+    stats = get_accuracy_stats(date_from=date_from, date_to=date_to)
+    today = _today_est().isoformat()
+    yesterday = (_today_est() - timedelta(days=1)).isoformat()
+    last_7 = (_today_est() - timedelta(days=7)).isoformat()
+    last_30 = (_today_est() - timedelta(days=30)).isoformat()
+
+    def _build_recap(day_label, day_date):
+        day_stats = get_accuracy_stats(date_from=day_date, date_to=day_date)
+        settled = [r for r in day_stats.get("all_single", []) if r.get("correct_pick") is not None]
+        if not settled:
+            return None
+        correct = sum(1 for r in settled if str(r.get("correct_pick")) == "1")
+        wrong = len(settled) - correct
+        best = max(settled, key=lambda r: max(float(r.get("away_win_pct") or 50), float(r.get("home_win_pct") or 50)))
+        worst = min(settled, key=lambda r: max(float(r.get("away_win_pct") or 50), float(r.get("home_win_pct") or 50)))
+        return {
+            "label": day_label,
+            "date": day_date,
+            "total": len(settled),
+            "correct": correct,
+            "wrong": wrong,
+            "pct": round(correct / len(settled) * 100, 1) if settled else 0,
+            "best_pick": best.get("predicted_winner", ""),
+            "best_matchup": f"{best.get('away_team', '')} @ {best.get('home_team', '')}",
+            "best_conf": round(max(float(best.get("away_win_pct") or 50), float(best.get("home_win_pct") or 50)), 1),
+            "best_correct": str(best.get("correct_pick")) == "1",
+            "worst_pick": worst.get("predicted_winner", ""),
+            "worst_matchup": f"{worst.get('away_team', '')} @ {worst.get('home_team', '')}",
+            "worst_conf": round(max(float(worst.get("away_win_pct") or 50), float(worst.get("home_win_pct") or 50)), 1),
+            "worst_correct": str(worst.get("correct_pick")) == "1",
+        }
+
+    today_recap = _build_recap("Today", today)
+    yesterday_recap = _build_recap("Yesterday", yesterday)
+
+    return render_template(
+        "accuracy.html",
+        **stats,
+        username=current_user.username,
+        date_from=date_from or "",
+        date_to=date_to or "",
+        today=today,
+        yesterday=yesterday,
+        last_7=last_7,
+        last_30=last_30,
+        today_recap=today_recap,
+        yesterday_recap=yesterday_recap,
+    )
 
 
 @app.route("/confidence-history")
 @login_required
 def confidence_history_page():
+    from datetime import timedelta
+
     update_results()
-    data = get_confidence_history()
-    return render_template("confidence_history.html", **data, username=current_user.username)
+    date_from = request.args.get("from")
+    date_to = request.args.get("to")
+    data = get_confidence_history(date_from=date_from, date_to=date_to)
+    today = _today_est().isoformat()
+    yesterday = (_today_est() - timedelta(days=1)).isoformat()
+    last_7 = (_today_est() - timedelta(days=7)).isoformat()
+    last_30 = (_today_est() - timedelta(days=30)).isoformat()
+    return render_template(
+        "confidence_history.html",
+        **data,
+        username=current_user.username,
+        date_from=date_from or "",
+        date_to=date_to or "",
+        today=today,
+        yesterday=yesterday,
+        last_7=last_7,
+        last_30=last_30,
+    )
 
 
 @app.route("/prop-accuracy")
@@ -2165,6 +2233,25 @@ def prop_accuracy_page():
 @login_required
 def api_auto_settle():
     """Auto-settle predictions, bets, odds, props, and picks when games go final."""
+    from data.bet_tracker import update_closing_lines
+
+    # Snapshot closing lines before settling
+    try:
+        all_odds = get_mlb_odds()
+        odds_map = {}
+        for key, od in all_odds.items():
+            games = get_today_schedule()
+            for g in games:
+                if frozenset([g["away_team"], g["home_team"]]) == key:
+                    odds_map[str(g["gamePk"])] = {
+                        "away": od.get("away_avg_odds"),
+                        "home": od.get("home_avg_odds"),
+                    }
+        if odds_map:
+            update_closing_lines(odds_map, user_id=_uid())
+    except Exception:
+        pass
+
     pred_count = update_results()
     bet_count = settle_bets(current_user.id)
     odds_count = settle_odds_history()
@@ -2202,6 +2289,26 @@ def trigger_update():
             "results_available": stats["results_available"],
         }
     )
+
+
+@app.route("/api/streaks")
+def api_streaks():
+    """JSON: team streaks for all teams in today's games."""
+    try:
+        games = get_today_schedule()
+        team_ids = set()
+        for g in games:
+            team_ids.add((g.get("away_team", ""), g.get("away_id")))
+            team_ids.add((g.get("home_team", ""), g.get("home_id")))
+        out = {}
+        for name, tid in team_ids:
+            if tid:
+                s = get_team_streak(tid)
+                if s.get("streak", 0) >= 3 or s.get("streak", 0) <= -3:
+                    out[name] = s
+        return jsonify(out)
+    except Exception:
+        return jsonify({})
 
 
 @app.route("/api/live-scores")
@@ -2391,6 +2498,102 @@ def manual_result_route():
         return jsonify({"status": "ok", "result": result, "payout": round(payout, 2)})
     except Exception as e:
         return jsonify({"status": "error", "msg": str(e)}), 500
+
+
+# ── CSV Export ────────────────────────────────────────────────────────────────
+
+
+@app.route("/export/accuracy.csv")
+@login_required
+def export_accuracy_csv():
+    import csv
+    import io
+
+    rows = get_accuracy_stats().get("all_single", [])
+    si = io.StringIO()
+    w = csv.writer(si)
+    w.writerow(["Date", "Away", "Home", "Pick", "Away%", "Home%", "Winner", "Score", "Result"])
+    for r in rows:
+        correct = r.get("correct_pick")
+        result = "Correct" if str(correct) == "1" else ("Wrong" if str(correct) == "0" else "Pending")
+        score = f"{r.get('actual_away_runs', '')}-{r.get('actual_home_runs', '')}" if r.get("actual_away_runs") is not None else ""
+        w.writerow([
+            r.get("game_date", ""),
+            r.get("away_team", ""),
+            r.get("home_team", ""),
+            r.get("predicted_winner", ""),
+            r.get("away_win_pct", ""),
+            r.get("home_win_pct", ""),
+            r.get("actual_winner", ""),
+            score,
+            result,
+        ])
+    resp = app.make_response(si.getvalue())
+    resp.headers["Content-Type"] = "text/csv"
+    resp.headers["Content-Disposition"] = "attachment; filename=accuracy.csv"
+    return resp
+
+
+@app.route("/export/bets.csv")
+@login_required
+def export_bets_csv():
+    import csv
+    import io
+
+    bets = get_all_bets(user_id=_uid())
+    si = io.StringIO()
+    w = csv.writer(si)
+    w.writerow(["Date", "Away", "Home", "Bet On", "Type", "Odds", "Amount", "Edge", "Result", "Payout", "CLV"])
+    for b in bets:
+        w.writerow([
+            b.get("game_date", ""),
+            b.get("away_team", ""),
+            b.get("home_team", ""),
+            b.get("bet_on", ""),
+            b.get("bet_type", ""),
+            b.get("odds", ""),
+            b.get("amount", ""),
+            b.get("model_edge", ""),
+            b.get("result", ""),
+            b.get("payout", ""),
+            b.get("clv", ""),
+        ])
+    resp = app.make_response(si.getvalue())
+    resp.headers["Content-Type"] = "text/csv"
+    resp.headers["Content-Disposition"] = "attachment; filename=bets.csv"
+    return resp
+
+
+@app.route("/export/odds.csv")
+@login_required
+def export_odds_csv():
+    import csv
+    import io
+
+    rows = get_odds_history(limit=1000)
+    si = io.StringIO()
+    w = csv.writer(si)
+    w.writerow(["Date", "Away", "Home", "Away ML", "Home ML", "Away ML Open", "Home ML Open", "O/U", "Model Away%", "Model Home%", "Winner", "Score"])
+    for r in rows:
+        score = f"{r.get('actual_away_runs', '')}-{r.get('actual_home_runs', '')}" if r.get("actual_away_runs") is not None else ""
+        w.writerow([
+            r.get("game_date", ""),
+            r.get("away_team", ""),
+            r.get("home_team", ""),
+            r.get("away_ml", ""),
+            r.get("home_ml", ""),
+            r.get("away_ml_open", ""),
+            r.get("home_ml_open", ""),
+            r.get("over_under", ""),
+            r.get("model_away_pct", ""),
+            r.get("model_home_pct", ""),
+            r.get("actual_winner", ""),
+            score,
+        ])
+    resp = app.make_response(si.getvalue())
+    resp.headers["Content-Type"] = "text/csv"
+    resp.headers["Content-Disposition"] = "attachment; filename=odds_history.csv"
+    return resp
 
 
 # ── Account Settings ─────────────────────────────────────────────────────────
