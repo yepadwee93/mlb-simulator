@@ -1,99 +1,43 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<script>!function(){var t=localStorage.getItem("mlb_theme")||"dark",m={dark:{"--bg":"#0d1120","--bg2":"#1a1e2e","--bg3":"#252836","--border":"#252836","--text":"#e8eaf0","--text2":"#b0b8cc","--text3":"#9aa0b8","--accent":"#64b5f6","--card-bg":"#1a1e2e"},medium:{"--bg":"#1a1528","--bg2":"#241d38","--bg3":"#302848","--border":"#3a2f5a","--text":"#ede8f5","--text2":"#c0b8d8","--text3":"#a098c0","--accent":"#b39ddb","--card-bg":"#241d38"},light:{"--bg":"#f0f2f8","--bg2":"#ffffff","--bg3":"#e8eaf6","--border":"#d0d4e8","--text":"#1a1a2e","--text2":"#444466","--text3":"#6666aa","--accent":"#3949ab","--card-bg":"#ffffff"}}[t]||{};Object.entries(m).forEach(function(e){document.documentElement.style.setProperty(e[0],e[1])});document.addEventListener("DOMContentLoaded",function(){document.body.style.background=m["--bg"];document.body.style.color=m["--text"]})}();</script>
+<script>!function(){var t=localStorage.getItem("mlb_theme")||"dark",m={dark:{"--bg":"#141010","--bg2":"#111","--bg3":"#241818","--border":"#241818","--text":"#f0ece4","--text2":"#999","--text3":"#777","--accent":"#e53935","--card-bg":"#111"},medium:{"--bg":"#1a1528","--bg2":"#241d38","--bg3":"#302848","--border":"#3a2f5a","--text":"#ede8f5","--text2":"#c0b8d8","--text3":"#a098c0","--accent":"#ffc107","--card-bg":"#241d38"},light:{"--bg":"#f0f2f8","--bg2":"#ffffff","--bg3":"#e8eaf6","--border":"#d0d4e8","--text":"#1a1a2e","--text2":"#444466","--text3":"#6666aa","--accent":"#3949ab","--card-bg":"#ffffff"}}[t]||{};Object.entries(m).forEach(function(e){document.documentElement.style.setProperty(e[0],e[1])});document.addEventListener("DOMContentLoaded",function(){document.body.style.background=m["--bg"];document.body.style.color=m["--text"]})}();</script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Prop Accuracy — MLB Simulator</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #0d1120; color: #e8eaf0; font-family: 'Segoe UI', Arial, sans-serif; padding: 32px 20px; }
-    a { color: #64b5f6; text-decoration: none; }
+    body { background: #141010; color: #f0ece4; font-family: 'Segoe UI', Arial, sans-serif; padding: 32px 20px; }
+    a { color: #e53935; text-decoration: none; }
     .back { display: inline-block; margin-bottom: 24px; font-size: 0.9rem; }
     h1 { font-size: 1.6rem; font-weight: 800; margin-bottom: 6px; }
-    .subtitle { color: #b0b8cc; font-size: 0.9rem; margin-bottom: 28px; }
-    .green { color: #4caf50; } .red { color: #ef5350; } .blue { color: #64b5f6; } .gold { color: #ffa726; }
+    .subtitle { color: #999; font-size: 0.9rem; margin-bottom: 28px; }
+    .green { color: #4caf50; } .red { color: #ef5350; } .blue { color: #e53935; } .gold { color: #ffa726; }
     .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 28px; }
-    .stat-card { background: #1a1e2e; border: 1px solid #252836; border-radius: 12px; padding: 14px 16px; }
-    .stat-label { font-size: 0.68rem; color: #b0b8cc; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
+    .stat-card { background: #1e1616; border: 1px solid #241818; border-radius: 12px; padding: 14px 16px; }
+    .stat-label { font-size: 0.68rem; color: #999; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
     .stat-val { font-size: 1.5rem; font-weight: 800; }
-    .card { background: #1a1e2e; border: 1px solid #252836; border-radius: 14px; padding: 20px 24px; margin-bottom: 24px; }
-    .section-title { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: #b0b8cc; margin-bottom: 14px; }
+    .card { background: #1e1616; border: 1px solid #241818; border-radius: 14px; padding: 20px 24px; margin-bottom: 24px; }
+    .section-title { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: #999; margin-bottom: 14px; }
     table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
-    th { text-align: left; color: #9aa0b8; font-size: 0.68rem; text-transform: uppercase; letter-spacing: .5px; padding: 8px 10px; border-bottom: 1px solid #252836; }
-    td { padding: 8px 10px; border-bottom: 1px solid #1a1e2e; }
-    tr:hover { background: #12162a; }
+    th { text-align: left; color: #777; font-size: 0.68rem; text-transform: uppercase; letter-spacing: .5px; padding: 8px 10px; border-bottom: 1px solid #241818; }
+    td { padding: 8px 10px; border-bottom: 1px solid #111; }
+    tr:hover { background: #100c0c; }
 
-.nav-dropdown { position:relative; display:inline-block; }
-.nav-dropdown > a { color:#ffb74d;text-decoration:none;font-weight:600; }
-.nav-dropdown-menu {
-  visibility:hidden; opacity:0; pointer-events:none;
-  position:absolute; top:100%; left:50%;
-  transform:translateX(-50%);
-  background:#1e2235; border:1px solid #353a52; border-radius:10px;
-  min-width:160px; z-index:999; padding:12px 0 6px 0; white-space:nowrap;
-  box-shadow:0 8px 24px rgba(0,0,0,0.4);
-  transition:opacity 0.15s, visibility 0.15s;
-  margin-top:0;
-}
-.nav-dropdown:hover .nav-dropdown-menu,
-.nav-dropdown:focus-within .nav-dropdown-menu {
-  visibility:visible; opacity:1; pointer-events:auto;
-}
-.nav-dropdown-menu a {
-  display:block; padding:9px 16px; font-size:0.83rem; font-weight:600;
-  text-decoration:none; color:#e8eaf0;
-}
-.nav-dropdown-menu a:hover { background:#252a3a; }
+
+    @media (max-width: 768px) {
+      body { padding: 16px 10px; }
+      h1 { font-size: 1.3rem; }
+      .summary-grid { grid-template-columns: repeat(2, 1fr); }
+      .section { padding: 14px 16px; overflow-x: auto; }
+      table { font-size: 0.72rem; }
+      table th, table td { padding: 6px 6px; }
+    }
 </style>
 </head>
 <body>
 
-<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 24px;background:#1e2235;border-bottom:1px solid #353a52;margin-bottom:28px;">
-  <a href="/mlb" style="color:#fff;text-decoration:none;font-size:1.1rem;font-weight:800;">⚾ MLB Simulator</a>
-  <div style="display:flex;gap:16px;font-size:0.85rem;align-items:center;flex-wrap:wrap;">
-    <a href="/mlb" style="color:#64b5f6;text-decoration:none;font-weight:600;">🎯 Games</a>
-    <span class="nav-dropdown"><a href="/bets">&#128176; My Bets &#9660;</a><div class="nav-dropdown-menu"><a href="/bets">&#128176; My Bets</a><a href="/bankroll">&#128200; Bankroll</a><a href="/calculator">&#129518; Calculator</a><a href="/parlay">&#127920; Parlay</a><a href="/my-picks">&#127919; My Picks</a></div></span>
-    <a href="/accuracy" style="color:#64b5f6;text-decoration:none;font-weight:600;">📊 Accuracy</a>
-    <a href="/confidence-history" style="color:#c084fc;text-decoration:none;font-weight:600;">📈 Confidence</a>
-    <a href="/prop-accuracy" style="color:#b39ddb;text-decoration:none;font-weight:600;">🎯 Props</a>
-    <a href="/odds-history" style="color:#ffd54f;text-decoration:none;font-weight:600;">📋 Odds</a>
-    {% if username %}
-      <a href="/settings" style="color:#aaa;text-decoration:none;font-weight:600;">👤 {{ username }}</a>
-      <a href="/logout" style="color:#ef9a9a;text-decoration:none;font-weight:600;">Sign Out</a>
-    {% endif %}
-  </div>
-</div>
-<h1>Prop Accuracy Tracker</h1>
-<p class="subtitle">How our player prop projections compare to actual box score results</p>
-
-{% set type_labels = {'hits': 'Hits', 'hr': 'Home Runs', 'rbi': 'RBI', 'tb': 'Total Bases', 'k': 'Strikeouts'} %}
-{% set type_colors = {'hits': '#64b5f6', 'hr': '#ef5350', 'rbi': '#ffa726', 'tb': '#b39ddb', 'k': '#4caf50'} %}
-
-<!-- Summary Cards -->
-<div class="summary-grid">
-  {% for t in by_type %}
-  {% if t.total > 0 %}
-  <div class="stat-card">
-    <div class="stat-label">{{ type_labels.get(t.prop_type, t.prop_type) }}</div>
-    <div class="stat-val" style="color:{{ type_colors.get(t.prop_type, '#b0b8cc') }};">
-      {% if t.pct is not none %}{{ t.pct }}%{% else %}—{% endif %}
-    </div>
-    <div style="font-size:0.72rem;color:#9aa0b8;margin-top:4px;">
-      {{ t.correct }}/{{ t.total }} hit
-    </div>
-  </div>
-  {% endif %}
-  {% endfor %}
-  <div class="stat-card">
-    <div class="stat-label">Settled</div>
-    <div class="stat-val blue">{{ total_settled }}</div>
-  </div>
-  <div class="stat-card">
-    <div class="stat-label">Pending</div>
-    <div class="stat-val gold">{{ total_pending }}</div>
-  </div>
-</div>
+{% include "_navbar.html" %}
 
 <!-- Accuracy Bars -->
 <div class="card">
@@ -101,19 +45,19 @@
   {% for t in by_type %}
   {% if t.total > 0 %}
   <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
-    <div style="width:80px;font-size:0.82rem;font-weight:700;color:{{ type_colors.get(t.prop_type, '#b0b8cc') }};">{{ type_labels.get(t.prop_type, t.prop_type) }}</div>
-    <div style="flex:1;background:#0d1120;border-radius:4px;height:22px;overflow:hidden;">
-      <div style="height:100%;width:{{ t.pct or 0 }}%;background:{{ type_colors.get(t.prop_type, '#b0b8cc') }};border-radius:4px;"></div>
+    <div style="width:80px;font-size:0.82rem;font-weight:700;color:{{ type_colors.get(t.prop_type, '#999') }};">{{ type_labels.get(t.prop_type, t.prop_type) }}</div>
+    <div style="flex:1;background:#141010;border-radius:4px;height:22px;overflow:hidden;">
+      <div style="height:100%;width:{{ t.pct or 0 }}%;background:{{ type_colors.get(t.prop_type, '#999') }};border-radius:4px;"></div>
     </div>
     <div style="width:130px;text-align:right;font-size:0.78rem;">
-      <span style="font-weight:700;color:{{ type_colors.get(t.prop_type, '#b0b8cc') }};">{{ t.pct }}%</span>
-      <span style="color:#9aa0b8;"> avg {{ t.avg_pred }}→{{ t.avg_actual }}</span>
+      <span style="font-weight:700;color:{{ type_colors.get(t.prop_type, '#999') }};">{{ t.pct }}%</span>
+      <span style="color:#777;"> avg {{ t.avg_pred }}→{{ t.avg_actual }}</span>
     </div>
   </div>
   {% endif %}
   {% endfor %}
   {% if total_settled == 0 %}
-  <p style="color:#555870;text-align:center;padding:20px;">No settled props yet. Simulate games with lineups to start tracking.</p>
+  <p style="color:#555;text-align:center;padding:20px;">No settled props yet. Simulate games with lineups to start tracking.</p>
   {% endif %}
 </div>
 
@@ -136,9 +80,9 @@
       <tbody>
         {% for r in recent %}
         <tr>
-          <td style="color:#9aa0b8;">{{ r.game_date }}</td>
+          <td style="color:#777;">{{ r.game_date }}</td>
           <td>{{ r.player_name }}</td>
-          <td style="color:{{ type_colors.get(r.prop_type, '#b0b8cc') }};">{{ type_labels.get(r.prop_type, r.prop_type) }}</td>
+          <td style="color:{{ type_colors.get(r.prop_type, '#999') }};">{{ type_labels.get(r.prop_type, r.prop_type) }}</td>
           <td>{{ r.predicted }}</td>
           <td style="font-weight:700;">{{ r.actual }}</td>
           <td>
@@ -157,9 +101,9 @@
 {% endif %}
 
 <div style="text-align:center;margin-top:20px;">
-  <a href="/accuracy" style="color:#64b5f6;font-size:0.85rem;">View Model Accuracy &rarr;</a>
+  <a href="/accuracy" style="color:#e53935;font-size:0.85rem;">View Model Accuracy &rarr;</a>
   &nbsp;&nbsp;
-  <a href="/confidence-history" style="color:#c084fc;font-size:0.85rem;">Confidence History &rarr;</a>
+  <a href="/confidence-history" style="color:#4a9eff;font-size:0.85rem;">Confidence History &rarr;</a>
 </div>
 
 </body>

@@ -1,63 +1,42 @@
 ﻿<!DOCTYPE html>
 <html lang="en">
 <head>
-<script>!function(){var t=localStorage.getItem("mlb_theme")||"dark",m={dark:{"--bg":"#0d1120","--bg2":"#1a1e2e","--bg3":"#252836","--border":"#252836","--text":"#e8eaf0","--text2":"#b0b8cc","--text3":"#9aa0b8","--accent":"#64b5f6","--card-bg":"#1a1e2e"},medium:{"--bg":"#1a1528","--bg2":"#241d38","--bg3":"#302848","--border":"#3a2f5a","--text":"#ede8f5","--text2":"#c0b8d8","--text3":"#a098c0","--accent":"#b39ddb","--card-bg":"#241d38"},light:{"--bg":"#f0f2f8","--bg2":"#ffffff","--bg3":"#e8eaf6","--border":"#d0d4e8","--text":"#1a1a2e","--text2":"#444466","--text3":"#6666aa","--accent":"#3949ab","--card-bg":"#ffffff"}}[t]||{};Object.entries(m).forEach(function(e){document.documentElement.style.setProperty(e[0],e[1])});document.addEventListener("DOMContentLoaded",function(){document.body.style.background=m["--bg"];document.body.style.color=m["--text"]})}();</script>
+<script>!function(){var t=localStorage.getItem("mlb_theme")||"dark",m={dark:{"--bg":"#141010","--bg2":"#111","--bg3":"#241818","--border":"#241818","--text":"#f0ece4","--text2":"#999","--text3":"#777","--accent":"#e53935","--card-bg":"#111"},medium:{"--bg":"#1a1528","--bg2":"#241d38","--bg3":"#302848","--border":"#3a2f5a","--text":"#ede8f5","--text2":"#c0b8d8","--text3":"#a098c0","--accent":"#ffc107","--card-bg":"#241d38"},light:{"--bg":"#f0f2f8","--bg2":"#ffffff","--bg3":"#e8eaf6","--border":"#d0d4e8","--text":"#1a1a2e","--text2":"#444466","--text3":"#6666aa","--accent":"#3949ab","--card-bg":"#ffffff"}}[t]||{};Object.entries(m).forEach(function(e){document.documentElement.style.setProperty(e[0],e[1])});document.addEventListener("DOMContentLoaded",function(){document.body.style.background=m["--bg"];document.body.style.color=m["--text"]})}();</script>
   <meta charset="UTF-8">
   <meta name="csrf-token" content="{{ csrf_token() }}">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Register — MLB Simulator</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #0d1120; color: #e8eaf0; font-family: 'Segoe UI', Arial, sans-serif;
+    body { background: #141010; color: #f0ece4; font-family: 'Segoe UI', Arial, sans-serif;
            min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
-    .card { background: #1a1e2e; border: 1px solid #252836; border-radius: 20px; padding: 40px 36px;
+    .card { background: #1e1616; border: 1px solid #241818; border-radius: 20px; padding: 40px 36px;
             width: 100%; max-width: 400px; }
     .logo { text-align: center; font-size: 2.5rem; margin-bottom: 8px; }
     h1 { text-align: center; font-size: 1.4rem; font-weight: 800; margin-bottom: 4px; }
-    .sub { text-align: center; color: #b0b8cc; font-size: 0.85rem; margin-bottom: 28px; }
+    .sub { text-align: center; color: #999; font-size: 0.85rem; margin-bottom: 28px; }
     .form-group { margin-bottom: 16px; }
-    label { display: block; font-size: 0.72rem; color: #b0b8cc; text-transform: uppercase;
+    label { display: block; font-size: 0.72rem; color: #999; text-transform: uppercase;
             letter-spacing: .4px; margin-bottom: 6px; }
-    input { width: 100%; background: #0d1120; border: 1px solid #333650; border-radius: 10px;
-            color: #e8eaf0; padding: 11px 14px; font-size: 0.95rem; }
-    input:focus { outline: none; border-color: #64b5f6; }
-    .hint { font-size: 0.72rem; color: #9aa0b8; margin-top: 4px; }
+    input { width: 100%; background: #141010; border: 1px solid #2a1c1c; border-radius: 10px;
+            color: #f0ece4; padding: 11px 14px; font-size: 0.95rem; }
+    input:focus { outline: none; border-color: #e53935; }
+    .hint { font-size: 0.72rem; color: #777; margin-top: 4px; }
     .btn { width: 100%; background: linear-gradient(135deg, #2e7d32, #1b5e20);
            color: #fff; border: none; border-radius: 10px; padding: 13px;
            font-size: 1rem; font-weight: 700; cursor: pointer; margin-top: 8px; }
     .btn:hover { background: linear-gradient(135deg, #388e3c, #2e7d32); }
     .error { background: #3a1a1a; border: 1px solid #ef5350; border-radius: 8px;
              padding: 10px 14px; color: #ef9a9a; font-size: 0.85rem; margin-bottom: 16px; }
-    .footer { text-align: center; margin-top: 24px; font-size: 0.85rem; color: #b0b8cc; }
-    .footer a { color: #64b5f6; }
+    .footer { text-align: center; margin-top: 24px; font-size: 0.85rem; color: #999; }
+    .footer a { color: #e53935; }
     .switch { position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0; }
     .switch input { opacity:0;width:0;height:0; }
-    .slider { position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#333650;border-radius:24px;transition:.2s; }
+    .slider { position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#2a1c1c;border-radius:24px;transition:.2s; }
     .slider:before { position:absolute;content:"";height:18px;width:18px;left:3px;bottom:3px;background:white;border-radius:50%;transition:.2s; }
     input:checked + .slider { background:#4caf50; }
     input:checked + .slider:before { transform:translateX(20px); }
 
-.nav-dropdown { position:relative; display:inline-block; }
-.nav-dropdown > a { color:#ffb74d;text-decoration:none;font-weight:600; }
-.nav-dropdown-menu {
-  visibility:hidden; opacity:0; pointer-events:none;
-  position:absolute; top:100%; left:50%;
-  transform:translateX(-50%);
-  background:#1e2235; border:1px solid #353a52; border-radius:10px;
-  min-width:160px; z-index:999; padding:12px 0 6px 0; white-space:nowrap;
-  box-shadow:0 8px 24px rgba(0,0,0,0.4);
-  transition:opacity 0.15s, visibility 0.15s;
-  margin-top:0;
-}
-.nav-dropdown:hover .nav-dropdown-menu,
-.nav-dropdown:focus-within .nav-dropdown-menu {
-  visibility:visible; opacity:1; pointer-events:auto;
-}
-.nav-dropdown-menu a {
-  display:block; padding:9px 16px; font-size:0.83rem; font-weight:600;
-  text-decoration:none; color:#e8eaf0;
-}
-.nav-dropdown-menu a:hover { background:#252a3a; }
 </style>
 
 <body>
@@ -65,9 +44,9 @@
   <div class="logo">⚾</div>
 
 <!-- ── Live Scoreboard Bar ── -->
-<div id="scoreboard-bar" style="background:#12162a;border-bottom:1px solid #252836;padding:0;overflow:hidden;">
+<div id="scoreboard-bar" style="background:#100c0c;border-bottom:1px solid #241818;padding:0;overflow:hidden;">
   <div id="scoreboard-inner" style="display:flex;overflow-x:auto;gap:0;scrollbar-width:none;-ms-overflow-style:none;">
-    <div style="padding:7px 14px;font-size:0.7rem;color:#555870;white-space:nowrap;align-self:center;flex-shrink:0;">TODAY</div>
+    <div style="padding:7px 14px;font-size:0.7rem;color:#555;white-space:nowrap;align-self:center;flex-shrink:0;">TODAY</div>
   </div>
 </div>
 <script>
@@ -80,13 +59,13 @@
     s = (s||'').toLowerCase();
     if (s.includes('progress')||s.includes('live')) return '#ef5350';
     if (s.includes('final')) return '#4caf50';
-    return '#9aa0b8';
+    return '#777';
   }
   function renderScoreboard(games) {
     var inner = document.getElementById('scoreboard-inner');
     if (!inner) return;
     if (!games.length) { document.getElementById('scoreboard-bar').style.display='none'; return; }
-    var html = '<div style="padding:7px 14px;font-size:0.7rem;color:#555870;white-space:nowrap;align-self:center;flex-shrink:0;">TODAY</div>';
+    var html = '<div style="padding:7px 14px;font-size:0.7rem;color:#555;white-space:nowrap;align-self:center;flex-shrink:0;">TODAY</div>';
     games.forEach(function(g) {
       var s = (g.status||'').toLowerCase();
       var isLive = s.includes('progress')||s.includes('live');
@@ -103,11 +82,11 @@
       var scoreHome = (isLive||isFinal) ? '<b style="color:#fff;">'+esc(g.home_score)+'</b>' : '';
       var dot = '<span style="width:6px;height:6px;border-radius:50%;background:'+statusColor(g.status)+';display:inline-block;margin-right:5px;vertical-align:middle;'+(isLive?'animation:pulse 1.2s infinite;':'')+'" ></span>';
       var link = g.gamePk ? '/simulate/'+g.gamePk+'?sims=100000' : '#';
-      html += '<a href="'+link+'" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:5px 14px;border-left:1px solid #1e2235;text-decoration:none;flex-shrink:0;min-width:110px;">'
+      html += '<a href="'+link+'" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:5px 14px;border-left:1px solid #111;text-decoration:none;flex-shrink:0;min-width:110px;">'
         + '<div style="display:flex;align-items:center;gap:6px;font-size:0.72rem;white-space:nowrap;">'
-        + '<span style="color:#b0b8cc;">'+esc(abbr(g.away))+' '+scoreAway+'</span>'
-        + '<span style="color:#555870;font-size:0.65rem;">@</span>'
-        + '<span style="color:#b0b8cc;">'+scoreHome+' '+esc(abbr(g.home))+'</span>'
+        + '<span style="color:#999;">'+esc(abbr(g.away))+' '+scoreAway+'</span>'
+        + '<span style="color:#555;font-size:0.65rem;">@</span>'
+        + '<span style="color:#999;">'+scoreHome+' '+esc(abbr(g.home))+'</span>'
         + '</div>'
         + '<div style="font-size:0.63rem;margin-top:2px;">'+dot+'<span style="color:'+statusColor(g.status)+';">'+timeStr+'</span></div>'
         + '</a>';
@@ -142,9 +121,9 @@
       <input type="password" name="password" id="pw" autocomplete="new-password" required minlength="8">
       <div class="hint">8+ characters · at least one capital letter · at least one number</div>
       <div id="pw-checks" style="margin-top:8px;font-size:0.72rem;display:none;">
-        <div id="chk-len"  style="color:#9aa0b8;">✗ At least 8 characters</div>
-        <div id="chk-cap"  style="color:#9aa0b8;">✗ One capital letter</div>
-        <div id="chk-num"  style="color:#9aa0b8;">✗ One number</div>
+        <div id="chk-len"  style="color:#777;">✗ At least 8 characters</div>
+        <div id="chk-cap"  style="color:#777;">✗ One capital letter</div>
+        <div id="chk-num"  style="color:#777;">✗ One number</div>
       </div>
     </div>
     <div class="form-group">
@@ -153,14 +132,14 @@
       <div id="match-msg" style="font-size:0.72rem;margin-top:4px;display:none;"></div>
     </div>
     <div class="form-group" style="margin-top:4px;">
-      <label>Email <span style="color:#555870;font-size:0.68rem;text-transform:none;letter-spacing:0;">(optional — for daily top play alerts)</span></label>
+      <label>Email <span style="color:#555;font-size:0.68rem;text-transform:none;letter-spacing:0;">(optional — for daily top play alerts)</span></label>
       <input type="email" name="email" autocomplete="email" placeholder="you@example.com">
       <div style="display:flex;align-items:center;gap:10px;margin-top:10px;">
         <label class="switch" style="flex-shrink:0;">
           <input type="checkbox" name="email_alerts" id="reg-alerts" checked>
           <span class="slider"></span>
         </label>
-        <span style="font-size:0.8rem;color:#b0b8cc;">Send me daily top play picks</span>
+        <span style="font-size:0.8rem;color:#999;">Send me daily top play picks</span>
       </div>
     </div>
     <button class="btn" type="submit">Create Account</button>
@@ -175,7 +154,7 @@
 
       function mark(el, ok) {
         el.textContent = (ok ? '✓' : '✗') + el.textContent.slice(1);
-        el.style.color = ok ? '#4caf50' : '#9aa0b8';
+        el.style.color = ok ? '#4caf50' : '#777';
       }
 
       pw.addEventListener('input', () => {

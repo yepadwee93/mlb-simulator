@@ -7,7 +7,7 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      background: #0a0a0a;
+      background: #141010;
       color: #f0ece4;
       font-family: 'Segoe UI', Arial, sans-serif;
       min-height: 100vh;
@@ -19,12 +19,12 @@
       justify-content: space-between;
       align-items: center;
       padding: 16px 28px;
-      border-bottom: 1px solid #1a1a1a;
+      border-bottom: 1px solid #241818;
     }
     .logo {
       font-size: 1.3rem;
       font-weight: 800;
-      background: linear-gradient(135deg, #ff6b2b, #ffc107);
+      background: linear-gradient(135deg, #e53935, #ffc107);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
@@ -47,7 +47,7 @@
       margin-bottom: 14px;
     }
     .hero h1 span {
-      background: linear-gradient(135deg, #ff6b2b, #ffc107);
+      background: linear-gradient(135deg, #e53935, #ffc107);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
@@ -69,7 +69,7 @@
     .hero-stat .num {
       font-size: 1.8rem;
       font-weight: 800;
-      color: #ff6b2b;
+      color: #e53935;
     }
     .hero-stat .lbl {
       font-size: 0.72rem;
@@ -100,8 +100,8 @@
       gap: 16px;
     }
     .sport-card {
-      background: #111;
-      border: 1px solid #1e1e1e;
+      background: #1e1616;
+      border: 1px solid #2a1a1a;
       border-radius: 16px;
       padding: 28px 24px;
       text-decoration: none;
@@ -115,10 +115,10 @@
       transform: translateY(-2px);
       box-shadow: 0 8px 24px rgba(0,0,0,0.3);
     }
-    .sport-card.live { border-color: #ff6b2b33; }
-    .sport-card.live:hover { border-color: #ff6b2b; }
+    .sport-card.live { border-color: #e5393533; }
+    .sport-card.live:hover { border-color: #e53935; }
     .sport-card.coming { opacity: 0.6; cursor: default; }
-    .sport-card.coming:hover { transform: none; box-shadow: none; border-color: #1e1e1e; }
+    .sport-card.coming:hover { transform: none; box-shadow: none; border-color: #2a1a1a; }
 
     .sport-icon { font-size: 2.4rem; margin-bottom: 12px; }
     .sport-name { font-size: 1.2rem; font-weight: 800; margin-bottom: 4px; }
@@ -128,7 +128,7 @@
       text-transform: uppercase;
       letter-spacing: 0.4px;
     }
-    .sport-status.live { color: #ff6b2b; }
+    .sport-status.live { color: #e53935; }
     .sport-status.coming { color: #555; }
     .sport-desc {
       font-size: 0.82rem;
@@ -148,9 +148,9 @@
       letter-spacing: 0.3px;
     }
     .badge-live {
-      background: #ff6b2b22;
-      color: #ff6b2b;
-      border: 1px solid #ff6b2b44;
+      background: #e5393522;
+      color: #e53935;
+      border: 1px solid #e5393544;
     }
     .badge-coming {
       background: #ffffff08;
@@ -171,14 +171,14 @@
       font-weight: 600;
     }
     .model-tag.active {
-      background: #ff6b2b18;
+      background: #e5393518;
       color: #ff8a50;
-      border: 1px solid #ff6b2b33;
+      border: 1px solid #e5393533;
     }
     .model-tag.coming-tag {
       background: #ffffff06;
       color: #444;
-      border: 1px solid #1e1e1e;
+      border: 1px solid #2a1a1a;
     }
 
     /* ── Bottom features ── */
@@ -193,8 +193,8 @@
       gap: 16px;
     }
     .feature-card {
-      background: #111;
-      border: 1px solid #1e1e1e;
+      background: #1e1616;
+      border: 1px solid #2a1a1a;
       border-radius: 12px;
       padding: 20px;
     }
@@ -206,7 +206,7 @@
     footer {
       text-align: center;
       padding: 30px 20px;
-      border-top: 1px solid #1a1a1a;
+      border-top: 1px solid #241818;
       color: #444;
       font-size: 0.75rem;
     }
@@ -217,7 +217,14 @@
       .hero h1 { font-size: 2rem; }
       .hero-stats { gap: 24px; }
     }
-  </style>
+  
+    @media (max-width: 768px) {
+      .hero h1 { font-size: 1.8rem !important; }
+      .hero p { font-size: 1rem !important; }
+      .sports-grid { grid-template-columns: 1fr !important; }
+      .features { grid-template-columns: 1fr !important; }
+    }
+</style>
 </head>
 <body>
 
@@ -228,7 +235,7 @@
       <a href="/settings">{{ username }}</a>
       <a href="/logout" style="color:#ef5350;">Logout</a>
     {% else %}
-      <a href="/login" style="color:#ff6b2b;">Login</a>
+      <a href="/login" style="color:#e53935;">Login</a>
       <a href="/register">Register</a>
     {% endif %}
   </div>

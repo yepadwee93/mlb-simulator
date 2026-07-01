@@ -7,34 +7,34 @@
   <title>Settings — MLB Simulator</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #0d1120; color: #e8eaf0; font-family: 'Segoe UI', Arial, sans-serif; padding-bottom: 60px; }
-    a { color: #64b5f6; text-decoration: none; }
+    body { background: #141010; color: #f0ece4; font-family: 'Segoe UI', Arial, sans-serif; padding-bottom: 60px; }
+    a { color: #e53935; text-decoration: none; }
     .page { max-width: 540px; margin: 0 auto; padding: 0 16px; }
     h1 { font-size: 1.4rem; font-weight: 800; margin-bottom: 6px; }
-    .subtitle { color: #b0b8cc; font-size: 0.88rem; margin-bottom: 28px; }
-    .card { background: #1a1e2e; border: 1px solid #252836; border-radius: 14px; padding: 24px 28px; margin-bottom: 20px; }
-    .card h2 { font-size: 0.9rem; font-weight: 700; color: #d8dce8; margin-bottom: 18px; }
-    label { display: block; font-size: 0.72rem; color: #b0b8cc; text-transform: uppercase; letter-spacing: .4px; margin-bottom: 6px; }
+    .subtitle { color: #999; font-size: 0.88rem; margin-bottom: 28px; }
+    .card { background: #1e1616; border: 1px solid #241818; border-radius: 14px; padding: 24px 28px; margin-bottom: 20px; }
+    .card h2 { font-size: 0.9rem; font-weight: 700; color: #ddd; margin-bottom: 18px; }
+    label { display: block; font-size: 0.72rem; color: #999; text-transform: uppercase; letter-spacing: .4px; margin-bottom: 6px; }
     input[type="email"] {
-      width: 100%; background: #0d1120; border: 1px solid #333650;
-      border-radius: 8px; color: #e8eaf0; padding: 10px 14px; font-size: 0.9rem;
+      width: 100%; background: #141010; border: 1px solid #2a1c1c;
+      border-radius: 8px; color: #f0ece4; padding: 10px 14px; font-size: 0.9rem;
       margin-bottom: 16px;
     }
-    input[type="email"]:focus { outline: none; border-color: #64b5f6; }
+    input[type="email"]:focus { outline: none; border-color: #e53935; }
     .toggle-row { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
-    .toggle-label { font-size: 0.88rem; color: #e8eaf0; }
-    .toggle-sub { font-size: 0.72rem; color: #9aa0b8; margin-top: 2px; }
+    .toggle-label { font-size: 0.88rem; color: #f0ece4; }
+    .toggle-sub { font-size: 0.72rem; color: #777; margin-top: 2px; }
     /* Toggle switch */
     .switch { position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0; }
     .switch input { opacity: 0; width: 0; height: 0; }
     .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
-              background: #333650; border-radius: 24px; transition: .2s; }
+              background: #2a1c1c; border-radius: 24px; transition: .2s; }
     .slider:before { position: absolute; content: ""; height: 18px; width: 18px;
                      left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: .2s; }
     input:checked + .slider { background: #4caf50; }
     input:checked + .slider:before { transform: translateX(20px); }
     .save-btn {
-      width: 100%; padding: 11px; background: #1565c0; border: none;
+      width: 100%; padding: 11px; background: #c62828; border: none;
       color: #fff; border-radius: 8px; font-size: 0.9rem; font-weight: 700;
       cursor: pointer; transition: background 0.15s;
     }
@@ -43,56 +43,13 @@
                padding: 10px 16px; border-radius: 8px; font-size: 0.85rem; margin-bottom: 16px; }
     .msg-err { background: #3a1a1a; color: #ef5350; border: 1px solid #c62828;
                padding: 10px 16px; border-radius: 8px; font-size: 0.85rem; margin-bottom: 16px; }
-    .hint { font-size: 0.72rem; color: #555870; margin-top: 12px; line-height: 1.5; }
+    .hint { font-size: 0.72rem; color: #555; margin-top: 12px; line-height: 1.5; }
   
-.nav-dropdown { position:relative; display:inline-block; }
-.nav-dropdown > a { color:#ffb74d;text-decoration:none;font-weight:600; }
-.nav-dropdown-menu {
-  visibility:hidden; opacity:0; pointer-events:none;
-  position:absolute; top:100%; left:50%;
-  transform:translateX(-50%);
-  background:#1e2235; border:1px solid #353a52; border-radius:10px;
-  min-width:160px; z-index:999; padding:12px 0 6px 0; white-space:nowrap;
-  box-shadow:0 8px 24px rgba(0,0,0,0.4);
-  transition:opacity 0.15s, visibility 0.15s;
-  margin-top:0;
-}
-.nav-dropdown:hover .nav-dropdown-menu,
-.nav-dropdown:focus-within .nav-dropdown-menu {
-  visibility:visible; opacity:1; pointer-events:auto;
-}
-.nav-dropdown-menu a {
-  display:block; padding:9px 16px; font-size:0.83rem; font-weight:600;
-  text-decoration:none; color:#e8eaf0;
-}
-.nav-dropdown-menu a:hover { background:#252a3a; }
 </style>
 
 <body>
 
-<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 24px;background:#1e2235;border-bottom:1px solid #353a52;margin-bottom:28px;">
-  <a href="/mlb" style="color:#fff;text-decoration:none;font-size:1.1rem;font-weight:800;">⚾ MLB Simulator</a>
-  <div style="display:flex;gap:16px;font-size:0.85rem;align-items:center;flex-wrap:wrap;">
-    <a href="/mlb" style="color:#64b5f6;text-decoration:none;font-weight:600;">🎯 Games</a>
-    <span class="nav-dropdown"><a href="/bets">&#128176; My Bets &#9660;</a><div class="nav-dropdown-menu"><a href="/bets">&#128176; My Bets</a><a href="/bankroll">&#128200; Bankroll</a><a href="/calculator">&#129518; Calculator</a><a href="/parlay">&#127920; Parlay</a><a href="/my-picks">&#127919; My Picks</a></div></span>
-    <a href="/accuracy" style="color:#64b5f6;text-decoration:none;font-weight:600;">📊 Accuracy</a>
-    <a href="/confidence-history" style="color:#c084fc;text-decoration:none;font-weight:600;">📈 Confidence</a>
-    <a href="/prop-accuracy" style="color:#b39ddb;text-decoration:none;font-weight:600;">🎯 Props</a>
-    <a href="/odds-history" style="color:#ffd54f;text-decoration:none;font-weight:600;">📋 Odds</a>
-    {% if current_user.is_authenticated %}
-      <a href="/settings" style="color:#aaa;text-decoration:none;font-weight:600;">👤 {{ current_user.username }}</a>
-      <a href="/logout" style="color:#ef9a9a;text-decoration:none;font-weight:600;">Sign Out</a>
-    {% endif %}
-  </div>
-</div>
-
-
-<!-- ── Live Scoreboard Bar ── -->
-<div id="scoreboard-bar" style="background:#12162a;border-bottom:1px solid #252836;padding:0;overflow:hidden;">
-  <div id="scoreboard-inner" style="display:flex;overflow-x:auto;gap:0;scrollbar-width:none;-ms-overflow-style:none;">
-    <div style="padding:7px 14px;font-size:0.7rem;color:#555870;white-space:nowrap;align-self:center;flex-shrink:0;">TODAY</div>
-  </div>
-</div>
+{% include "_navbar.html" %}
 <script>
 (function(){
   function abbr(name) {
@@ -103,13 +60,13 @@
     s = (s||'').toLowerCase();
     if (s.includes('progress')||s.includes('live')) return '#ef5350';
     if (s.includes('final')) return '#4caf50';
-    return '#9aa0b8';
+    return '#777';
   }
   function renderScoreboard(games) {
     var inner = document.getElementById('scoreboard-inner');
     if (!inner) return;
     if (!games.length) { document.getElementById('scoreboard-bar').style.display='none'; return; }
-    var html = '<div style="padding:7px 14px;font-size:0.7rem;color:#555870;white-space:nowrap;align-self:center;flex-shrink:0;">TODAY</div>';
+    var html = '<div style="padding:7px 14px;font-size:0.7rem;color:#555;white-space:nowrap;align-self:center;flex-shrink:0;">TODAY</div>';
     games.forEach(function(g) {
       var s = (g.status||'').toLowerCase();
       var isLive = s.includes('progress')||s.includes('live');
@@ -126,11 +83,11 @@
       var scoreHome = (isLive||isFinal) ? '<b style="color:#fff;">'+esc(g.home_score)+'</b>' : '';
       var dot = '<span style="width:6px;height:6px;border-radius:50%;background:'+statusColor(g.status)+';display:inline-block;margin-right:5px;vertical-align:middle;'+(isLive?'animation:pulse 1.2s infinite;':'')+'" ></span>';
       var link = g.gamePk ? '/simulate/'+g.gamePk+'?sims=100000' : '#';
-      html += '<a href="'+link+'" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:5px 14px;border-left:1px solid #1e2235;text-decoration:none;flex-shrink:0;min-width:110px;">'
+      html += '<a href="'+link+'" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:5px 14px;border-left:1px solid #111;text-decoration:none;flex-shrink:0;min-width:110px;">'
         + '<div style="display:flex;align-items:center;gap:6px;font-size:0.72rem;white-space:nowrap;">'
-        + '<span style="color:#b0b8cc;">'+esc(abbr(g.away))+' '+scoreAway+'</span>'
-        + '<span style="color:#555870;font-size:0.65rem;">@</span>'
-        + '<span style="color:#b0b8cc;">'+scoreHome+' '+esc(abbr(g.home))+'</span>'
+        + '<span style="color:#999;">'+esc(abbr(g.away))+' '+scoreAway+'</span>'
+        + '<span style="color:#555;font-size:0.65rem;">@</span>'
+        + '<span style="color:#999;">'+scoreHome+' '+esc(abbr(g.home))+'</span>'
         + '</div>'
         + '<div style="font-size:0.63rem;margin-top:2px;">'+dot+'<span style="color:'+statusColor(g.status)+';">'+timeStr+'</span></div>'
         + '</a>';
@@ -145,6 +102,12 @@
 <style>
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
 #scoreboard-inner::-webkit-scrollbar { display:none; }
+
+    @media (max-width: 768px) {
+      body { padding: 16px 10px; }
+      h1 { font-size: 1.3rem; }
+      .section, .card { padding: 14px 16px; }
+    }
 </style>
 <div class="page">
   <h1>⚙️ Account Settings</h1>
@@ -192,13 +155,13 @@
 
   <div class="card">
     <h2>🧠 Simulation Model Inputs</h2>
-    <p style="font-size:0.82rem;color:#9aa0b8;margin-bottom:18px;line-height:1.6;">
+    <p style="font-size:0.82rem;color:#777;margin-bottom:18px;line-height:1.6;">
       Every game runs 100,000 Monte Carlo simulations. Here's everything factored in:
     </p>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-      <div style="background:#0d1120;border-radius:10px;padding:14px 16px;">
-        <div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:.4px;color:#64b5f6;font-weight:700;margin-bottom:10px;">⚾ Pitching</div>
-        <ul style="list-style:none;font-size:0.8rem;color:#b0b8cc;line-height:2;">
+      <div style="background:#141010;border-radius:10px;padding:14px 16px;">
+        <div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:.4px;color:#e53935;font-weight:700;margin-bottom:10px;">⚾ Pitching</div>
+        <ul style="list-style:none;font-size:0.8rem;color:#999;line-height:2;">
           <li>✦ Season ERA &amp; FIP</li>
           <li>✦ WHIP &amp; K/9</li>
           <li>✦ Platoon splits (L/R)</li>
@@ -209,9 +172,9 @@
           <li>✦ IL status impact</li>
         </ul>
       </div>
-      <div style="background:#0d1120;border-radius:10px;padding:14px 16px;">
+      <div style="background:#141010;border-radius:10px;padding:14px 16px;">
         <div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:.4px;color:#81c784;font-weight:700;margin-bottom:10px;">🏏 Batting</div>
-        <ul style="list-style:none;font-size:0.8rem;color:#b0b8cc;line-height:2;">
+        <ul style="list-style:none;font-size:0.8rem;color:#999;line-height:2;">
           <li>✦ Season AVG / OBP / SLG</li>
           <li>✦ Lineup slot PA expectations</li>
           <li>✦ vs LHP / RHP splits</li>
@@ -221,9 +184,9 @@
           <li>✦ Prop projections (H/HR/RBI/TB)</li>
         </ul>
       </div>
-      <div style="background:#0d1120;border-radius:10px;padding:14px 16px;">
+      <div style="background:#141010;border-radius:10px;padding:14px 16px;">
         <div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:.4px;color:#ffd54f;font-weight:700;margin-bottom:10px;">🏟️ Game Context</div>
-        <ul style="list-style:none;font-size:0.8rem;color:#b0b8cc;line-height:2;">
+        <ul style="list-style:none;font-size:0.8rem;color:#999;line-height:2;">
           <li>✦ Home field advantage</li>
           <li>✦ Ballpark run factor</li>
           <li>✦ Umpire K-rate tendency</li>
@@ -232,9 +195,9 @@
           <li>✦ F3 / F5 / F7 inning models</li>
         </ul>
       </div>
-      <div style="background:#0d1120;border-radius:10px;padding:14px 16px;">
+      <div style="background:#141010;border-radius:10px;padding:14px 16px;">
         <div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:.4px;color:#ce93d8;font-weight:700;margin-bottom:10px;">🌤️ External Factors</div>
-        <ul style="list-style:none;font-size:0.8rem;color:#b0b8cc;line-height:2;">
+        <ul style="list-style:none;font-size:0.8rem;color:#999;line-height:2;">
           <li>✦ Game-time temp &amp; wind</li>
           <li>✦ Rain probability</li>
           <li>✦ HR wind boost %</li>
@@ -244,7 +207,7 @@
         </ul>
       </div>
     </div>
-    <div style="margin-top:14px;padding:12px 16px;background:#0d1120;border-radius:8px;font-size:0.75rem;color:#555870;line-height:1.6;">
+    <div style="margin-top:14px;padding:12px 16px;background:#141010;border-radius:8px;font-size:0.75rem;color:#555;line-height:1.6;">
       Run line (-1.5 / +1.5 / -2.5), O/U, and Same Game Parlay use the full correlated score distribution from all 100k simulated final scores.
     </div>
   </div>
@@ -254,12 +217,12 @@
 <div class="page">
   <div class="card" style="margin-top:0;">
     <h2>🏟️ My Sports</h2>
-    <p style="font-size:0.82rem;color:#9aa0b8;margin-bottom:16px;line-height:1.5;">
+    <p style="font-size:0.82rem;color:#777;margin-bottom:16px;line-height:1.5;">
       Pick your favorite sports. Your homepage will show these front and center.
     </p>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;" id="sport-toggles">
 
-      <label style="display:flex;align-items:center;gap:12px;background:#0d1120;border:2px solid #252836;border-radius:12px;padding:14px 16px;cursor:pointer;transition:border-color .2s;" id="sport-card-mlb">
+      <label style="display:flex;align-items:center;gap:12px;background:#141010;border:2px solid #241818;border-radius:12px;padding:14px 16px;cursor:pointer;transition:border-color .2s;" id="sport-card-mlb">
         <input type="checkbox" value="mlb" class="sport-check" style="display:none;" checked>
         <span style="font-size:1.4rem;">⚾</span>
         <div>
@@ -268,36 +231,36 @@
         </div>
       </label>
 
-      <label style="display:flex;align-items:center;gap:12px;background:#0d1120;border:2px solid #252836;border-radius:12px;padding:14px 16px;cursor:pointer;transition:border-color .2s;" id="sport-card-nfl">
+      <label style="display:flex;align-items:center;gap:12px;background:#141010;border:2px solid #241818;border-radius:12px;padding:14px 16px;cursor:pointer;transition:border-color .2s;" id="sport-card-nfl">
         <input type="checkbox" value="nfl" class="sport-check" style="display:none;">
         <span style="font-size:1.4rem;">🏈</span>
         <div>
           <div style="font-weight:700;font-size:0.9rem;">NFL</div>
-          <div style="font-size:0.68rem;color:#7c3aed;font-weight:600;">COMING AUG 2026</div>
+          <div style="font-size:0.68rem;color:#e53935;font-weight:600;">COMING AUG 2026</div>
         </div>
       </label>
 
-      <label style="display:flex;align-items:center;gap:12px;background:#0d1120;border:2px solid #252836;border-radius:12px;padding:14px 16px;cursor:pointer;transition:border-color .2s;" id="sport-card-nba">
+      <label style="display:flex;align-items:center;gap:12px;background:#141010;border:2px solid #241818;border-radius:12px;padding:14px 16px;cursor:pointer;transition:border-color .2s;" id="sport-card-nba">
         <input type="checkbox" value="nba" class="sport-check" style="display:none;">
         <span style="font-size:1.4rem;">🏀</span>
         <div>
           <div style="font-weight:700;font-size:0.9rem;">NBA</div>
-          <div style="font-size:0.68rem;color:#7c3aed;font-weight:600;">COMING OCT 2026</div>
+          <div style="font-size:0.68rem;color:#e53935;font-weight:600;">COMING OCT 2026</div>
         </div>
       </label>
 
-      <label style="display:flex;align-items:center;gap:12px;background:#0d1120;border:2px solid #252836;border-radius:12px;padding:14px 16px;cursor:pointer;transition:border-color .2s;" id="sport-card-nhl">
+      <label style="display:flex;align-items:center;gap:12px;background:#141010;border:2px solid #241818;border-radius:12px;padding:14px 16px;cursor:pointer;transition:border-color .2s;" id="sport-card-nhl">
         <input type="checkbox" value="nhl" class="sport-check" style="display:none;">
         <span style="font-size:1.4rem;">🏒</span>
         <div>
           <div style="font-weight:700;font-size:0.9rem;">NHL</div>
-          <div style="font-size:0.68rem;color:#7c3aed;font-weight:600;">COMING DEC 2026</div>
+          <div style="font-size:0.68rem;color:#e53935;font-weight:600;">COMING DEC 2026</div>
         </div>
       </label>
 
     </div>
     <div id="sports-saved" style="font-size:0.78rem;color:#81c784;margin-top:14px;display:none;">✓ Favorites saved — homepage updated</div>
-    <div style="font-size:0.72rem;color:#555870;margin-top:12px;line-height:1.5;">
+    <div style="font-size:0.72rem;color:#555;margin-top:12px;line-height:1.5;">
       Your homepage sport selector will highlight your picks. When a sport goes live, you'll see its games on your dashboard automatically.
     </div>
   </div>
@@ -312,15 +275,15 @@
   checks.forEach(function(cb) {
     if (saved.indexOf(cb.value) >= 0) {
       cb.checked = true;
-      document.getElementById('sport-card-' + cb.value).style.borderColor = '#64b5f6';
+      document.getElementById('sport-card-' + cb.value).style.borderColor = '#e53935';
     }
     cb.addEventListener('change', function() {
       var favs = [];
       checks.forEach(function(c) {
         if (c.checked) favs.push(c.value);
-        document.getElementById('sport-card-' + c.value).style.borderColor = c.checked ? '#64b5f6' : '#252836';
+        document.getElementById('sport-card-' + c.value).style.borderColor = c.checked ? '#e53935' : '#241818';
       });
-      if (favs.length === 0) { favs = ['mlb']; cb.checked = true; document.getElementById('sport-card-mlb').style.borderColor = '#64b5f6'; }
+      if (favs.length === 0) { favs = ['mlb']; cb.checked = true; document.getElementById('sport-card-mlb').style.borderColor = '#e53935'; }
       localStorage.setItem('fav_sports', JSON.stringify(favs));
       var msg = document.getElementById('sports-saved');
       msg.style.display = 'block';
@@ -337,10 +300,10 @@
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
 
       <button onclick="setTheme('dark')" id="theme-btn-dark"
-        style="border:2px solid transparent;border-radius:12px;padding:16px 10px;cursor:pointer;background:#0d1120;color:#e8eaf0;font-size:0.82rem;font-weight:600;transition:.2s;">
-        <div style="width:100%;height:36px;background:linear-gradient(135deg,#1a1e2e,#0d1120);border-radius:6px;margin-bottom:8px;"></div>
+        style="border:2px solid transparent;border-radius:12px;padding:16px 10px;cursor:pointer;background:#141010;color:#f0ece4;font-size:0.82rem;font-weight:600;transition:.2s;">
+        <div style="width:100%;height:36px;background:linear-gradient(135deg,#111,#141010);border-radius:6px;margin-bottom:8px;"></div>
         🌑 Dark
-        <div style="font-size:0.68rem;color:#9aa0b8;margin-top:4px;">Deep navy · current default</div>
+        <div style="font-size:0.68rem;color:#777;margin-top:4px;">Deep navy · current default</div>
       </button>
 
       <button onclick="setTheme('medium')" id="theme-btn-medium"
@@ -365,15 +328,15 @@
 <script>
 const THEMES = {
   dark: {
-    '--bg':       '#0d1120',
-    '--bg2':      '#1a1e2e',
-    '--bg3':      '#252836',
-    '--border':   '#252836',
-    '--text':     '#e8eaf0',
-    '--text2':    '#b0b8cc',
-    '--text3':    '#9aa0b8',
-    '--accent':   '#64b5f6',
-    '--card-bg':  '#1a1e2e',
+    '--bg':       '#141010',
+    '--bg2':      '#111',
+    '--bg3':      '#241818',
+    '--border':   '#241818',
+    '--text':     '#f0ece4',
+    '--text2':    '#999',
+    '--text3':    '#777',
+    '--accent':   '#e53935',
+    '--card-bg':  '#111',
   },
   medium: {
     '--bg':       '#1a1528',
@@ -383,7 +346,7 @@ const THEMES = {
     '--text':     '#ede8f5',
     '--text2':    '#c0b8d8',
     '--text3':    '#a098c0',
-    '--accent':   '#b39ddb',
+    '--accent':   '#ffc107',
     '--card-bg':  '#241d38',
   },
   light: {
@@ -408,7 +371,7 @@ function applyTheme(name) {
   // highlight active button
   ['dark','medium','light'].forEach(n => {
     const btn = document.getElementById('theme-btn-' + n);
-    if (btn) btn.style.borderColor = (n === name) ? '#64b5f6' : 'transparent';
+    if (btn) btn.style.borderColor = (n === name) ? '#e53935' : 'transparent';
   });
 }
 

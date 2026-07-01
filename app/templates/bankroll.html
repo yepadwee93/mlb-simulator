@@ -1,90 +1,45 @@
 ﻿<!DOCTYPE html>
 <html lang="en">
 <head>
-<script>!function(){var t=localStorage.getItem("mlb_theme")||"dark",m={dark:{"--bg":"#0d1120","--bg2":"#1a1e2e","--bg3":"#252836","--border":"#252836","--text":"#e8eaf0","--text2":"#b0b8cc","--text3":"#9aa0b8","--accent":"#64b5f6","--card-bg":"#1a1e2e"},medium:{"--bg":"#1a1528","--bg2":"#241d38","--bg3":"#302848","--border":"#3a2f5a","--text":"#ede8f5","--text2":"#c0b8d8","--text3":"#a098c0","--accent":"#b39ddb","--card-bg":"#241d38"},light:{"--bg":"#f0f2f8","--bg2":"#ffffff","--bg3":"#e8eaf6","--border":"#d0d4e8","--text":"#1a1a2e","--text2":"#444466","--text3":"#6666aa","--accent":"#3949ab","--card-bg":"#ffffff"}}[t]||{};Object.entries(m).forEach(function(e){document.documentElement.style.setProperty(e[0],e[1])});document.addEventListener("DOMContentLoaded",function(){document.body.style.background=m["--bg"];document.body.style.color=m["--text"]})}();</script>
+<script>!function(){var t=localStorage.getItem("mlb_theme")||"dark",m={dark:{"--bg":"#141010","--bg2":"#111","--bg3":"#241818","--border":"#241818","--text":"#f0ece4","--text2":"#999","--text3":"#777","--accent":"#e53935","--card-bg":"#111"},medium:{"--bg":"#1a1528","--bg2":"#241d38","--bg3":"#302848","--border":"#3a2f5a","--text":"#ede8f5","--text2":"#c0b8d8","--text3":"#a098c0","--accent":"#ffc107","--card-bg":"#241d38"},light:{"--bg":"#f0f2f8","--bg2":"#ffffff","--bg3":"#e8eaf6","--border":"#d0d4e8","--text":"#1a1a2e","--text2":"#444466","--text3":"#6666aa","--accent":"#3949ab","--card-bg":"#ffffff"}}[t]||{};Object.entries(m).forEach(function(e){document.documentElement.style.setProperty(e[0],e[1])});document.addEventListener("DOMContentLoaded",function(){document.body.style.background=m["--bg"];document.body.style.color=m["--text"]})}();</script>
   <meta charset="UTF-8">
   <meta name="csrf-token" content="{{ csrf_token() }}">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Bankroll — MLB Simulator</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #0d1120; color: #e8eaf0; font-family: 'Segoe UI', Arial, sans-serif; padding: 32px 20px; }
-    a { color: #64b5f6; text-decoration: none; } a:hover { text-decoration: underline; }
+    body { background: #141010; color: #f0ece4; font-family: 'Segoe UI', Arial, sans-serif; padding: 32px 20px; }
+    a { color: #e53935; text-decoration: none; } a:hover { text-decoration: underline; }
     .back { display: inline-block; margin-bottom: 24px; font-size: 0.9rem; }
     h1 { font-size: 1.6rem; font-weight: 800; margin-bottom: 6px; }
-    .subtitle { color: #b0b8cc; font-size: 0.9rem; margin-bottom: 28px; }
-    .green { color: #4caf50; } .red { color: #ef5350; } .blue { color: #64b5f6; } .gold { color: #ffa726; }
+    .subtitle { color: #999; font-size: 0.9rem; margin-bottom: 28px; }
+    .green { color: #4caf50; } .red { color: #ef5350; } .blue { color: #e53935; } .gold { color: #ffa726; }
     .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 28px; }
-    .stat-card { background: #1a1e2e; border: 1px solid #252836; border-radius: 12px; padding: 14px 16px; }
-    .stat-label { font-size: 0.68rem; color: #b0b8cc; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
+    .stat-card { background: #1e1616; border: 1px solid #241818; border-radius: 12px; padding: 14px 16px; }
+    .stat-label { font-size: 0.68rem; color: #999; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
     .stat-val { font-size: 1.4rem; font-weight: 800; }
-    .section { background: #1a1e2e; border: 1px solid #252836; border-radius: 14px; padding: 20px 24px; margin-bottom: 24px; }
-    .section-title { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: #b0b8cc; margin-bottom: 14px; }
+    .section { background: #1e1616; border: 1px solid #241818; border-radius: 14px; padding: 20px 24px; margin-bottom: 24px; }
+    .section-title { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: #999; margin-bottom: 14px; }
     .setup-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
-    .setup-row label { font-size: 0.8rem; color: #b0b8cc; }
-    .setup-row input { background: #0d1120; border: 1px solid #333650; border-radius: 8px; color: #e8eaf0; padding: 8px 12px; font-size: 0.9rem; width: 120px; }
-    .btn { background: #1a3a5a; color: #64b5f6; border: 1px solid #1565c0; border-radius: 8px; padding: 8px 18px; font-size: 0.85rem; font-weight: 700; cursor: pointer; }
-    .btn:hover { background: #1e4a70; }
+    .setup-row label { font-size: 0.8rem; color: #999; }
+    .setup-row input { background: #141010; border: 1px solid #2a1c1c; border-radius: 8px; color: #f0ece4; padding: 8px 12px; font-size: 0.9rem; width: 120px; }
+    .btn { background: #1a1028; color: #e53935; border: 1px solid #c62828; border-radius: 8px; padding: 8px 18px; font-size: 0.85rem; font-weight: 700; cursor: pointer; }
+    .btn:hover { background: #2a1838; }
     nav { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
-    nav a { font-size: 0.82rem; color: #b0b8cc; padding: 5px 12px; border-radius: 6px; border: 1px solid #252836; }
-    nav a:hover { color: #e8eaf0; border-color: #9aa0b8; text-decoration: none; }
+    nav a { font-size: 0.82rem; color: #999; padding: 5px 12px; border-radius: 6px; border: 1px solid #241818; }
+    nav a:hover { color: #f0ece4; border-color: #777; text-decoration: none; }
     .proj-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-top: 16px; }
-    .proj-card { background: #0d1120; border-radius: 10px; padding: 14px; text-align: center; }
-    .proj-period { font-size: 0.7rem; color: #b0b8cc; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+    .proj-card { background: #141010; border-radius: 10px; padding: 14px; text-align: center; }
+    .proj-period { font-size: 0.7rem; color: #999; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
     .proj-val { font-size: 1.2rem; font-weight: 800; }
-    .drawdown-bar-wrap { background: #0d1120; border-radius: 4px; height: 10px; overflow: hidden; margin-top: 6px; }
+    .drawdown-bar-wrap { background: #141010; border-radius: 4px; height: 10px; overflow: hidden; margin-top: 6px; }
     .drawdown-bar { height: 100%; background: #ef5350; border-radius: 4px; }
   
-.nav-dropdown { position:relative; display:inline-block; }
-.nav-dropdown > a { color:#ffb74d;text-decoration:none;font-weight:600; }
-.nav-dropdown-menu {
-  visibility:hidden; opacity:0; pointer-events:none;
-  position:absolute; top:100%; left:50%;
-  transform:translateX(-50%);
-  background:#1e2235; border:1px solid #353a52; border-radius:10px;
-  min-width:160px; z-index:999; padding:12px 0 6px 0; white-space:nowrap;
-  box-shadow:0 8px 24px rgba(0,0,0,0.4);
-  transition:opacity 0.15s, visibility 0.15s;
-  margin-top:0;
-}
-.nav-dropdown:hover .nav-dropdown-menu,
-.nav-dropdown:focus-within .nav-dropdown-menu {
-  visibility:visible; opacity:1; pointer-events:auto;
-}
-.nav-dropdown-menu a {
-  display:block; padding:9px 16px; font-size:0.83rem; font-weight:600;
-  text-decoration:none; color:#e8eaf0;
-}
-.nav-dropdown-menu a:hover { background:#252a3a; }
 </style>
 
 <body>
 
-<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 24px;background:#1e2235;border-bottom:1px solid #353a52;margin-bottom:28px;">
-  <a href="/mlb" style="color:#fff;text-decoration:none;font-size:1.1rem;font-weight:800;">⚾ MLB Simulator</a>
-  <div style="display:flex;gap:16px;font-size:0.85rem;align-items:center;flex-wrap:wrap;">
-    <a href="/mlb" style="color:#64b5f6;text-decoration:none;font-weight:600;">🎯 Games</a>
-    <span class="nav-dropdown"><a href="/bets">&#128176; My Bets &#9660;</a><div class="nav-dropdown-menu"><a href="/bets">&#128176; My Bets</a><a href="/bankroll">&#128200; Bankroll</a><a href="/calculator">&#129518; Calculator</a><a href="/parlay">&#127920; Parlay</a><a href="/my-picks">&#127919; My Picks</a></div></span>
-    <a href="/accuracy" style="color:#64b5f6;text-decoration:none;font-weight:600;">📊 Accuracy</a>
-    <a href="/confidence-history" style="color:#c084fc;text-decoration:none;font-weight:600;">📈 Confidence</a>
-    <a href="/prop-accuracy" style="color:#b39ddb;text-decoration:none;font-weight:600;">🎯 Props</a>
-    <a href="/odds-history" style="color:#ffd54f;text-decoration:none;font-weight:600;">📋 Odds</a>
-    {% if current_user.is_authenticated %}
-      <a href="/settings" style="color:#aaa;text-decoration:none;font-weight:600;">👤 {{ current_user.username }}</a>
-      <a href="/logout" style="color:#ef9a9a;text-decoration:none;font-weight:600;">Sign Out</a>
-    {% else %}
-      <a href="/login" style="color:#a5d6a7;text-decoration:none;font-weight:600;">Login</a>
-    {% endif %}
-  </div>
-</div>
-
-
-<!-- ── Live Scoreboard Bar ── -->
-<div id="scoreboard-bar" style="background:#12162a;border-bottom:1px solid #252836;padding:0;overflow:hidden;">
-  <div id="scoreboard-inner" style="display:flex;overflow-x:auto;gap:0;scrollbar-width:none;-ms-overflow-style:none;">
-    <div style="padding:7px 14px;font-size:0.7rem;color:#555870;white-space:nowrap;align-self:center;flex-shrink:0;">TODAY</div>
-  </div>
-</div>
+{% include "_navbar.html" %}
 <script>
 (function(){
   function abbr(name) {
@@ -95,13 +50,13 @@
     s = (s||'').toLowerCase();
     if (s.includes('progress')||s.includes('live')) return '#ef5350';
     if (s.includes('final')) return '#4caf50';
-    return '#9aa0b8';
+    return '#777';
   }
   function renderScoreboard(games) {
     var inner = document.getElementById('scoreboard-inner');
     if (!inner) return;
     if (!games.length) { document.getElementById('scoreboard-bar').style.display='none'; return; }
-    var html = '<div style="padding:7px 14px;font-size:0.7rem;color:#555870;white-space:nowrap;align-self:center;flex-shrink:0;">TODAY</div>';
+    var html = '<div style="padding:7px 14px;font-size:0.7rem;color:#555;white-space:nowrap;align-self:center;flex-shrink:0;">TODAY</div>';
     games.forEach(function(g) {
       var s = (g.status||'').toLowerCase();
       var isLive = s.includes('progress')||s.includes('live');
@@ -118,11 +73,11 @@
       var scoreHome = (isLive||isFinal) ? '<b style="color:#fff;">'+esc(g.home_score)+'</b>' : '';
       var dot = '<span style="width:6px;height:6px;border-radius:50%;background:'+statusColor(g.status)+';display:inline-block;margin-right:5px;vertical-align:middle;'+(isLive?'animation:pulse 1.2s infinite;':'')+'" ></span>';
       var link = g.gamePk ? '/simulate/'+g.gamePk+'?sims=100000' : '#';
-      html += '<a href="'+link+'" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:5px 14px;border-left:1px solid #1e2235;text-decoration:none;flex-shrink:0;min-width:110px;">'
+      html += '<a href="'+link+'" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:5px 14px;border-left:1px solid #111;text-decoration:none;flex-shrink:0;min-width:110px;">'
         + '<div style="display:flex;align-items:center;gap:6px;font-size:0.72rem;white-space:nowrap;">'
-        + '<span style="color:#b0b8cc;">'+esc(abbr(g.away))+' '+scoreAway+'</span>'
-        + '<span style="color:#555870;font-size:0.65rem;">@</span>'
-        + '<span style="color:#b0b8cc;">'+scoreHome+' '+esc(abbr(g.home))+'</span>'
+        + '<span style="color:#999;">'+esc(abbr(g.away))+' '+scoreAway+'</span>'
+        + '<span style="color:#555;font-size:0.65rem;">@</span>'
+        + '<span style="color:#999;">'+scoreHome+' '+esc(abbr(g.home))+'</span>'
         + '</div>'
         + '<div style="font-size:0.63rem;margin-top:2px;">'+dot+'<span style="color:'+statusColor(g.status)+';">'+timeStr+'</span></div>'
         + '</a>';
@@ -137,6 +92,17 @@
 <style>
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
 #scoreboard-inner::-webkit-scrollbar { display:none; }
+
+    @media (max-width: 768px) {
+      body { padding: 16px 10px; }
+      h1 { font-size: 1.3rem; }
+      .summary-grid { grid-template-columns: repeat(2, 1fr); }
+      .section { padding: 14px 16px; }
+      .setup-row { flex-direction: column; align-items: flex-start; }
+      .proj-grid { grid-template-columns: repeat(2, 1fr); }
+      nav { gap: 8px; }
+      nav a { font-size: 0.75rem; padding: 4px 8px; }
+    }
 </style>
 <h1>📈 Bankroll Tracker</h1>
 <p class="subtitle">Track your betting bankroll over time, measure drawdown, and project growth.</p>
@@ -146,7 +112,7 @@
   <div class="section-title">Setup</div>
   <div class="setup-row">
     <label>Starting Bankroll:</label>
-    <span style="color:#b0b8cc;">$</span>
+    <span style="color:#999;">$</span>
     <input id="start-br" type="number" value="1000" min="1">
     <button class="btn" onclick="saveBankroll()">Save & Recalculate</button>
     <span id="br-msg" style="font-size:0.78rem;color:#4caf50;"></span>
@@ -265,7 +231,7 @@ function recalculate(startBR) {
         }, {
           label: 'Starting Bankroll',
           data: Array(balances.length).fill(startBR),
-          borderColor: '#9aa0b8',
+          borderColor: '#777',
           borderDash: [4,4],
           pointRadius: 0,
           fill: false,
@@ -275,10 +241,10 @@ function recalculate(startBR) {
         responsive: true,
         interaction: { mode: 'index' },
         scales: {
-          y: { grid: { color: '#1a1d28' }, ticks: { color: '#b0b8cc', callback: v => '$' + v } },
-          x: { ticks: { color: '#b0b8cc', font: { size: 9 }, maxRotation: 45, maxTicksLimit: 12 }, grid: { display: false } }
+          y: { grid: { color: '#1a1d28' }, ticks: { color: '#999', callback: v => '$' + v } },
+          x: { ticks: { color: '#999', font: { size: 9 }, maxRotation: 45, maxTicksLimit: 12 }, grid: { display: false } }
         },
-        plugins: { legend: { labels: { color: '#b0b8cc' } } }
+        plugins: { legend: { labels: { color: '#999' } } }
       }
     });
 
@@ -289,7 +255,7 @@ function recalculate(startBR) {
     const clvHtml = avgClv !== null
       ? `<div class="stat-card"><div class="stat-label">Avg CLV</div>
           <div class="stat-val ${avgClv >= 0 ? 'green' : 'red'}">${avgClv >= 0 ? '+' : ''}${avgClv.toFixed(1)}%</div>
-          <div style="font-size:0.7rem;color:#9aa0b8;margin-top:3px;">${clvPositive}/${clvBets.length} beat close</div></div>`
+          <div style="font-size:0.7rem;color:#777;margin-top:3px;">${clvPositive}/${clvBets.length} beat close</div></div>`
       : '';
     document.getElementById('br-stats').innerHTML += clvHtml;
 
@@ -304,11 +270,11 @@ function recalculate(startBR) {
     });
     const dailyKeys = Object.keys(dailyPL).sort();
     if (dailyKeys.length > 0) {
-      let dailyHtml = '<div class="section"><div class="section-title">📅 Daily P&L</div><div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:0.8rem;"><thead><tr><th style="text-align:left;color:#9aa0b8;padding:6px 10px;border-bottom:1px solid #252836;">Date</th><th style="text-align:center;color:#9aa0b8;padding:6px 10px;border-bottom:1px solid #252836;">Record</th><th style="text-align:right;color:#9aa0b8;padding:6px 10px;border-bottom:1px solid #252836;">P&L</th></tr></thead><tbody>';
+      let dailyHtml = '<div class="section"><div class="section-title">📅 Daily P&L</div><div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:0.8rem;"><thead><tr><th style="text-align:left;color:#777;padding:6px 10px;border-bottom:1px solid #241818;">Date</th><th style="text-align:center;color:#777;padding:6px 10px;border-bottom:1px solid #241818;">Record</th><th style="text-align:right;color:#777;padding:6px 10px;border-bottom:1px solid #241818;">P&L</th></tr></thead><tbody>';
       dailyKeys.reverse().forEach(d => {
         const day = dailyPL[d];
         const plColor = day.pl >= 0 ? '#4caf50' : '#ef5350';
-        dailyHtml += '<tr><td style="padding:6px 10px;border-bottom:1px solid #1a1e2e;color:#b0b8cc;">' + d + '</td><td style="text-align:center;padding:6px 10px;border-bottom:1px solid #1a1e2e;">' + day.w + '-' + day.l + '</td><td style="text-align:right;padding:6px 10px;border-bottom:1px solid #1a1e2e;font-weight:700;color:' + plColor + ';">' + (day.pl >= 0 ? '+' : '') + '$' + day.pl.toFixed(2) + '</td></tr>';
+        dailyHtml += '<tr><td style="padding:6px 10px;border-bottom:1px solid #111;color:#999;">' + d + '</td><td style="text-align:center;padding:6px 10px;border-bottom:1px solid #111;">' + day.w + '-' + day.l + '</td><td style="text-align:right;padding:6px 10px;border-bottom:1px solid #111;font-weight:700;color:' + plColor + ';">' + (day.pl >= 0 ? '+' : '') + '$' + day.pl.toFixed(2) + '</td></tr>';
       });
       dailyHtml += '</tbody></table></div></div>';
       document.getElementById('projections').parentElement.insertAdjacentHTML('afterend', dailyHtml);
@@ -334,12 +300,12 @@ function recalculate(startBR) {
       return `<div class="proj-card">
         <div class="proj-period">${p.label}</div>
         <div class="proj-val ${diff >= 0 ? 'green' : 'red'}">$${proj.toFixed(0)}</div>
-        <div style="font-size:0.7rem;color:#b0b8cc;margin-top:3px;">${diff >= 0 ? '+' : ''}$${diff.toFixed(0)}</div>
+        <div style="font-size:0.7rem;color:#999;margin-top:3px;">${diff >= 0 ? '+' : ''}$${diff.toFixed(0)}</div>
       </div>`;
     }).join('');
 
     if (settled.length === 0) {
-      document.getElementById('br-stats').innerHTML += `<div style="grid-column:1/-1;color:#9aa0b8;font-size:0.82rem;padding:8px 0;">Log settled bets in the Bet Tracker to see your bankroll curve.</div>`;
+      document.getElementById('br-stats').innerHTML += `<div style="grid-column:1/-1;color:#777;font-size:0.82rem;padding:8px 0;">Log settled bets in the Bet Tracker to see your bankroll curve.</div>`;
     }
   });
 }
