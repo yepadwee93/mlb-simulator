@@ -307,6 +307,59 @@
   text-decoration:none; color:#e8eaf0;
 }
 .nav-dropdown-menu a:hover { background:#252a3a; }
+
+/* ── Sticky section nav ── */
+.section-nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: #0d1120;
+  border-bottom: 1px solid #252836;
+  padding: 0;
+  display: flex;
+  gap: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.section-nav::-webkit-scrollbar { display: none; }
+.section-nav a {
+  flex-shrink: 0;
+  padding: 10px 14px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #9aa0b8;
+  text-decoration: none;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.section-nav a:hover { color: #e8eaf0; }
+.section-nav a.active { color: #64b5f6; border-bottom-color: #64b5f6; }
+
+/* ── Back to top button ── */
+#back-to-top {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 44px;
+  height: 44px;
+  background: #1e2235;
+  border: 1px solid #353a52;
+  border-radius: 50%;
+  color: #b0b8cc;
+  font-size: 1.2rem;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  transition: background 0.15s, color 0.15s;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+#back-to-top:hover { background: #2a3050; color: #fff; }
 </style>
 
 <body>
@@ -408,8 +461,26 @@
 #scoreboard-inner::-webkit-scrollbar { display:none; }
 </style>
 
+<!-- ── Section Navigation ── -->
+<div class="section-nav" id="section-nav">
+  <a href="#sec-prediction">Prediction</a>
+  <a href="#sec-models">Models</a>
+  <a href="#sec-odds">Odds</a>
+  <a href="#sec-edges">Edges</a>
+  <a href="#sec-bet">Quick Bet</a>
+  <a href="#sec-pitchers">Pitchers</a>
+  <a href="#sec-weather">Weather</a>
+  <a href="#sec-lineups">Lineups</a>
+  <a href="#sec-props">Props</a>
+  <a href="#sec-stadium">Stadium</a>
+  <a href="#sec-optimizer">Optimizer</a>
+  <a href="#sec-sgp">SGP Builder</a>
+</div>
+
+<button id="back-to-top" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">↑</button>
+
 <!-- ── Main prediction card ── -->
-<div class="card">
+<div class="card" id="sec-prediction">
   <div class="matchup">
     <div class="team-block">
       <div class="team-name">{{ away_team }}</div>
@@ -452,6 +523,7 @@
   {% endif %}
 
   <!-- ── Multi-Model Comparison ── -->
+  <div id="sec-models"></div>
   {% if consensus and consensus.models %}
   <div style="background:var(--bg2, #1a1e2e);border:1px solid var(--border, #252836);border-radius:12px;padding:16px 20px;margin:14px 0;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
@@ -541,7 +613,7 @@
 
 <!-- ── Odds comparison card ── -->
 {% if away_implied_pct %}
-<div class="card">
+<div class="card" id="sec-odds">
   <div class="section-title">
     Our Model vs Vegas
     <span style="float:right; font-weight:400;">{{ books_used }} book{{ 's' if books_used != 1 }} averaged</span>
@@ -656,7 +728,7 @@
 
 <!-- ── Betting Edges Card (O/U, Run Line, KDE) ── -->
 {% if ou_line is defined and ou_line %}
-<div class="card">
+<div class="card" id="sec-edges">
   <div class="section-title">Betting Edges</div>
 
   <!-- Over/Under -->
@@ -747,6 +819,7 @@
 {% endif %}
 
 <!-- ── Quick Bet Slip ── -->
+<div id="sec-bet"></div>
 {% if away_avg_odds is defined and away_avg_odds %}
 <div class="card" id="quick-bet-card">
   <div class="section-title">Quick Bet</div>
@@ -816,6 +889,7 @@ function qbSubmit() {
 {% endif %}
 
 <!-- ── Pitching matchup card ── -->
+<div id="sec-pitchers"></div>
 <div class="card">
   <div class="section-title">Starting Pitchers</div>
 
@@ -964,6 +1038,7 @@ function qbSubmit() {
 {% endif %}
 
 <!-- ── Weather Card ── -->
+<div id="sec-weather"></div>
 {% if weather and weather.temp_f %}
 <div class="card" style="max-width:900px; padding:16px 20px;">
   <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
@@ -1106,6 +1181,7 @@ function qbSubmit() {
 </div>
 
 <!-- ── Lineups card ── -->
+<div id="sec-lineups"></div>
 <div class="card" style="max-width:900px;">
   <div class="section-title">
     Lineups
@@ -1311,6 +1387,7 @@ function qbSubmit() {
 </div>
 
 <!-- ── Batter Prop Model Predictions ── -->
+<div id="sec-props"></div>
 {% if away_batter_props or home_batter_props %}
 <div class="card" style="max-width:900px;" id="batter-props-card">
   <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;">
@@ -1379,6 +1456,7 @@ function qbSubmit() {
 {% endif %}
 
 {# ── Stadium Batter Splits ── #}
+<div id="sec-stadium"></div>
 {% if stadium_profile and stadium_profile.venue %}
 {% set sp = stadium_profile %}
 <div class="card" style="max-width:900px;">
@@ -1499,6 +1577,7 @@ function qbSubmit() {
 {% endif %}
 {% endmacro %}
 
+<div id="sec-optimizer"></div>
 {% if away_order_opt or home_order_opt %}
 <div class="card" style="max-width:900px;">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
@@ -1707,7 +1786,7 @@ document.querySelectorAll('[data-prop-player]').forEach(function(wrapper) {
 </script>
 
 <!-- ── Same Game Parlay (SGP) Builder ── -->
-<div class="card" style="margin-top:28px;">
+<div class="card" style="margin-top:28px;" id="sec-sgp">
   <div class="card-header" style="cursor:pointer;" onclick="toggleSection('sgp-body')">
     <span>🎲 Same Game Parlay Builder</span>
     <span style="font-size:0.75rem;color:#9aa0b8;margin-left:8px;">Correlated probabilities from your simulation</span>
@@ -2088,7 +2167,70 @@ document.querySelectorAll('[data-prop-player]').forEach(function(wrapper) {
 <script>
 function getCsrfToken(){return document.cookie.split(';').map(function(c){return c.trim();}).find(function(c){return c.startsWith('csrf_token=');})?.split('=')[1]||'';}
 function csrfFetch(url,opts){opts=opts||{};opts.headers=Object.assign({'X-CSRFToken':getCsrfToken()},opts.headers||{});return fetch(url,opts);}
-</script></body>
+</script>
+
+<script>
+(function() {
+  var nav = document.getElementById('section-nav');
+  var btn = document.getElementById('back-to-top');
+  if (!nav) return;
+
+  var links = nav.querySelectorAll('a');
+  var sections = [];
+  links.forEach(function(a) {
+    var id = a.getAttribute('href').substring(1);
+    var el = document.getElementById(id);
+    if (el) sections.push({id: id, el: el, link: a});
+  });
+
+  var navHeight = nav.offsetHeight + 10;
+
+  // Smooth scroll with offset for sticky nav
+  links.forEach(function(a) {
+    a.addEventListener('click', function(e) {
+      e.preventDefault();
+      var id = a.getAttribute('href').substring(1);
+      var target = document.getElementById(id);
+      if (target) {
+        var top = target.getBoundingClientRect().top + window.pageYOffset - navHeight;
+        window.scrollTo({top: top, behavior: 'smooth'});
+      }
+    });
+  });
+
+  // Scroll spy + back-to-top visibility
+  var ticking = false;
+  window.addEventListener('scroll', function() {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(function() {
+      var scrollPos = window.pageYOffset + navHeight + 20;
+
+      // Highlight active section
+      var active = null;
+      for (var i = sections.length - 1; i >= 0; i--) {
+        if (sections[i].el.offsetTop <= scrollPos) {
+          active = sections[i];
+          break;
+        }
+      }
+      links.forEach(function(a) { a.classList.remove('active'); });
+      if (active) {
+        active.link.classList.add('active');
+        // Scroll the nav to keep active link visible
+        var navScroll = active.link.offsetLeft - nav.offsetWidth / 2 + active.link.offsetWidth / 2;
+        nav.scrollTo({left: navScroll, behavior: 'smooth'});
+      }
+
+      // Back to top button
+      if (btn) btn.style.display = window.pageYOffset > 400 ? 'flex' : 'none';
+
+      ticking = false;
+    });
+  });
+})();
+</script>
+</body>
 </html>
 
 
