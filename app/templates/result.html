@@ -1,7 +1,7 @@
 ﻿<!DOCTYPE html>
 <html lang="en">
 <head>
-<script>!function(){var t=localStorage.getItem("mlb_theme")||"dark",m={dark:{"--bg":"#0d0808","--bg2":"#111","--bg3":"#241818","--border":"#241818","--text":"#f0ece4","--text2":"#999","--text3":"#777","--accent":"#e53935","--card-bg":"#111"},medium:{"--bg":"#1a1528","--bg2":"#241d38","--bg3":"#302848","--border":"#3a2f5a","--text":"#ede8f5","--text2":"#c0b8d8","--text3":"#a098c0","--accent":"#ffc107","--card-bg":"#241d38"},light:{"--bg":"#f0f2f8","--bg2":"#ffffff","--bg3":"#e8eaf6","--border":"#d0d4e8","--text":"#1a1a2e","--text2":"#444466","--text3":"#6666aa","--accent":"#3949ab","--card-bg":"#ffffff"}}[t]||{};Object.entries(m).forEach(function(e){document.documentElement.style.setProperty(e[0],e[1])});document.addEventListener("DOMContentLoaded",function(){document.body.style.background=m["--bg"];document.body.style.color=m["--text"]})}();</script>
+<script>!function(){var t=localStorage.getItem("mlb_theme")||"dark",m={dark:{"--bg":"#141010","--bg2":"#111","--bg3":"#241818","--border":"#241818","--text":"#f0ece4","--text2":"#999","--text3":"#777","--accent":"#e53935","--card-bg":"#111"},medium:{"--bg":"#1a1528","--bg2":"#241d38","--bg3":"#302848","--border":"#3a2f5a","--text":"#ede8f5","--text2":"#c0b8d8","--text3":"#a098c0","--accent":"#ffc107","--card-bg":"#241d38"},light:{"--bg":"#f0f2f8","--bg2":"#ffffff","--bg3":"#e8eaf6","--border":"#d0d4e8","--text":"#1a1a2e","--text2":"#444466","--text3":"#6666aa","--accent":"#3949ab","--card-bg":"#ffffff"}}[t]||{};Object.entries(m).forEach(function(e){document.documentElement.style.setProperty(e[0],e[1])});document.addEventListener("DOMContentLoaded",function(){document.body.style.background=m["--bg"];document.body.style.color=m["--text"]})}();</script>
   <meta charset="UTF-8">
   <meta name="csrf-token" content="{{ csrf_token() }}">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,7 +10,7 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      background: #0d0808;
+      background: #141010;
       color: #f0ece4;
       font-family: 'Segoe UI', Arial, sans-serif;
       min-height: 100vh;
@@ -27,7 +27,7 @@
     .back-link:hover { text-decoration: underline; }
 
     .card {
-      background: #1a1212;
+      background: #1e1616;
       border: 1px solid #2a1a1a;
       border-radius: 14px;
       padding: 28px 32px;
@@ -111,7 +111,7 @@
     .score-box {
       text-align: center;
       padding: 16px;
-      background: #0d0808;
+      background: #141010;
       border-radius: 10px;
       margin-bottom: 8px;
     }
@@ -286,34 +286,13 @@
     }
     .back-btn:hover { background: #c62828; }
   
-.nav-dropdown { position:relative; display:inline-block; }
-.nav-dropdown > a { color:#ffc107;text-decoration:none;font-weight:600; }
-.nav-dropdown-menu {
-  visibility:hidden; opacity:0; pointer-events:none;
-  position:absolute; top:100%; left:50%;
-  transform:translateX(-50%);
-  background:#1a1212; border:1px solid #2a1a1a; border-radius:10px;
-  min-width:160px; z-index:999; padding:12px 0 6px 0; white-space:nowrap;
-  box-shadow:0 8px 24px rgba(0,0,0,0.4);
-  transition:opacity 0.15s, visibility 0.15s;
-  margin-top:0;
-}
-.nav-dropdown:hover .nav-dropdown-menu,
-.nav-dropdown:focus-within .nav-dropdown-menu {
-  visibility:visible; opacity:1; pointer-events:auto;
-}
-.nav-dropdown-menu a {
-  display:block; padding:9px 16px; font-size:0.83rem; font-weight:600;
-  text-decoration:none; color:#f0ece4;
-}
-.nav-dropdown-menu a:hover { background:#241818; }
 
 /* ── Sticky section nav ── */
 .section-nav {
   position: sticky;
   top: 0;
   z-index: 100;
-  background: #0d0808;
+  background: #141010;
   border-bottom: 1px solid #241818;
   padding: 0;
   display: flex;
@@ -346,7 +325,7 @@
   right: 24px;
   width: 44px;
   height: 44px;
-  background: #1a1212;
+  background: #1e1616;
   border: 1px solid #2a1a1a;
   border-radius: 50%;
   color: #999;
@@ -360,49 +339,31 @@
   box-shadow: 0 4px 12px rgba(0,0,0,0.4);
 }
 #back-to-top:hover { background: #2a3050; color: #fff; }
+
+/* ── Mobile responsive ── */
+@media (max-width: 768px) {
+  body { padding: 0 0 40px 0; }
+  .card { padding: 18px 14px; margin: 0 8px 16px; border-radius: 12px; }
+  .matchup { flex-direction: column; gap: 8px; text-align: center; }
+  .team-block { text-align: center !important; }
+  .team-pct { font-size: 2rem; }
+  .team-name { font-size: 1rem; }
+  .vs-divider { padding: 4px 0; }
+  .section-nav { padding: 0 10px; }
+  .section-nav a { font-size: 0.68rem; padding: 8px 10px; }
+  .back-link { margin: 12px 14px; }
+  #back-to-top { width: 38px; height: 38px; bottom: 16px; right: 16px; font-size: 1rem; }
+  table { font-size: 0.72rem; }
+  table td, table th { padding: 6px 8px; }
+}
 </style>
 
 <body>
 
-<!-- Sport Selector -->
-<div style="display:flex;gap:0;max-width:500px;margin:16px auto 0 auto;border-radius:10px;overflow:hidden;border:1px solid #2a1a1a;">
-  <a href="/mlb" style="flex:1;padding:10px 0;text-align:center;background:linear-gradient(135deg,#1a1028,#0d0808);color:#e53935;font-weight:700;font-size:0.85rem;text-decoration:none;border-right:1px solid #2a1a1a;">
-    ⚾ MLB
-  </a>
-  <div style="flex:1;padding:10px 0;text-align:center;color:#555;font-size:0.85rem;border-right:1px solid #2a1a1a;cursor:default;position:relative;" title="Coming Aug 2026">
-    🏈 NFL
-    <span style="position:absolute;top:-1px;right:6px;font-size:0.55rem;background:#e53935;color:#fff;padding:1px 5px;border-radius:0 0 4px 4px;font-weight:700;">AUG</span>
-  </div>
-  <div style="flex:1;padding:10px 0;text-align:center;color:#555;font-size:0.85rem;border-right:1px solid #2a1a1a;cursor:default;position:relative;" title="Coming Oct 2026">
-    🏀 NBA
-    <span style="position:absolute;top:-1px;right:6px;font-size:0.55rem;background:#e53935;color:#fff;padding:1px 5px;border-radius:0 0 4px 4px;font-weight:700;">OCT</span>
-  </div>
-  <div style="flex:1;padding:10px 0;text-align:center;color:#555;font-size:0.85rem;cursor:default;position:relative;" title="Coming Dec 2026">
-    🏒 NHL
-    <span style="position:absolute;top:-1px;right:6px;font-size:0.55rem;background:#e53935;color:#fff;padding:1px 5px;border-radius:0 0 4px 4px;font-weight:700;">DEC</span>
-  </div>
-</div>
-
-<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 24px;background:#1a1212;border-bottom:1px solid #2a1a1a;margin-bottom:28px;">
-  <a href="/mlb" style="color:#fff;text-decoration:none;font-size:1.1rem;font-weight:800;">⚾ MLB Simulator</a>
-  <div style="display:flex;gap:16px;font-size:0.85rem;align-items:center;flex-wrap:wrap;">
-    <a href="/mlb" style="color:#e53935;text-decoration:none;font-weight:600;">🎯 Games</a>
-    <span class="nav-dropdown"><a href="/bets">&#128176; My Bets &#9660;</a><div class="nav-dropdown-menu"><a href="/bets">&#128176; My Bets</a><a href="/bankroll">&#128200; Bankroll</a><a href="/calculator">&#129518; Calculator</a><a href="/parlay">&#127920; Parlay</a><a href="/my-picks">&#127919; My Picks</a></div></span>
-    <a href="/accuracy" style="color:#e53935;text-decoration:none;font-weight:600;">📊 Accuracy</a>
-    <a href="/confidence-history" style="color:#4a9eff;text-decoration:none;font-weight:600;">📈 Confidence</a>
-    <a href="/prop-accuracy" style="color:#ffc107;text-decoration:none;font-weight:600;">🎯 Props</a>
-    <a href="/odds-history" style="color:#ffd54f;text-decoration:none;font-weight:600;">📋 Odds</a>
-    {% if current_user.is_authenticated %}
-      <a href="/settings" style="color:#aaa;text-decoration:none;font-weight:600;">👤 {{ current_user.username }}</a>
-      <a href="/logout" style="color:#ef9a9a;text-decoration:none;font-weight:600;">Sign Out</a>
-    {% else %}
-      <a href="/login" style="color:#a5d6a7;text-decoration:none;font-weight:600;">Login</a>
-    {% endif %}
-  </div>
-</div>
+{% include "_navbar.html" %}
 
 <!-- ── Live Scoreboard Bar ── -->
-<div id="scoreboard-bar" style="background:#0a0606;border-bottom:1px solid #241818;padding:0;overflow:hidden;">
+<div id="scoreboard-bar" style="background:#100c0c;border-bottom:1px solid #241818;padding:0;overflow:hidden;">
   <div id="scoreboard-inner" style="display:flex;overflow-x:auto;gap:0;scrollbar-width:none;-ms-overflow-style:none;">
     <div style="padding:7px 14px;font-size:0.7rem;color:#555;white-space:nowrap;align-self:center;flex-shrink:0;">TODAY</div>
   </div>
@@ -539,7 +500,7 @@
       {% set m_fav = away_team if mdata.away_pct > 50 else home_team %}
       {% set m_pct = [mdata.away_pct, mdata.home_pct]|max %}
       {% set m_color = '#4caf50' if m_pct >= 60 else '#ffa726' if m_pct >= 55 else '#e53935' %}
-      <div style="background:var(--bg, #0d0808);border-radius:10px;padding:10px 8px;text-align:center;">
+      <div style="background:var(--bg, #141010);border-radius:10px;padding:10px 8px;text-align:center;">
         <div style="font-size:1.1rem;">{{ model_icons.get(mkey, '📈') }}</div>
         <div style="font-size:0.68rem;color:var(--text3, #777);margin:4px 0 2px 0;font-weight:600;">{{ model_names.get(mkey, mkey) }}</div>
         <div style="font-size:1.1rem;font-weight:900;color:{{ m_color }};">{{ m_pct }}%</div>
@@ -670,7 +631,7 @@
       <div style="font-size:0.78rem;font-weight:700;color:{% if side=='away' %}#e53935{% else %}#81c784{% endif %};margin-bottom:6px;">{{ team }}</div>
       <div style="display:flex;flex-wrap:wrap;gap:6px;">
         {% for b in books %}
-        <div style="background:{% if loop.index == 1 and b.edge_pct > 3 %}#1b3a2a{% else %}var(--bg, #0d0808){% endif %};border:1px solid {% if loop.index == 1 and b.edge_pct > 3 %}#1a2838{% elif loop.index == 1 %}#1a1028{% else %}var(--border, #241818){% endif %};border-radius:8px;padding:6px 10px;min-width:90px;">
+        <div style="background:{% if loop.index == 1 and b.edge_pct > 3 %}#1b3a2a{% else %}var(--bg, #141010){% endif %};border:1px solid {% if loop.index == 1 and b.edge_pct > 3 %}#1a2838{% elif loop.index == 1 %}#1a1028{% else %}var(--border, #241818){% endif %};border-radius:8px;padding:6px 10px;min-width:90px;">
           <div style="font-size:0.65rem;color:var(--text3, #777);margin-bottom:2px;">{{ b.book }}</div>
           <div style="font-size:0.95rem;font-weight:800;color:var(--text, #f0ece4);">{{ b.odds_str }}</div>
           <div style="font-size:0.68rem;font-weight:700;color:{% if b.edge_pct > 3 %}#4caf50{% elif b.edge_pct < -3 %}#ef5350{% else %}var(--text2, #999){% endif %};">
@@ -711,7 +672,7 @@
         </span>
       </div>
       <!-- Bet % bar -->
-      <div style="height:6px; background:#1a1212; border-radius:3px; overflow:hidden;">
+      <div style="height:6px; background:#1e1616; border-radius:3px; overflow:hidden;">
         <div style="height:100%; width:{{ bet_pct }}%; background:{% if side=='away' %}#e53935{% else %}#81c784{% endif %}; border-radius:3px; transition:width 0.3s;"></div>
       </div>
     </div>
@@ -731,7 +692,7 @@
 
   <!-- Over/Under -->
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
-    <div style="background:var(--bg, #0d0808);border:1px solid var(--border, #241818);border-radius:10px;padding:12px 14px;">
+    <div style="background:var(--bg, #141010);border:1px solid var(--border, #241818);border-radius:10px;padding:12px 14px;">
       <div style="font-size:0.68rem;color:var(--text3, #777);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">Over {{ ou_line }}</div>
       <div style="font-size:1.3rem;font-weight:800;color:{% if ou_over_edge is defined and ou_over_edge and ou_over_edge > 3 %}#4caf50{% else %}var(--text, #f0ece4){% endif %};">
         {{ model_over_pct }}%
@@ -745,7 +706,7 @@
       </div>
       {% endif %}
     </div>
-    <div style="background:var(--bg, #0d0808);border:1px solid var(--border, #241818);border-radius:10px;padding:12px 14px;">
+    <div style="background:var(--bg, #141010);border:1px solid var(--border, #241818);border-radius:10px;padding:12px 14px;">
       <div style="font-size:0.68rem;color:var(--text3, #777);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">Under {{ ou_line }}</div>
       <div style="font-size:1.3rem;font-weight:800;color:{% if ou_under_edge is defined and ou_under_edge and ou_under_edge > 3 %}#4caf50{% else %}var(--text, #f0ece4){% endif %};">
         {{ model_under_pct }}%
@@ -763,7 +724,7 @@
 
   <!-- KDE-smoothed edge -->
   {% if kde_ou_edge is defined and kde_ou_edge %}
-  <div style="background:{% if kde_ou_edge.best_edge_pct > 3 %}#1b3a2a{% else %}var(--bg, #0d0808){% endif %};border:1px solid {% if kde_ou_edge.best_edge_pct > 3 %}#1a2838{% else %}var(--border, #241818){% endif %};border-radius:10px;padding:10px 14px;margin-bottom:14px;">
+  <div style="background:{% if kde_ou_edge.best_edge_pct > 3 %}#1b3a2a{% else %}var(--bg, #141010){% endif %};border:1px solid {% if kde_ou_edge.best_edge_pct > 3 %}#1a2838{% else %}var(--border, #241818){% endif %};border-radius:10px;padding:10px 14px;margin-bottom:14px;">
     <div style="font-size:0.68rem;color:var(--text3, #777);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;">KDE-Smoothed O/U Edge</div>
     <div style="display:flex;align-items:center;gap:12px;">
       <span style="font-size:1.1rem;font-weight:800;color:{% if kde_ou_edge.best_edge_pct > 3 %}#4caf50{% else %}var(--text, #f0ece4){% endif %};">
@@ -779,7 +740,7 @@
   <!-- Run Line -->
   {% if away_rl_odds is defined and away_rl_odds %}
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
-    <div style="background:var(--bg, #0d0808);border:1px solid var(--border, #241818);border-radius:10px;padding:12px 14px;">
+    <div style="background:var(--bg, #141010);border:1px solid var(--border, #241818);border-radius:10px;padding:12px 14px;">
       <div style="font-size:0.68rem;color:var(--text3, #777);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">{{ away_team }} -1.5</div>
       <div style="font-size:1.3rem;font-weight:800;color:{% if away_rl_edge is defined and away_rl_edge and away_rl_edge > 3 %}#4caf50{% else %}var(--text, #f0ece4){% endif %};">
         {{ away_cover_pct }}%
@@ -793,7 +754,7 @@
       </div>
       {% endif %}
     </div>
-    <div style="background:var(--bg, #0d0808);border:1px solid var(--border, #241818);border-radius:10px;padding:12px 14px;">
+    <div style="background:var(--bg, #141010);border:1px solid var(--border, #241818);border-radius:10px;padding:12px 14px;">
       <div style="font-size:0.68rem;color:var(--text3, #777);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">{{ home_team }} +1.5</div>
       <div style="font-size:1.3rem;font-weight:800;color:{% if home_rl_edge is defined and home_rl_edge and home_rl_edge > 3 %}#4caf50{% else %}var(--text, #f0ece4){% endif %};">
         {{ home_cover_pct }}%
@@ -840,14 +801,14 @@
     </button>
   </div>
   {% endif %}
-  <div id="qb-form" style="display:none;background:#0d0808;border-radius:10px;padding:14px;margin-top:8px;">
+  <div id="qb-form" style="display:none;background:#141010;border-radius:10px;padding:14px;margin-top:8px;">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
       <span id="qb-label" style="font-weight:700;font-size:0.9rem;color:#f0ece4;"></span>
       <span id="qb-edge-badge" style="font-size:0.75rem;font-weight:700;padding:2px 8px;border-radius:10px;"></span>
     </div>
     <div style="display:flex;gap:10px;align-items:center;">
       <label style="font-size:0.78rem;color:#999;">Wager $</label>
-      <input id="qb-amount" type="number" value="100" min="1" style="width:80px;background:#1a1212;border:1px solid #2a1a1a;border-radius:6px;color:#f0ece4;padding:6px 8px;font-size:0.85rem;">
+      <input id="qb-amount" type="number" value="100" min="1" style="width:80px;background:#1e1616;border:1px solid #2a1a1a;border-radius:6px;color:#f0ece4;padding:6px 8px;font-size:0.85rem;">
       <button onclick="qbSubmit()" style="padding:8px 20px;background:linear-gradient(135deg,#e53935,#e53935);color:#fff;font-weight:700;font-size:0.85rem;border:none;border-radius:8px;cursor:pointer;">Log Bet</button>
       <button onclick="document.getElementById('qb-form').style.display='none'" style="padding:8px 12px;background:#2a1a1a;color:#999;border:none;border-radius:8px;cursor:pointer;font-size:0.8rem;">Cancel</button>
     </div>
@@ -984,7 +945,7 @@ function qbSubmit() {
         ('WHIP', ars.whip | string if ars.whip else '—', '#ef5350' if ars.whip and ars.whip > 1.35 else '#81c784' if ars.whip and ars.whip < 1.1 else '#f0ece4'),
         ('K/BB', ars.k_bb_ratio | string if ars.k_bb_ratio else '—', '#81c784' if ars.k_bb_ratio and ars.k_bb_ratio > 3 else '#ef5350' if ars.k_bb_ratio and ars.k_bb_ratio < 2 else '#f0ece4'),
       ] %}
-      <div style="background:#0d0808;border-radius:8px;padding:8px;text-align:center;">
+      <div style="background:#141010;border-radius:8px;padding:8px;text-align:center;">
         <div style="font-size:1.05rem;font-weight:800;color:{{ color }};">{{ val }}</div>
         <div style="font-size:0.62rem;color:#777;text-transform:uppercase;letter-spacing:.4px;margin-top:2px;">{{ label }}</div>
       </div>
@@ -1000,7 +961,7 @@ function qbSubmit() {
     ] %}
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:0.78rem;">
       <div style="width:36px;color:#777;font-size:0.7rem;flex-shrink:0;">{{ label }}</div>
-      <div style="flex:1;background:#0d0808;border-radius:3px;height:8px;overflow:hidden;">
+      <div style="flex:1;background:#141010;border-radius:3px;height:8px;overflow:hidden;">
         <div style="width:{{ [pct, 100]|min }}%;height:100%;background:
           {%- if grade in ['Elite'] -%}#4caf50
           {%- elif grade in ['Above Avg'] -%}#81c784
@@ -1017,7 +978,7 @@ function qbSubmit() {
     {% endfor %}
 
     {% if ars.fip and ars.era %}
-    <div style="font-size:0.68rem;color:#777;margin-top:6px;padding:6px 8px;background:#0d0808;border-radius:6px;">
+    <div style="font-size:0.68rem;color:#777;margin-top:6px;padding:6px 8px;background:#141010;border-radius:6px;">
       {% set diff = ars.era - ars.fip %}
       {% if diff > 0.4 %}
         📉 ERA {{ "%.2f"|format(diff) }} above FIP — due for regression (ERA likely to drop)
@@ -1108,7 +1069,7 @@ function qbSubmit() {
         </span>
       {% endif %}
       {% if weather.temp_effect %}
-        <span style="background:#1a1212; color:#999; font-size:0.7rem;
+        <span style="background:#1e1616; color:#999; font-size:0.7rem;
                      padding:3px 10px; border-radius:20px; border:1px solid #241818;">
           🌡 {{ weather.temp_effect | capitalize }}
         </span>
@@ -1137,7 +1098,7 @@ function qbSubmit() {
 <div style="max-width:900px; margin: 0 auto 16px auto; display:flex; gap:12px; flex-wrap:wrap;">
 
   {% macro inj_card(team, impact) %}
-  <div style="flex:1; min-width:240px; background:#1a1212; border:1px solid {{ impact.color }}44;
+  <div style="flex:1; min-width:240px; background:#1e1616; border:1px solid {{ impact.color }}44;
               border-left:3px solid {{ impact.color }}; border-radius:10px; padding:12px 16px;">
     <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
       <span style="font-size:1rem;">🏥</span>
@@ -1433,7 +1394,7 @@ function qbSubmit() {
           </tr>
           <!-- Vegas line comparison row — filled in by JS after loadProps() -->
           <tr class="prop-compare-row" data-compare-batter="{{ p.name }}" style="display:none;">
-            <td colspan="9" style="padding:4px 8px 8px 24px;background:#0d0808;">
+            <td colspan="9" style="padding:4px 8px 8px 24px;background:#141010;">
               <div class="prop-compare-content" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
             </td>
           </tr>
@@ -1460,7 +1421,7 @@ function qbSubmit() {
 <div class="card" style="max-width:900px;">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
     <h2 style="font-size:1rem;font-weight:800;">🏟️ {{ sp.venue }}</h2>
-    <span style="font-size:0.75rem;font-weight:700;padding:3px 10px;border-radius:12px;background:#1a1212;color:{{ sp.park_color }};border:1px solid {{ sp.park_color }};">
+    <span style="font-size:0.75rem;font-weight:700;padding:3px 10px;border-radius:12px;background:#1e1616;color:{{ sp.park_color }};border:1px solid {{ sp.park_color }};">
       {{ sp.park_type | title }}
     </span>
   </div>
@@ -1472,10 +1433,10 @@ function qbSubmit() {
         ('Hit Factor', sp.hit_factor, '#e53935' if sp.hit_factor > 1 else '#777'),
         ('Run Factor', sp.run_factor, '#ffd54f' if sp.run_factor > 1 else '#777'),
     ] %}
-    <div style="background:#0d0808;border-radius:10px;padding:10px 14px;">
+    <div style="background:#141010;border-radius:10px;padding:10px 14px;">
       <div style="font-size:0.67rem;color:#777;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">{{ label }}</div>
       <div style="font-size:1.2rem;font-weight:800;color:{{ color }};">{{ "%.2f"|format(val) }}x</div>
-      <div style="margin-top:6px;height:4px;background:#1a1212;border-radius:2px;overflow:hidden;">
+      <div style="margin-top:6px;height:4px;background:#1e1616;border-radius:2px;overflow:hidden;">
         {% set bar_pct = [(val - 0.75) / 0.75 * 100, 0] | max %}
         {% set bar_pct = [bar_pct, 100] | min %}
         <div style="width:{{ bar_pct }}%;height:100%;background:{{ color }};border-radius:2px;"></div>
@@ -1799,35 +1760,35 @@ document.querySelectorAll('[data-prop-player]').forEach(function(wrapper) {
     <div style="font-size:0.68rem;text-transform:uppercase;letter-spacing:.6px;color:#777;font-weight:700;margin-bottom:8px;">Game Outcomes</div>
     <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:18px;">
       <button class="sgp-leg-btn" data-type="ml_away" data-line="0" data-label="ML: {{ away_team }}"
-              onclick="sgpToggle(this)" style="background:#1a1212;border:1px solid #2a1a1a;color:#f0ece4;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.82rem;">
+              onclick="sgpToggle(this)" style="background:#1e1616;border:1px solid #2a1a1a;color:#f0ece4;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.82rem;">
         ML: {{ away_team }}
       </button>
       <button class="sgp-leg-btn" data-type="ml_home" data-line="0" data-label="ML: {{ home_team }}"
-              onclick="sgpToggle(this)" style="background:#1a1212;border:1px solid #2a1a1a;color:#f0ece4;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.82rem;">
+              onclick="sgpToggle(this)" style="background:#1e1616;border:1px solid #2a1a1a;color:#f0ece4;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.82rem;">
         ML: {{ home_team }}
       </button>
       <button class="sgp-leg-btn" data-type="rl_away" data-line="-1.5" data-label="{{ away_team }} -1.5"
-              onclick="sgpToggle(this)" style="background:#1a1212;border:1px solid #2a1a1a;color:#f0ece4;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.82rem;">
+              onclick="sgpToggle(this)" style="background:#1e1616;border:1px solid #2a1a1a;color:#f0ece4;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.82rem;">
         {{ away_team }} -1.5
       </button>
       <button class="sgp-leg-btn" data-type="rl_home" data-line="-1.5" data-label="{{ home_team }} -1.5"
-              onclick="sgpToggle(this)" style="background:#1a1212;border:1px solid #2a1a1a;color:#f0ece4;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.82rem;">
+              onclick="sgpToggle(this)" style="background:#1e1616;border:1px solid #2a1a1a;color:#f0ece4;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.82rem;">
         {{ home_team }} -1.5
       </button>
       {% set ou_line = ((away_avg_runs + home_avg_runs) | round(0) | int) %}
       <button class="sgp-leg-btn" data-type="over" data-line="{{ ou_line - 0.5 }}" data-label="Over {{ ou_line - 0.5 }}"
-              onclick="sgpToggle(this)" style="background:#1a1212;border:1px solid #2a1a1a;color:#f0ece4;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.82rem;">
+              onclick="sgpToggle(this)" style="background:#1e1616;border:1px solid #2a1a1a;color:#f0ece4;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.82rem;">
         Over {{ ou_line - 0.5 }}
       </button>
       <button class="sgp-leg-btn" data-type="under" data-line="{{ ou_line - 0.5 }}" data-label="Under {{ ou_line - 0.5 }}"
-              onclick="sgpToggle(this)" style="background:#1a1212;border:1px solid #2a1a1a;color:#f0ece4;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.82rem;">
+              onclick="sgpToggle(this)" style="background:#1e1616;border:1px solid #2a1a1a;color:#f0ece4;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.82rem;">
         Under {{ ou_line - 0.5 }}
       </button>
       <div style="display:flex;align-items:center;gap:6px;">
         <input id="sgp-custom-line" type="number" step="0.5" min="1" max="25" value="{{ ou_line - 0.5 }}"
-               style="width:70px;background:#0d0808;border:1px solid #2a1c1c;color:#f0ece4;padding:6px 10px;border-radius:7px;font-size:0.82rem;">
-        <button onclick="sgpAddCustomOver()" style="background:#1a1212;border:1px solid #2a1a1a;color:#e53935;padding:7px 12px;border-radius:7px;cursor:pointer;font-size:0.8rem;">+ Over</button>
-        <button onclick="sgpAddCustomUnder()" style="background:#1a1212;border:1px solid #2a1a1a;color:#81c784;padding:7px 12px;border-radius:7px;cursor:pointer;font-size:0.8rem;">+ Under</button>
+               style="width:70px;background:#141010;border:1px solid #2a1c1c;color:#f0ece4;padding:6px 10px;border-radius:7px;font-size:0.82rem;">
+        <button onclick="sgpAddCustomOver()" style="background:#1e1616;border:1px solid #2a1a1a;color:#e53935;padding:7px 12px;border-radius:7px;cursor:pointer;font-size:0.8rem;">+ Over</button>
+        <button onclick="sgpAddCustomUnder()" style="background:#1e1616;border:1px solid #2a1a1a;color:#81c784;padding:7px 12px;border-radius:7px;cursor:pointer;font-size:0.8rem;">+ Under</button>
       </div>
     </div>
 
@@ -1844,7 +1805,7 @@ document.querySelectorAll('[data-prop-player]').forEach(function(wrapper) {
           <button class="sgp-prop-btn" data-player="{{ away_pitcher_name }}" data-team="away" data-market="k"
                   data-line="{{ line }}" data-ou="over" data-base-prob="{{ (pct / 100) | round(3) }}"
                   data-label="{{ away_pitcher_name }} O{{ line }}K" onclick="sgpToggleProp(this)"
-                  style="background:#1a1212;border:1px solid #2a1a1a;color:#f0ece4;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:0.78rem;transition:all 0.15s;">
+                  style="background:#1e1616;border:1px solid #2a1a1a;color:#f0ece4;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:0.78rem;transition:all 0.15s;">
             O{{ line }} <span style="color:#ffc107;">{{ pct }}%</span>
           </button>
           {% endif %}
@@ -1861,7 +1822,7 @@ document.querySelectorAll('[data-prop-player]').forEach(function(wrapper) {
           <button class="sgp-prop-btn" data-player="{{ home_pitcher_name }}" data-team="home" data-market="k"
                   data-line="{{ line }}" data-ou="over" data-base-prob="{{ (pct / 100) | round(3) }}"
                   data-label="{{ home_pitcher_name }} O{{ line }}K" onclick="sgpToggleProp(this)"
-                  style="background:#1a1212;border:1px solid #2a1a1a;color:#f0ece4;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:0.78rem;transition:all 0.15s;">
+                  style="background:#1e1616;border:1px solid #2a1a1a;color:#f0ece4;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:0.78rem;transition:all 0.15s;">
             O{{ line }} <span style="color:#ffc107;">{{ pct }}%</span>
           </button>
           {% endif %}
@@ -1891,14 +1852,14 @@ document.querySelectorAll('[data-prop-player]').forEach(function(wrapper) {
             <button class="sgp-prop-btn" data-player="{{ p.name }}" data-team="{{ team_side }}" data-market="hits"
                     data-line="0.5" data-ou="over" data-base-prob="{{ (p.hit_pct / 100) | round(3) }}"
                     data-label="{{ p.name }} Hit" onclick="sgpToggleProp(this)"
-                    style="background:#1a1212;border:1px solid #2a1a1a;color:#f0ece4;padding:5px 10px;border-radius:7px;cursor:pointer;font-size:0.72rem;transition:all 0.15s;">
+                    style="background:#1e1616;border:1px solid #2a1a1a;color:#f0ece4;padding:5px 10px;border-radius:7px;cursor:pointer;font-size:0.72rem;transition:all 0.15s;">
               Hit <span style="color:#ffc107;">{{ p.hit_pct }}%</span>
             </button>
             {% if p.multi_hit_pct >= 5 %}
             <button class="sgp-prop-btn" data-player="{{ p.name }}" data-team="{{ team_side }}" data-market="hits"
                     data-line="1.5" data-ou="over" data-base-prob="{{ (p.multi_hit_pct / 100) | round(3) }}"
                     data-label="{{ p.name }} 2+H" onclick="sgpToggleProp(this)"
-                    style="background:#1a1212;border:1px solid #2a1a1a;color:#f0ece4;padding:5px 10px;border-radius:7px;cursor:pointer;font-size:0.72rem;transition:all 0.15s;">
+                    style="background:#1e1616;border:1px solid #2a1a1a;color:#f0ece4;padding:5px 10px;border-radius:7px;cursor:pointer;font-size:0.72rem;transition:all 0.15s;">
               2+H <span style="color:#ffc107;">{{ p.multi_hit_pct }}%</span>
             </button>
             {% endif %}
@@ -1906,14 +1867,14 @@ document.querySelectorAll('[data-prop-player]').forEach(function(wrapper) {
             <button class="sgp-prop-btn" data-player="{{ p.name }}" data-team="{{ team_side }}" data-market="hr"
                     data-line="0.5" data-ou="over" data-base-prob="{{ (p.hr_pct / 100) | round(3) }}"
                     data-label="{{ p.name }} HR" onclick="sgpToggleProp(this)"
-                    style="background:#1a1212;border:1px solid #2a1a1a;color:#f0ece4;padding:5px 10px;border-radius:7px;cursor:pointer;font-size:0.72rem;transition:all 0.15s;">
+                    style="background:#1e1616;border:1px solid #2a1a1a;color:#f0ece4;padding:5px 10px;border-radius:7px;cursor:pointer;font-size:0.72rem;transition:all 0.15s;">
               HR <span style="color:#ffc107;">{{ p.hr_pct }}%</span>
             </button>
             {% endif %}
             <button class="sgp-prop-btn" data-player="{{ p.name }}" data-team="{{ team_side }}" data-market="tb"
                     data-line="1.5" data-ou="over" data-base-prob="{{ (p.tb_pct_2plus / 100) | round(3) }}"
                     data-label="{{ p.name }} 2+TB" onclick="sgpToggleProp(this)"
-                    style="background:#1a1212;border:1px solid #2a1a1a;color:#f0ece4;padding:5px 10px;border-radius:7px;cursor:pointer;font-size:0.72rem;transition:all 0.15s;">
+                    style="background:#1e1616;border:1px solid #2a1a1a;color:#f0ece4;padding:5px 10px;border-radius:7px;cursor:pointer;font-size:0.72rem;transition:all 0.15s;">
               2+TB <span style="color:#ffc107;">{{ p.tb_pct_2plus }}%</span>
             </button>
           </div>
@@ -1935,7 +1896,7 @@ document.querySelectorAll('[data-prop-player]').forEach(function(wrapper) {
     </div>
 
     <!-- Result -->
-    <div id="sgp-result" style="display:none;background:#0d0808;border-radius:10px;padding:16px 20px;border:1px solid #241818;">
+    <div id="sgp-result" style="display:none;background:#141010;border-radius:10px;padding:16px 20px;border:1px solid #241818;">
       <div style="display:flex;flex-wrap:wrap;gap:24px;align-items:center;">
         <div>
           <div style="font-size:0.72rem;color:#777;text-transform:uppercase;letter-spacing:.4px;">True Probability</div>
@@ -1961,12 +1922,12 @@ document.querySelectorAll('[data-prop-player]').forEach(function(wrapper) {
           <div style="display:flex;align-items:center;gap:6px;">
             <label style="font-size:0.72rem;color:#777;white-space:nowrap;">Stake $</label>
             <input id="sgp-stake" type="number" value="10" min="1" oninput="sgpRecalcPayout()"
-                   style="width:80px;background:#0d0808;border:1px solid #2a1c1c;border-radius:8px;color:#f0ece4;padding:7px 10px;font-size:0.88rem;text-align:right;">
+                   style="width:80px;background:#141010;border:1px solid #2a1c1c;border-radius:8px;color:#f0ece4;padding:7px 10px;font-size:0.88rem;text-align:right;">
           </div>
           <div style="display:flex;align-items:center;gap:6px;">
             <label style="font-size:0.72rem;color:#777;white-space:nowrap;">Book Odds</label>
             <input id="sgp-book-odds" type="text" placeholder="e.g. +450" oninput="sgpRecalcPayout()"
-                   style="width:90px;background:#0d0808;border:1px solid #2a1c1c;border-radius:8px;color:#f0ece4;padding:7px 10px;font-size:0.88rem;text-align:right;">
+                   style="width:90px;background:#141010;border:1px solid #2a1c1c;border-radius:8px;color:#f0ece4;padding:7px 10px;font-size:0.88rem;text-align:right;">
           </div>
         </div>
         <div id="sgp-payout" style="font-size:1.6rem;font-weight:900;color:#ffd54f;text-align:center;margin-top:10px;">$0.00</div>

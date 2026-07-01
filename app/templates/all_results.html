@@ -1,13 +1,13 @@
 ﻿<!DOCTYPE html>
 <html lang="en">
 <head>
-<script>!function(){var t=localStorage.getItem("mlb_theme")||"dark",m={dark:{"--bg":"#0d0808","--bg2":"#111","--bg3":"#241818","--border":"#241818","--text":"#f0ece4","--text2":"#999","--text3":"#777","--accent":"#e53935","--card-bg":"#111"},medium:{"--bg":"#1a1528","--bg2":"#241d38","--bg3":"#302848","--border":"#3a2f5a","--text":"#ede8f5","--text2":"#c0b8d8","--text3":"#a098c0","--accent":"#ffc107","--card-bg":"#241d38"},light:{"--bg":"#f0f2f8","--bg2":"#ffffff","--bg3":"#e8eaf6","--border":"#d0d4e8","--text":"#1a1a2e","--text2":"#444466","--text3":"#6666aa","--accent":"#3949ab","--card-bg":"#ffffff"}}[t]||{};Object.entries(m).forEach(function(e){document.documentElement.style.setProperty(e[0],e[1])});document.addEventListener("DOMContentLoaded",function(){document.body.style.background=m["--bg"];document.body.style.color=m["--text"]})}();</script>
+<script>!function(){var t=localStorage.getItem("mlb_theme")||"dark",m={dark:{"--bg":"#141010","--bg2":"#111","--bg3":"#241818","--border":"#241818","--text":"#f0ece4","--text2":"#999","--text3":"#777","--accent":"#e53935","--card-bg":"#111"},medium:{"--bg":"#1a1528","--bg2":"#241d38","--bg3":"#302848","--border":"#3a2f5a","--text":"#ede8f5","--text2":"#c0b8d8","--text3":"#a098c0","--accent":"#ffc107","--card-bg":"#241d38"},light:{"--bg":"#f0f2f8","--bg2":"#ffffff","--bg3":"#e8eaf6","--border":"#d0d4e8","--text":"#1a1a2e","--text2":"#444466","--text3":"#6666aa","--accent":"#3949ab","--card-bg":"#ffffff"}}[t]||{};Object.entries(m).forEach(function(e){document.documentElement.style.setProperty(e[0],e[1])});document.addEventListener("DOMContentLoaded",function(){document.body.style.background=m["--bg"];document.body.style.color=m["--text"]})}();</script>
   <meta charset="UTF-8">
   <meta name="csrf-token" content="{{ csrf_token() }}">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>All Games — MLB Simulator</title>
   <style>
-    :root { --bg: #0d0808; --text: #f0ece4; }
+    :root { --bg: #141010; --text: #f0ece4; }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -152,7 +152,7 @@
     }
 
     .game-card {
-      background: #1a1212;
+      background: #1e1616;
       border: 1px solid #2a1a1a;
       border-radius: 12px;
       padding: 20px 22px;
@@ -194,7 +194,7 @@
       padding-top: 8px; border-top: 1px solid #241818;
     }
     .seg-cell {
-      flex: 1; background: #0d0808; border-radius: 8px;
+      flex: 1; background: #141010; border-radius: 8px;
       padding: 6px 8px; text-align: center; font-size: 0.7rem;
     }
     .seg-label { color: #999; text-transform: uppercase; letter-spacing: .4px; font-size: 0.62rem; }
@@ -301,12 +301,12 @@
     }
     .log-bet-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:1000; align-items:center; justify-content:center; }
     .log-bet-modal.open { display:flex; }
-    .log-bet-box { background:#1a1212; border:1px solid #2a1c1c; border-radius:16px; padding:24px 28px; min-width:320px; max-width:460px; width:90%; }
+    .log-bet-box { background:#1e1616; border:1px solid #2a1c1c; border-radius:16px; padding:24px 28px; min-width:320px; max-width:460px; width:90%; }
     .log-bet-box h3 { font-size:1rem; font-weight:800; margin-bottom:16px; }
     .lbf-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
     .lbf-grp label { display:block; font-size:0.65rem; color:#999; text-transform:uppercase; letter-spacing:.4px; margin-bottom:4px; }
     .lbf-grp input, .lbf-grp select {
-      width:100%; background:#0d0808; border:1px solid #2a1c1c; border-radius:7px;
+      width:100%; background:#141010; border:1px solid #2a1c1c; border-radius:7px;
       color:#f0ece4; padding:7px 9px; font-size:0.82rem;
     }
     .lbf-btns { display:flex; gap:10px; margin-top:14px; }
@@ -323,11 +323,11 @@
     .log-bet-btn:hover { background:#1b3a24; }
     .log-bet-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:1000; align-items:center; justify-content:center; }
     .log-bet-modal.open { display:flex; }
-    .log-bet-box { background:#1a1212; border:1px solid #2a1c1c; border-radius:16px; padding:24px 28px; min-width:320px; max-width:460px; width:90%; }
+    .log-bet-box { background:#1e1616; border:1px solid #2a1c1c; border-radius:16px; padding:24px 28px; min-width:320px; max-width:460px; width:90%; }
     .log-bet-box h3 { font-size:1rem; font-weight:800; margin-bottom:16px; }
     .lbf-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
     .lbf-grp label { display:block; font-size:0.65rem; color:#999; text-transform:uppercase; letter-spacing:.4px; margin-bottom:4px; }
-    .lbf-grp input, .lbf-grp select { width:100%; background:#0d0808; border:1px solid #2a1c1c; border-radius:7px; color:#f0ece4; padding:7px 9px; font-size:0.82rem; }
+    .lbf-grp input, .lbf-grp select { width:100%; background:#141010; border:1px solid #2a1c1c; border-radius:7px; color:#f0ece4; padding:7px 9px; font-size:0.82rem; }
     .lbf-btns { display:flex; gap:10px; margin-top:14px; }
     .lbf-submit { flex:1; background:#14261a; color:#4caf50; border:1px solid #1a2838; border-radius:8px; padding:9px; font-weight:700; cursor:pointer; font-size:0.85rem; }
     .lbf-cancel { background:#1a1d28; color:#999; border:1px solid #2a1c1c; border-radius:8px; padding:9px 16px; cursor:pointer; font-size:0.85rem; }
@@ -459,7 +459,7 @@
     .best-bets-box {
       max-width: 820px;
       margin: 0 auto 28px auto;
-      background: #1a1212;
+      background: #1e1616;
       border: 1px solid #2a1a1a;
       border-radius: 16px;
       padding: 24px 28px;
@@ -486,7 +486,7 @@
       align-items: center;
       justify-content: space-between;
       padding: 10px 14px;
-      background: #0d0808;
+      background: #141010;
       border-radius: 8px;
       margin-bottom: 6px;
     }
@@ -537,7 +537,7 @@
     #scoreboard-strip::-webkit-scrollbar-thumb { background: #2a1c1c; border-radius: 2px; }
     .sb-game {
       display: inline-flex; align-items: center; gap: 10px;
-      background: #1a1212; border: 1px solid #241818;
+      background: #1e1616; border: 1px solid #241818;
       border-radius: 10px; padding: 6px 12px;
       margin-right: 8px; font-size: 0.78rem; cursor: default;
       vertical-align: middle; min-width: 170px;
@@ -570,27 +570,6 @@
     }
     .game-time-badge.soon { color: #ffa726; border-color: #5a3a1a; background: #2a1f0d; }
   
-.nav-dropdown { position:relative; display:inline-block; }
-.nav-dropdown > a { color:#ffc107;text-decoration:none;font-weight:600; }
-.nav-dropdown-menu {
-  visibility:hidden; opacity:0; pointer-events:none;
-  position:absolute; top:100%; left:50%;
-  transform:translateX(-50%);
-  background:#1a1212; border:1px solid #2a1a1a; border-radius:10px;
-  min-width:160px; z-index:999; padding:12px 0 6px 0; white-space:nowrap;
-  box-shadow:0 8px 24px rgba(0,0,0,0.4);
-  transition:opacity 0.15s, visibility 0.15s;
-  margin-top:0;
-}
-.nav-dropdown:hover .nav-dropdown-menu,
-.nav-dropdown:focus-within .nav-dropdown-menu {
-  visibility:visible; opacity:1; pointer-events:auto;
-}
-.nav-dropdown-menu a {
-  display:block; padding:9px 16px; font-size:0.83rem; font-weight:600;
-  text-decoration:none; color:#f0ece4;
-}
-.nav-dropdown-menu a:hover { background:#241818; }
 </style>
 
 <body>
@@ -611,26 +590,10 @@
 } -%}
 
 
-<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 24px;background:#1a1212;border-bottom:1px solid #2a1a1a;margin-bottom:0;">
-  <a href="/mlb" style="color:#fff;text-decoration:none;font-size:1.1rem;font-weight:800;">⚾ MLB Simulator</a>
-  <div style="display:flex;gap:16px;font-size:0.85rem;align-items:center;flex-wrap:wrap;">
-    <a href="/mlb" style="color:#e53935;text-decoration:none;font-weight:600;">🎯 Games</a>
-    <span class="nav-dropdown"><a href="/bets">&#128176; My Bets &#9660;</a><div class="nav-dropdown-menu"><a href="/bets">&#128176; My Bets</a><a href="/bankroll">&#128200; Bankroll</a><a href="/calculator">&#129518; Calculator</a><a href="/parlay">&#127920; Parlay</a><a href="/my-picks">&#127919; My Picks</a></div></span>
-    <a href="/accuracy" style="color:#e53935;text-decoration:none;font-weight:600;">📊 Accuracy</a>
-    <a href="/confidence-history" style="color:#4a9eff;text-decoration:none;font-weight:600;">📈 Confidence</a>
-    <a href="/prop-accuracy" style="color:#ffc107;text-decoration:none;font-weight:600;">🎯 Props</a>
-    <a href="/odds-history" style="color:#ffd54f;text-decoration:none;font-weight:600;">📋 Odds</a>
-    {% if current_user.is_authenticated %}
-      <a href="/settings" style="color:#aaa;text-decoration:none;font-weight:600;">👤 {{ current_user.username }}</a>
-      <a href="/logout" style="color:#ef9a9a;text-decoration:none;font-weight:600;">Sign Out</a>
-    {% else %}
-      <a href="/login" style="color:#a5d6a7;text-decoration:none;font-weight:600;">Login</a>
-    {% endif %}
-  </div>
-</div>
+{% include "_navbar.html" %}
 
 <!-- ── Live Scoreboard Bar ── -->
-<div id="scoreboard-bar" style="background:#0a0606;border-bottom:1px solid #241818;padding:0;overflow:hidden;">
+<div id="scoreboard-bar" style="background:#100c0c;border-bottom:1px solid #241818;padding:0;overflow:hidden;">
   <div id="scoreboard-inner" style="display:flex;overflow-x:auto;gap:0;scrollbar-width:none;-ms-overflow-style:none;">
     <div style="padding:7px 14px;font-size:0.7rem;color:#555;white-space:nowrap;align-self:center;flex-shrink:0;">TODAY</div>
   </div>
@@ -687,6 +650,16 @@
 <style>
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
 #scoreboard-inner::-webkit-scrollbar { display:none; }
+
+    @media (max-width: 768px) {
+      body { padding: 16px 8px; }
+      header h1 { font-size: 1.4rem; }
+      .parlay-box { padding: 16px; }
+      .parlay-header { flex-direction: column; }
+      .game-card { padding: 16px !important; }
+      .game-card .matchup { flex-direction: column; gap: 8px; text-align: center; }
+      .game-card .matchup .team { font-size: 0.85rem; }
+    }
 </style>
 
 <!-- ── Live scoreboard strip ── -->
@@ -696,24 +669,6 @@
 
 <div style="padding: 32px 20px 0;">
 
-<!-- Sport Selector -->
-<div style="display:flex;gap:0;max-width:500px;margin:0 auto 20px auto;border-radius:10px;overflow:hidden;border:1px solid #2a1a1a;">
-  <a href="/mlb" style="flex:1;padding:10px 0;text-align:center;background:linear-gradient(135deg,#1a1028,#0d0808);color:#e53935;font-weight:700;font-size:0.85rem;text-decoration:none;border-right:1px solid #2a1a1a;">
-    ⚾ MLB
-  </a>
-  <div style="flex:1;padding:10px 0;text-align:center;color:#555;font-size:0.85rem;border-right:1px solid #2a1a1a;cursor:default;position:relative;" title="Coming Aug 2026">
-    🏈 NFL
-    <span style="position:absolute;top:-1px;right:6px;font-size:0.55rem;background:#e53935;color:#fff;padding:1px 5px;border-radius:0 0 4px 4px;font-weight:700;">AUG</span>
-  </div>
-  <div style="flex:1;padding:10px 0;text-align:center;color:#555;font-size:0.85rem;border-right:1px solid #2a1a1a;cursor:default;position:relative;" title="Coming Oct 2026">
-    🏀 NBA
-    <span style="position:absolute;top:-1px;right:6px;font-size:0.55rem;background:#e53935;color:#fff;padding:1px 5px;border-radius:0 0 4px 4px;font-weight:700;">OCT</span>
-  </div>
-  <div style="flex:1;padding:10px 0;text-align:center;color:#555;font-size:0.85rem;cursor:default;position:relative;" title="Coming Dec 2026">
-    🏒 NHL
-    <span style="position:absolute;top:-1px;right:6px;font-size:0.55rem;background:#e53935;color:#fff;padding:1px 5px;border-radius:0 0 4px 4px;font-weight:700;">DEC</span>
-  </div>
-</div>
 
 <header>
   <h1>⚾ Today's Predictions</h1>
@@ -1448,7 +1403,7 @@ async function submitBet() {
   Data: MLB Stats API + Open-Meteo · Predictions for entertainment only
 </footer>
 
-<div id="refresh-bar" style="position:fixed;bottom:0;left:0;right:0;background:#1a1212;border-top:1px solid #241818;
+<div id="refresh-bar" style="position:fixed;bottom:0;left:0;right:0;background:#1e1616;border-top:1px solid #241818;
   padding:8px 20px;display:flex;justify-content:space-between;align-items:center;font-size:0.78rem;color:#999;z-index:500;">
   <span>🔄 Auto-refresh in <strong id="refresh-countdown">10:00</strong></span>
   <span>
@@ -1828,7 +1783,7 @@ function csrfFetch(url,opts){opts=opts||{};opts.headers=Object.assign({'X-CSRFTo
     // F5
     if (d.f5) {
       html += '<div style="display:flex;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid #241818;">';
-      html += '<div style="flex:1;background:#0d0808;border-radius:8px;padding:6px 8px;text-align:center;font-size:0.7rem;">';
+      html += '<div style="flex:1;background:#141010;border-radius:8px;padding:6px 8px;text-align:center;font-size:0.7rem;">';
       html += '<div style="color:#999;text-transform:uppercase;letter-spacing:.4px;font-size:0.62rem;">F5</div>';
       html += '<div style="color:#e53935;font-weight:700;font-size:0.85rem;">' + d.f5.away_win_pct + '%</div>';
       html += '<div style="color:#81c784;font-weight:700;font-size:0.85rem;">' + d.f5.home_win_pct + '%</div>';
