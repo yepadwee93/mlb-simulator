@@ -1,7 +1,7 @@
 ﻿<!DOCTYPE html>
 <html lang="en">
 <head>
-<script>!function(){var t=localStorage.getItem("mlb_theme")||"dark",m={dark:{"--bg":"#0a0a0a","--bg2":"#111","--bg3":"#1a1a1a","--border":"#1a1a1a","--text":"#f0ece4","--text2":"#999","--text3":"#777","--accent":"#ff6b2b","--card-bg":"#111"},medium:{"--bg":"#1a1528","--bg2":"#241d38","--bg3":"#302848","--border":"#3a2f5a","--text":"#ede8f5","--text2":"#c0b8d8","--text3":"#a098c0","--accent":"#ffc107","--card-bg":"#241d38"},light:{"--bg":"#f0f2f8","--bg2":"#ffffff","--bg3":"#e8eaf6","--border":"#d0d4e8","--text":"#1a1a2e","--text2":"#444466","--text3":"#6666aa","--accent":"#3949ab","--card-bg":"#ffffff"}}[t]||{};Object.entries(m).forEach(function(e){document.documentElement.style.setProperty(e[0],e[1])});document.addEventListener("DOMContentLoaded",function(){document.body.style.background=m["--bg"];document.body.style.color=m["--text"]})}();</script>
+<script>!function(){var t=localStorage.getItem("mlb_theme")||"dark",m={dark:{"--bg":"#0d0808","--bg2":"#111","--bg3":"#241818","--border":"#241818","--text":"#f0ece4","--text2":"#999","--text3":"#777","--accent":"#e53935","--card-bg":"#111"},medium:{"--bg":"#1a1528","--bg2":"#241d38","--bg3":"#302848","--border":"#3a2f5a","--text":"#ede8f5","--text2":"#c0b8d8","--text3":"#a098c0","--accent":"#ffc107","--card-bg":"#241d38"},light:{"--bg":"#f0f2f8","--bg2":"#ffffff","--bg3":"#e8eaf6","--border":"#d0d4e8","--text":"#1a1a2e","--text2":"#444466","--text3":"#6666aa","--accent":"#3949ab","--card-bg":"#ffffff"}}[t]||{};Object.entries(m).forEach(function(e){document.documentElement.style.setProperty(e[0],e[1])});document.addEventListener("DOMContentLoaded",function(){document.body.style.background=m["--bg"];document.body.style.color=m["--text"]})}();</script>
   <meta charset="UTF-8">
   <meta name="csrf-token" content="{{ csrf_token() }}">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,7 +10,7 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      background: #0a0a0a;
+      background: #0d0808;
       color: #f0ece4;
       font-family: 'Segoe UI', Arial, sans-serif;
       min-height: 100vh;
@@ -41,15 +41,15 @@
       align-items: center;
       justify-content: center;
       width: 36px; height: 36px;
-      background: #111;
-      border: 1px solid #1e1e1e;
+      background: #1a1212;
+      border: 1px solid #2a1a1a;
       border-radius: 8px;
       color: #999;
       text-decoration: none;
       font-size: 1.1rem;
       transition: border-color 0.2s, color 0.2s;
     }
-    .date-arrow:hover { border-color: #ff6b2b; color: #fff; }
+    .date-arrow:hover { border-color: #e53935; color: #fff; }
 
     .date-picker-wrap {
       flex: 1;
@@ -59,8 +59,8 @@
     .date-picker-wrap input[type="date"] {
       width: 100%;
       padding: 8px 12px;
-      background: #111;
-      border: 1px solid #1e1e1e;
+      background: #1a1212;
+      border: 1px solid #2a1a1a;
       border-radius: 8px;
       color: #f0ece4;
       font-size: 0.95rem;
@@ -76,7 +76,7 @@
 
     .today-badge {
       font-size: 0.7rem;
-      background: #ff6b2b;
+      background: #e53935;
       color: #fff;
       padding: 2px 8px;
       border-radius: 10px;
@@ -89,7 +89,7 @@
       display: inline-block;
       margin: 4px auto 24px auto;
       padding: 13px 30px;
-      background: linear-gradient(135deg, #ff6b2b, #ff6b2b);
+      background: linear-gradient(135deg, #e53935, #ffc107);
       color: #fff;
       font-weight: 700;
       font-size: 1rem;
@@ -100,7 +100,7 @@
     }
     .simulate-all-btn:hover { opacity: 0.88; }
     .simulate-all-btn.disabled {
-      background: #1e1e1e;
+      background: #2a1a1a;
       color: #777;
       pointer-events: none;
     }
@@ -118,8 +118,8 @@
     }
 
     .game-card {
-      background: #111;
-      border: 1px solid #1e1e1e;
+      background: #1a1212;
+      border: 1px solid #2a1a1a;
       border-radius: 12px;
       padding: 20px 22px;
       display: flex;
@@ -127,7 +127,7 @@
       gap: 12px;
       transition: border-color 0.2s;
     }
-    .game-card:hover { border-color: #ff6b2b; }
+    .game-card:hover { border-color: #e53935; }
 
     /* Teams row */
     .teams {
@@ -154,7 +154,7 @@
     }
 
     .probable-pitcher span {
-      color: #ff8a50;
+      color: #4a9eff;
       font-weight: 600;
     }
 
@@ -177,9 +177,9 @@
     }
     .status.final   { background: #1a2a1a; color: #4caf50; }
     .status.live    { background: #3a1e1e; color: #f44336; }
-    .status.pregame { background: #1a0d00; color: #ff6b2b; }
+    .status.pregame { background: #1a1028; color: #e53935; }
     .status.delayed { background: #3a2e1e; color: #ffa726; }
-    .status.other   { background: #1e1e1e; color: #999; }
+    .status.other   { background: #2a1a1a; color: #999; }
 
     .game-time {
       font-size: 0.75rem;
@@ -208,7 +208,7 @@
       flex: 1;
       text-align: center;
       padding: 9px 4px;
-      background: #ff6b2b;
+      background: #e53935;
       color: #fff;
       font-size: 0.82rem;
       font-weight: 700;
@@ -216,13 +216,13 @@
       text-decoration: none;
       transition: background 0.2s;
     }
-    .sim-opt:hover { background: #e55a1b; }
+    .sim-opt:hover { background: #c62828; }
 
     .btn-disabled {
       display: block;
       width: 100%;
       padding: 10px;
-      background: #111;
+      background: #1a1212;
       color: #777;
       font-size: 0.82rem;
       border-radius: 7px;
@@ -251,7 +251,7 @@
   visibility:hidden; opacity:0; pointer-events:none;
   position:absolute; top:100%; left:50%;
   transform:translateX(-50%);
-  background:#111; border:1px solid #1e1e1e; border-radius:10px;
+  background:#1a1212; border:1px solid #2a1a1a; border-radius:10px;
   min-width:160px; z-index:999; padding:12px 0 6px 0; white-space:nowrap;
   box-shadow:0 8px 24px rgba(0,0,0,0.4);
   transition:opacity 0.15s, visibility 0.15s;
@@ -265,17 +265,17 @@
   display:block; padding:9px 16px; font-size:0.83rem; font-weight:600;
   text-decoration:none; color:#f0ece4;
 }
-.nav-dropdown-menu a:hover { background:#1a1a1a; }
+.nav-dropdown-menu a:hover { background:#241818; }
 </style>
 
 <body>
 
 {% if show_email_nudge and current_user.is_authenticated %}
-<div id="email-nudge" style="background:#111;border-bottom:1px solid #1e1e1e;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+<div id="email-nudge" style="background:#1a1212;border-bottom:1px solid #2a1a1a;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
   <div style="display:flex;align-items:center;gap:10px;font-size:0.85rem;">
     <span style="font-size:1.1rem;">📬</span>
     <span style="color:#999;">Get daily top play picks sent to your inbox every morning.</span>
-    <a href="/settings" style="background:#ff6b2b;color:#fff;padding:5px 14px;border-radius:6px;font-size:0.8rem;font-weight:700;text-decoration:none;white-space:nowrap;">Sign up for alerts</a>
+    <a href="/settings" style="background:#e53935;color:#fff;padding:5px 14px;border-radius:6px;font-size:0.8rem;font-weight:700;text-decoration:none;white-space:nowrap;">Sign up for alerts</a>
   </div>
   <button onclick="dismissNudge()" style="background:none;border:none;color:#555;font-size:1.2rem;cursor:pointer;padding:0 4px;line-height:1;" title="Dismiss">✕</button>
 </div>
@@ -292,21 +292,21 @@ if (localStorage.getItem('email_nudge_dismissed') === '1') {
 {% endif %}
 
 <!-- Sport Selector -->
-<div id="sport-selector" style="display:flex;gap:0;max-width:500px;margin:0 auto 20px auto;border-radius:10px;overflow:hidden;border:1px solid #1e1e1e;">
-  <a href="/mlb" id="sport-tab-mlb" data-sport="mlb" style="flex:1;padding:10px 0;text-align:center;background:linear-gradient(135deg,#1a0d00,#0a0a0a);color:#ff6b2b;font-weight:700;font-size:0.85rem;text-decoration:none;border-right:1px solid #1e1e1e;">
+<div id="sport-selector" style="display:flex;gap:0;max-width:500px;margin:0 auto 20px auto;border-radius:10px;overflow:hidden;border:1px solid #2a1a1a;">
+  <a href="/mlb" id="sport-tab-mlb" data-sport="mlb" style="flex:1;padding:10px 0;text-align:center;background:linear-gradient(135deg,#1a1028,#0d0808);color:#e53935;font-weight:700;font-size:0.85rem;text-decoration:none;border-right:1px solid #2a1a1a;">
     ⚾ MLB
   </a>
-  <div id="sport-tab-nfl" data-sport="nfl" style="flex:1;padding:10px 0;text-align:center;color:#555;font-size:0.85rem;border-right:1px solid #1e1e1e;cursor:default;position:relative;" title="Coming Aug 2026">
+  <div id="sport-tab-nfl" data-sport="nfl" style="flex:1;padding:10px 0;text-align:center;color:#555;font-size:0.85rem;border-right:1px solid #2a1a1a;cursor:default;position:relative;" title="Coming Aug 2026">
     🏈 NFL
-    <span style="position:absolute;top:-1px;right:6px;font-size:0.55rem;background:#ff6b2b;color:#fff;padding:1px 5px;border-radius:0 0 4px 4px;font-weight:700;">AUG</span>
+    <span style="position:absolute;top:-1px;right:6px;font-size:0.55rem;background:#e53935;color:#fff;padding:1px 5px;border-radius:0 0 4px 4px;font-weight:700;">AUG</span>
   </div>
-  <div id="sport-tab-nba" data-sport="nba" style="flex:1;padding:10px 0;text-align:center;color:#555;font-size:0.85rem;border-right:1px solid #1e1e1e;cursor:default;position:relative;" title="Coming Oct 2026">
+  <div id="sport-tab-nba" data-sport="nba" style="flex:1;padding:10px 0;text-align:center;color:#555;font-size:0.85rem;border-right:1px solid #2a1a1a;cursor:default;position:relative;" title="Coming Oct 2026">
     🏀 NBA
-    <span style="position:absolute;top:-1px;right:6px;font-size:0.55rem;background:#ff6b2b;color:#fff;padding:1px 5px;border-radius:0 0 4px 4px;font-weight:700;">OCT</span>
+    <span style="position:absolute;top:-1px;right:6px;font-size:0.55rem;background:#e53935;color:#fff;padding:1px 5px;border-radius:0 0 4px 4px;font-weight:700;">OCT</span>
   </div>
   <div id="sport-tab-nhl" data-sport="nhl" style="flex:1;padding:10px 0;text-align:center;color:#555;font-size:0.85rem;cursor:default;position:relative;" title="Coming Dec 2026">
     🏒 NHL
-    <span style="position:absolute;top:-1px;right:6px;font-size:0.55rem;background:#ff6b2b;color:#fff;padding:1px 5px;border-radius:0 0 4px 4px;font-weight:700;">DEC</span>
+    <span style="position:absolute;top:-1px;right:6px;font-size:0.55rem;background:#e53935;color:#fff;padding:1px 5px;border-radius:0 0 4px 4px;font-weight:700;">DEC</span>
   </div>
 </div>
 <script>
@@ -339,8 +339,8 @@ if (localStorage.getItem('email_nudge_dismissed') === '1') {
   <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
     <h1>⚾ MLB Simulator</h1>
     <div style="display:flex; gap:16px; font-size:0.85rem; align-items:center;">
-      <a href="/accuracy" style="color:#ff6b2b; text-decoration:none; font-weight:600;">📊 Accuracy</a>
-      <a href="/confidence-history" style="color:#ff8a50;text-decoration:none;font-weight:600;">📈 Confidence</a>
+      <a href="/accuracy" style="color:#e53935; text-decoration:none; font-weight:600;">📊 Accuracy</a>
+      <a href="/confidence-history" style="color:#4a9eff;text-decoration:none;font-weight:600;">📈 Confidence</a>
       <a href="/prop-accuracy" style="color:#ffc107;text-decoration:none;font-weight:600;">🎯 Props</a>
       <a href="/odds-history" style="color:#ffd54f;text-decoration:none;font-weight:600;">📋 Odds</a>
       <span class="nav-dropdown"><a href="/bets">&#128176; My Bets &#9660;</a><div class="nav-dropdown-menu"><a href="/bets">&#128176; My Bets</a><a href="/bankroll">&#128200; Bankroll</a><a href="/calculator">&#129518; Calculator</a><a href="/parlay">&#127920; Parlay</a><a href="/my-picks">&#127919; My Picks</a></div></span>
@@ -361,12 +361,12 @@ if (localStorage.getItem('email_nudge_dismissed') === '1') {
       flex-shrink:0;
       display:flex;flex-direction:column;align-items:center;
       padding:8px 12px;border-radius:10px;text-decoration:none;
-      border:1px solid {% if d.selected %}#ff6b2b{% elif d.is_today %}#1e1e1e{% else %}#1a1a1a{% endif %};
-      background:{% if d.selected %}#0a0a0a{% elif d.is_today %}#111{% else %}#0a0a0a{% endif %};
+      border:1px solid {% if d.selected %}#e53935{% elif d.is_today %}#2a1a1a{% else %}#241818{% endif %};
+      background:{% if d.selected %}#0d0808{% elif d.is_today %}#111{% else %}#0d0808{% endif %};
       min-width:52px;
     ">
-      <span style="font-size:0.65rem;color:{% if d.selected %}#ff6b2b{% elif d.is_today %}#ffd54f{% else %}#777{% endif %};font-weight:700;text-transform:uppercase;letter-spacing:.3px;">{{ d.label }}</span>
-      <span style="font-size:1.1rem;font-weight:800;color:{% if d.selected %}#ff6b2b{% else %}#f0ece4{% endif %};margin:2px 0;">{{ d.day_num }}</span>
+      <span style="font-size:0.65rem;color:{% if d.selected %}#e53935{% elif d.is_today %}#ffd54f{% else %}#777{% endif %};font-weight:700;text-transform:uppercase;letter-spacing:.3px;">{{ d.label }}</span>
+      <span style="font-size:1.1rem;font-weight:800;color:{% if d.selected %}#e53935{% else %}#f0ece4{% endif %};margin:2px 0;">{{ d.day_num }}</span>
       <span style="font-size:0.62rem;color:{% if d.count > 0 %}#81c784{% else %}#555{% endif %};">
         {% if d.count > 0 %}{{ d.count }}G{% else %}—{% endif %}
       </span>
@@ -427,17 +427,17 @@ if (localStorage.getItem('email_nudge_dismissed') === '1') {
 </header>
 
 <!-- Live Scores Bar -->
-<div id="live-scores-bar" style="background:#080808;border-bottom:1px solid #1a1a1a;padding:0;overflow-x:auto;display:flex;align-items:center;margin-bottom:16px;border-radius:8px;scrollbar-width:none;-ms-overflow-style:none;"></div>
+<div id="live-scores-bar" style="background:#0a0606;border-bottom:1px solid #241818;padding:0;overflow-x:auto;display:flex;align-items:center;margin-bottom:16px;border-radius:8px;scrollbar-width:none;-ms-overflow-style:none;"></div>
 
 <!-- RLM Alerts -->
 {% if rlm_alerts %}
-<div style="background:#0f0800;border:1px solid #3a2000;border-radius:12px;padding:14px 20px;margin-bottom:20px;">
-  <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#ff8a50;margin-bottom:10px;">
+<div style="background:#120a1e;border:1px solid #2a1838;border-radius:12px;padding:14px 20px;margin-bottom:20px;">
+  <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#4a9eff;margin-bottom:10px;">
     Reverse Line Movement Detected
   </div>
   {% for a in rlm_alerts %}
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;font-size:0.82rem;">
-    <span style="color:#ff8a50;font-weight:800;font-size:0.9rem;">RLM</span>
+    <span style="color:#4a9eff;font-weight:800;font-size:0.9rem;">RLM</span>
     <span style="color:#f0ece4;">
       Sharp money on <strong>{% if a.direction == 'away' %}{{ a.away_team }}{% else %}{{ a.home_team }}{% endif %}</strong>
       ({{ a.away_team }} @ {{ a.home_team }})
@@ -447,7 +447,7 @@ if (localStorage.getItem('email_nudge_dismissed') === '1') {
     </span>
   </div>
   {% endfor %}
-  <div style="font-size:0.65rem;color:#886644;margin-top:6px;">
+  <div style="font-size:0.65rem;color:#6a7088;margin-top:6px;">
     RLM = line moves opposite of public betting %, suggesting sharp/pro money on the other side
   </div>
 </div>
@@ -455,20 +455,20 @@ if (localStorage.getItem('email_nudge_dismissed') === '1') {
 
 <!-- Trending Teams (7-day model accuracy) -->
 {% if team_trends %}
-<div style="background:#1a1500;border:1px solid #3a2800;border-radius:12px;padding:14px 20px;margin-bottom:20px;">
+<div style="background:#121828;border:1px solid #1a2838;border-radius:12px;padding:14px 20px;margin-bottom:20px;">
   <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#4caf50;margin-bottom:10px;">
     Model Hot Picks (Last 7 Days)
   </div>
   <div style="display:flex;gap:10px;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;">
     {% for t in team_trends[:8] %}
-    <div style="flex-shrink:0;background:#0a0a0a;border:1px solid {% if t.pct >= 70 %}#3a2800{% else %}#1a1a1a{% endif %};border-radius:10px;padding:8px 14px;min-width:100px;text-align:center;">
+    <div style="flex-shrink:0;background:#0d0808;border:1px solid {% if t.pct >= 70 %}#1a2838{% else %}#241818{% endif %};border-radius:10px;padding:8px 14px;min-width:100px;text-align:center;">
       <div style="font-size:0.82rem;font-weight:700;color:#f0ece4;">{{ t.team.split(' ')[-1] }}</div>
       <div style="font-size:1.1rem;font-weight:800;color:{% if t.pct >= 70 %}#4caf50{% elif t.pct >= 50 %}#ffa726{% else %}#ef5350{% endif %};">{{ t.pct }}%</div>
       <div style="font-size:0.65rem;color:#777;">{{ t.wins }}-{{ t.losses }} · {{ t.streak }}</div>
     </div>
     {% endfor %}
   </div>
-  <div style="font-size:0.63rem;color:#3a2800;margin-top:8px;">
+  <div style="font-size:0.63rem;color:#1a2838;margin-top:8px;">
     Teams where our model has been most accurate picking winners recently
   </div>
 </div>
@@ -535,12 +535,12 @@ if (localStorage.getItem('email_nudge_dismissed') === '1') {
       {% if pub %}
       <div style="margin:6px 0 4px 0; font-size:0.72rem; color:#777;">
         <div style="display:flex; justify-content:space-between; margin-bottom:3px;">
-          <span>{{ game.away_team.split(' ')[-1] }} <b style="color:#ff6b2b;">{{ pub.away_bet_pct }}%</b></span>
+          <span>{{ game.away_team.split(' ')[-1] }} <b style="color:#e53935;">{{ pub.away_bet_pct }}%</b></span>
           <span style="color:#555; font-size:0.65rem;">public bets</span>
           <span><b style="color:#81c784;">{{ pub.home_bet_pct }}%</b> {{ game.home_team.split(' ')[-1] }}</span>
         </div>
-        <div style="height:5px; background:#111; border-radius:3px; overflow:hidden; display:flex;">
-          <div style="width:{{ pub.away_bet_pct }}%; background:#ff6b2b; border-radius:3px 0 0 3px;"></div>
+        <div style="height:5px; background:#1a1212; border-radius:3px; overflow:hidden; display:flex;">
+          <div style="width:{{ pub.away_bet_pct }}%; background:#e53935; border-radius:3px 0 0 3px;"></div>
           <div style="width:{{ pub.home_bet_pct }}%; background:#81c784; border-radius:0 3px 3px 0;"></div>
         </div>
 
@@ -548,13 +548,13 @@ if (localStorage.getItem('email_nudge_dismissed') === '1') {
         {% if lm and pub.away_bet_pct and pub.home_bet_pct %}
           {# RLM on home: public heavily on away BUT line moved toward home #}
           {% if pub.away_bet_pct >= 60 and lm.home_impl_move >= 2 %}
-          <div style="margin-top:5px;padding:4px 8px;background:#1a1228;border:1px solid #ff6b2b;border-radius:6px;color:#c4b5fd;font-size:0.68rem;font-weight:700;display:flex;align-items:center;gap:5px;">
+          <div style="margin-top:5px;padding:4px 8px;background:#1a1228;border:1px solid #e53935;border-radius:6px;color:#c4b5fd;font-size:0.68rem;font-weight:700;display:flex;align-items:center;gap:5px;">
             🔀 RLM — {{ pub.away_bet_pct }}% public on {{ game.away_team.split(' ')[-1] }} but line moving toward <b style="color:#fff;">{{ game.home_team.split(' ')[-1] }}</b>
             <span style="color:#a78bfa;font-weight:400;">(sharp signal)</span>
           </div>
           {# RLM on away: public heavily on home BUT line moved toward away #}
           {% elif pub.home_bet_pct >= 60 and lm.away_impl_move >= 2 %}
-          <div style="margin-top:5px;padding:4px 8px;background:#1a1228;border:1px solid #ff6b2b;border-radius:6px;color:#c4b5fd;font-size:0.68rem;font-weight:700;display:flex;align-items:center;gap:5px;">
+          <div style="margin-top:5px;padding:4px 8px;background:#1a1228;border:1px solid #e53935;border-radius:6px;color:#c4b5fd;font-size:0.68rem;font-weight:700;display:flex;align-items:center;gap:5px;">
             🔀 RLM — {{ pub.home_bet_pct }}% public on {{ game.home_team.split(' ')[-1] }} but line moving toward <b style="color:#fff;">{{ game.away_team.split(' ')[-1] }}</b>
             <span style="color:#a78bfa;font-weight:400;">(sharp signal)</span>
           </div>
@@ -606,7 +606,7 @@ if (localStorage.getItem('email_nudge_dismissed') === '1') {
       {% set existing_note = game_notes.get(gk) %}
       <div class="game-note-section" style="margin-top:10px;">
         {% if existing_note %}
-        <div class="note-display" id="note-display-{{ gk }}" style="background:#111;border:1px solid #1e1e1e;border-radius:8px;padding:8px 10px;font-size:0.78rem;color:#f0ece4;position:relative;">
+        <div class="note-display" id="note-display-{{ gk }}" style="background:#1a1212;border:1px solid #2a1a1a;border-radius:8px;padding:8px 10px;font-size:0.78rem;color:#f0ece4;position:relative;">
           <span style="color:#ffd54f;font-weight:700;font-size:0.65rem;display:block;margin-bottom:3px;">📝 MY NOTE</span>
           <span id="note-text-{{ gk }}">{{ existing_note.note }}</span>
           <div style="display:flex;gap:8px;margin-top:6px;">
@@ -617,13 +617,13 @@ if (localStorage.getItem('email_nudge_dismissed') === '1') {
         {% endif %}
         <div id="note-form-{{ gk }}" style="{% if existing_note %}display:none;{% endif %}">
           {% if not existing_note %}
-          <button onclick="showNoteForm('{{ gk }}')" id="note-add-btn-{{ gk }}" style="font-size:0.7rem;background:none;border:1px solid #1e1e1e;color:#777;padding:4px 10px;border-radius:6px;cursor:pointer;margin-top:2px;width:100%;">+ Add note</button>
+          <button onclick="showNoteForm('{{ gk }}')" id="note-add-btn-{{ gk }}" style="font-size:0.7rem;background:none;border:1px solid #2a1a1a;color:#777;padding:4px 10px;border-radius:6px;cursor:pointer;margin-top:2px;width:100%;">+ Add note</button>
           {% endif %}
           <div id="note-input-area-{{ gk }}" style="display:none;">
-            <textarea id="note-ta-{{ gk }}" placeholder="Your notes on this game…" style="width:100%;background:#111;border:1px solid #1e1e1e;color:#f0ece4;border-radius:8px;padding:8px;font-size:0.78rem;resize:vertical;min-height:60px;margin-top:4px;box-sizing:border-box;"></textarea>
+            <textarea id="note-ta-{{ gk }}" placeholder="Your notes on this game…" style="width:100%;background:#1a1212;border:1px solid #2a1a1a;color:#f0ece4;border-radius:8px;padding:8px;font-size:0.78rem;resize:vertical;min-height:60px;margin-top:4px;box-sizing:border-box;"></textarea>
             <div style="display:flex;gap:6px;margin-top:4px;">
-              <button onclick="saveNote('{{ gk }}','{{ game.away_team | replace("'","\\'")|replace('"','\\"') }}','{{ game.home_team | replace("'","\\'")|replace('"','\\"') }}','{{ game.game_date }}')" style="font-size:0.72rem;background:#1b3a2a;border:1px solid #3a2800;color:#81c784;padding:4px 12px;border-radius:6px;cursor:pointer;">Save</button>
-              <button onclick="cancelNote('{{ gk }}')" style="font-size:0.72rem;background:none;border:1px solid #1e1e1e;color:#777;padding:4px 10px;border-radius:6px;cursor:pointer;">Cancel</button>
+              <button onclick="saveNote('{{ gk }}','{{ game.away_team | replace("'","\\'")|replace('"','\\"') }}','{{ game.home_team | replace("'","\\'")|replace('"','\\"') }}','{{ game.game_date }}')" style="font-size:0.72rem;background:#1b3a2a;border:1px solid #1a2838;color:#81c784;padding:4px 12px;border-radius:6px;cursor:pointer;">Save</button>
+              <button onclick="cancelNote('{{ gk }}')" style="font-size:0.72rem;background:none;border:1px solid #2a1a1a;color:#777;padding:4px 10px;border-radius:6px;cursor:pointer;">Cancel</button>
             </div>
           </div>
         </div>
@@ -694,7 +694,7 @@ function saveNote(gk, away, home, gameDate) {
         var div = document.createElement('div');
         div.className = 'note-display';
         div.id = 'note-display-' + gk;
-        div.style.cssText = 'background:#111;border:1px solid #1e1e1e;border-radius:8px;padding:8px 10px;font-size:0.78rem;color:#f0ece4;';
+        div.style.cssText = 'background:#1a1212;border:1px solid #2a1a1a;border-radius:8px;padding:8px 10px;font-size:0.78rem;color:#f0ece4;';
         var noteLabel = document.createElement('span');
         noteLabel.style.cssText = 'color:#ffd54f;font-weight:700;font-size:0.65rem;display:block;margin-bottom:3px;';
         noteLabel.textContent = '📝 MY NOTE';
@@ -739,7 +739,7 @@ function deleteNote(gk) {
           var btn = document.createElement('button');
           btn.id = 'note-add-btn-' + gk;
           btn.onclick = function() { showNoteForm(gk); };
-          btn.style.cssText = 'font-size:0.7rem;background:none;border:1px solid #1e1e1e;color:#777;padding:4px 10px;border-radius:6px;cursor:pointer;margin-top:2px;width:100%;';
+          btn.style.cssText = 'font-size:0.7rem;background:none;border:1px solid #2a1a1a;color:#777;padding:4px 10px;border-radius:6px;cursor:pointer;margin-top:2px;width:100%;';
           btn.textContent = '+ Add note';
           form.insertBefore(btn, area);
         }
@@ -774,7 +774,7 @@ function csrfFetch(url,opts){opts=opts||{};opts.headers=Object.assign({'X-CSRFTo
       if (isLive) hasLive = true;
       var stLabel = isFinal ? '<span style="color:#ef5350;">F</span>' :
         '<span style="color:#4caf50;">' + (g.inning_half === 'top' ? '▲' : '▼') + g.inning + '</span>';
-      html += '<div style="display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-right:1px solid #1a1a1a;white-space:nowrap;font-size:0.75rem;">'
+      html += '<div style="display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-right:1px solid #241818;white-space:nowrap;font-size:0.75rem;">'
         + '<span style="color:#999;">' + abbr(g.away) + '</span>'
         + '<span style="font-weight:800;color:#f0ece4;">' + (g.away_score || 0) + '</span>'
         + '<span style="color:#555;">-</span>'
