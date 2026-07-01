@@ -30,9 +30,50 @@
       background-clip: text;
       letter-spacing: -0.5px;
     }
-    .top-links { display: flex; gap: 16px; font-size: 0.85rem; }
-    .top-links a { color: #888; text-decoration: none; font-weight: 600; transition: color 0.15s; }
-    .top-links a:hover { color: #f0ece4; }
+    .gear-btn {
+      background: none;
+      border: none;
+      color: #999;
+      font-size: 1.2rem;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 6px;
+      transition: background 0.15s, color 0.15s;
+      line-height: 1;
+      position: relative;
+    }
+    .gear-btn:hover { background: #2a1a1a; color: #f0ece4; }
+    .gear-dropdown {
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      background: #221a1a;
+      border: 1px solid #2a1a1a;
+      border-radius: 10px;
+      min-width: 180px;
+      z-index: 1500;
+      padding: 8px 0;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+      display: none;
+    }
+    .gear-dropdown.open { display: block; }
+    .gear-dropdown a, .gear-dropdown span {
+      display: block;
+      padding: 9px 16px;
+      font-size: 0.83rem;
+      font-weight: 600;
+      text-decoration: none;
+      color: #ddd;
+    }
+    .gear-dropdown a:hover { background: #241818; }
+    .gear-user {
+      color: #ffc107;
+      font-weight: 700;
+      border-bottom: 1px solid #241818;
+      padding-bottom: 10px;
+      margin-bottom: 4px;
+    }
+    .gear-logout { color: #ef5350; }
 
     /* ── Hero ── */
     .hero {
@@ -229,17 +270,35 @@
 <body>
 
 <div class="top-bar">
-  <div class="logo">SPORTS SIM</div>
-  <div class="top-links">
-    {% if username %}
-      <a href="/settings">{{ username }}</a>
-      <a href="/logout" style="color:#ef5350;">Logout</a>
-    {% else %}
-      <a href="/login" style="color:#e53935;">Login</a>
-      <a href="/register">Register</a>
-    {% endif %}
+  <div></div>
+  <div class="logo">SPORTS SIMULATOR</div>
+  <div style="position:relative;">
+    <button class="gear-btn" onclick="toggleHomeGear(event)" aria-label="Account">⚙</button>
+    <div class="gear-dropdown" id="home-gear-dropdown">
+      {% if username %}
+        <span class="gear-user">👤 {{ username }}</span>
+        <a href="/settings">⚙ Settings</a>
+        <a href="/logout" class="gear-logout">↩ Sign Out</a>
+      {% else %}
+        <a href="/login" style="color:#4caf50;">→ Login</a>
+        <a href="/register" style="color:#ffc107;">+ Register</a>
+      {% endif %}
+    </div>
   </div>
 </div>
+
+<script>
+function toggleHomeGear(e) {
+  e.stopPropagation();
+  document.getElementById('home-gear-dropdown').classList.toggle('open');
+}
+document.addEventListener('click', function(e) {
+  var dd = document.getElementById('home-gear-dropdown');
+  if (dd && !e.target.closest('.gear-btn') && !e.target.closest('.gear-dropdown')) {
+    dd.classList.remove('open');
+  }
+});
+</script>
 
 <div class="hero">
   <h1>Your <span>Edge</span> Starts Here</h1>
