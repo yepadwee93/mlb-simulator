@@ -1,32 +1,32 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<script>!function(){var t=localStorage.getItem("mlb_theme")||"dark",m={dark:{"--bg":"#0d1120","--bg2":"#1a1e2e","--bg3":"#252836","--border":"#252836","--text":"#e8eaf0","--text2":"#b0b8cc","--text3":"#9aa0b8","--accent":"#64b5f6","--card-bg":"#1a1e2e"},medium:{"--bg":"#1a1528","--bg2":"#241d38","--bg3":"#302848","--border":"#3a2f5a","--text":"#ede8f5","--text2":"#c0b8d8","--text3":"#a098c0","--accent":"#b39ddb","--card-bg":"#241d38"},light:{"--bg":"#f0f2f8","--bg2":"#ffffff","--bg3":"#e8eaf6","--border":"#d0d4e8","--text":"#1a1a2e","--text2":"#444466","--text3":"#6666aa","--accent":"#3949ab","--card-bg":"#ffffff"}}[t]||{};Object.entries(m).forEach(function(e){document.documentElement.style.setProperty(e[0],e[1])});document.addEventListener("DOMContentLoaded",function(){document.body.style.background=m["--bg"];document.body.style.color=m["--text"]})}();</script>
+<script>!function(){var t=localStorage.getItem("mlb_theme")||"dark",m={dark:{"--bg":"#0a0a0a","--bg2":"#111","--bg3":"#1a1a1a","--border":"#1a1a1a","--text":"#f0ece4","--text2":"#999","--text3":"#777","--accent":"#ff6b2b","--card-bg":"#111"},medium:{"--bg":"#1a1528","--bg2":"#241d38","--bg3":"#302848","--border":"#3a2f5a","--text":"#ede8f5","--text2":"#c0b8d8","--text3":"#a098c0","--accent":"#ffc107","--card-bg":"#241d38"},light:{"--bg":"#f0f2f8","--bg2":"#ffffff","--bg3":"#e8eaf6","--border":"#d0d4e8","--text":"#1a1a2e","--text2":"#444466","--text3":"#6666aa","--accent":"#3949ab","--card-bg":"#ffffff"}}[t]||{};Object.entries(m).forEach(function(e){document.documentElement.style.setProperty(e[0],e[1])});document.addEventListener("DOMContentLoaded",function(){document.body.style.background=m["--bg"];document.body.style.color=m["--text"]})}();</script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Confidence History — MLB Simulator</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #0d1120; color: #e8eaf0; font-family: 'Segoe UI', Arial, sans-serif; padding: 32px 20px; }
-    a { color: #64b5f6; text-decoration: none; }
+    body { background: #0a0a0a; color: #f0ece4; font-family: 'Segoe UI', Arial, sans-serif; padding: 32px 20px; }
+    a { color: #ff6b2b; text-decoration: none; }
     .back { display: inline-block; margin-bottom: 24px; font-size: 0.9rem; }
     h1 { font-size: 1.6rem; font-weight: 800; margin-bottom: 6px; }
-    .subtitle { color: #b0b8cc; font-size: 0.9rem; margin-bottom: 28px; }
-    .green { color: #4caf50; } .red { color: #ef5350; } .blue { color: #64b5f6; } .gold { color: #ffa726; }
+    .subtitle { color: #999; font-size: 0.9rem; margin-bottom: 28px; }
+    .green { color: #4caf50; } .red { color: #ef5350; } .blue { color: #ff6b2b; } .gold { color: #ffa726; }
     .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 28px; }
-    .stat-card { background: #1a1e2e; border: 1px solid #252836; border-radius: 12px; padding: 14px 16px; }
-    .stat-label { font-size: 0.68rem; color: #b0b8cc; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
+    .stat-card { background: #111; border: 1px solid #1a1a1a; border-radius: 12px; padding: 14px 16px; }
+    .stat-label { font-size: 0.68rem; color: #999; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
     .stat-val { font-size: 1.5rem; font-weight: 800; }
-    .card { background: #1a1e2e; border: 1px solid #252836; border-radius: 14px; padding: 20px 24px; margin-bottom: 24px; }
-    .section-title { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: #b0b8cc; margin-bottom: 14px; }
+    .card { background: #111; border: 1px solid #1a1a1a; border-radius: 14px; padding: 20px 24px; margin-bottom: 24px; }
+    .section-title { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: #999; margin-bottom: 14px; }
 
 .nav-dropdown { position:relative; display:inline-block; }
-.nav-dropdown > a { color:#ffb74d;text-decoration:none;font-weight:600; }
+.nav-dropdown > a { color:#ffc107;text-decoration:none;font-weight:600; }
 .nav-dropdown-menu {
   visibility:hidden; opacity:0; pointer-events:none;
   position:absolute; top:100%; left:50%;
   transform:translateX(-50%);
-  background:#1e2235; border:1px solid #353a52; border-radius:10px;
+  background:#111; border:1px solid #1e1e1e; border-radius:10px;
   min-width:160px; z-index:999; padding:12px 0 6px 0; white-space:nowrap;
   box-shadow:0 8px 24px rgba(0,0,0,0.4);
   transition:opacity 0.15s, visibility 0.15s;
@@ -38,21 +38,21 @@
 }
 .nav-dropdown-menu a {
   display:block; padding:9px 16px; font-size:0.83rem; font-weight:600;
-  text-decoration:none; color:#e8eaf0;
+  text-decoration:none; color:#f0ece4;
 }
-.nav-dropdown-menu a:hover { background:#252a3a; }
+.nav-dropdown-menu a:hover { background:#1a1a1a; }
 </style>
 </head>
 <body>
 
-<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 24px;background:#1e2235;border-bottom:1px solid #353a52;margin-bottom:28px;">
+<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 24px;background:#111;border-bottom:1px solid #1e1e1e;margin-bottom:28px;">
   <a href="/mlb" style="color:#fff;text-decoration:none;font-size:1.1rem;font-weight:800;">⚾ MLB Simulator</a>
   <div style="display:flex;gap:16px;font-size:0.85rem;align-items:center;flex-wrap:wrap;">
-    <a href="/mlb" style="color:#64b5f6;text-decoration:none;font-weight:600;">🎯 Games</a>
+    <a href="/mlb" style="color:#ff6b2b;text-decoration:none;font-weight:600;">🎯 Games</a>
     <span class="nav-dropdown"><a href="/bets">&#128176; My Bets &#9660;</a><div class="nav-dropdown-menu"><a href="/bets">&#128176; My Bets</a><a href="/bankroll">&#128200; Bankroll</a><a href="/calculator">&#129518; Calculator</a><a href="/parlay">&#127920; Parlay</a><a href="/my-picks">&#127919; My Picks</a></div></span>
-    <a href="/accuracy" style="color:#64b5f6;text-decoration:none;font-weight:600;">📊 Accuracy</a>
-    <a href="/confidence-history" style="color:#c084fc;text-decoration:none;font-weight:600;">📈 Confidence</a>
-    <a href="/prop-accuracy" style="color:#b39ddb;text-decoration:none;font-weight:600;">🎯 Props</a>
+    <a href="/accuracy" style="color:#ff6b2b;text-decoration:none;font-weight:600;">📊 Accuracy</a>
+    <a href="/confidence-history" style="color:#ff8a50;text-decoration:none;font-weight:600;">📈 Confidence</a>
+    <a href="/prop-accuracy" style="color:#ffc107;text-decoration:none;font-weight:600;">🎯 Props</a>
     <a href="/odds-history" style="color:#ffd54f;text-decoration:none;font-weight:600;">📋 Odds</a>
     {% if username %}
       <a href="/settings" style="color:#aaa;text-decoration:none;font-weight:600;">👤 {{ username }}</a>
@@ -65,14 +65,14 @@
 
 <!-- Grade Summary Cards -->
 <div class="summary-grid">
-  {% set grade_colors = {'A': '#4caf50', 'B': '#64b5f6', 'C': '#ffa726', 'D': '#ef5350'} %}
+  {% set grade_colors = {'A': '#4caf50', 'B': '#ff6b2b', 'C': '#ffa726', 'D': '#ef5350'} %}
   {% for g in by_grade %}
   <div class="stat-card">
     <div class="stat-label">Grade {{ g.grade }}</div>
-    <div class="stat-val" style="color:{{ grade_colors.get(g.grade, '#b0b8cc') }};">
+    <div class="stat-val" style="color:{{ grade_colors.get(g.grade, '#999') }};">
       {% if g.pct is not none %}{{ g.pct }}%{% else %}—{% endif %}
     </div>
-    <div style="font-size:0.72rem;color:#9aa0b8;margin-top:4px;">
+    <div style="font-size:0.72rem;color:#777;margin-top:4px;">
       {{ g.correct }}/{{ g.total }} correct
     </div>
   </div>
@@ -86,27 +86,27 @@
 <!-- Grade Bars -->
 <div class="card">
   <div class="section-title">Win Rate by Confidence Grade</div>
-  <p style="font-size:0.72rem;color:#9aa0b8;margin-bottom:16px;">
+  <p style="font-size:0.72rem;color:#777;margin-bottom:16px;">
     Higher grades should have higher win rates. A's are our strongest picks.
   </p>
   {% for g in by_grade %}
   {% if g.total > 0 %}
   <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
-    <div style="width:30px;font-size:1.1rem;font-weight:900;color:{{ grade_colors.get(g.grade, '#b0b8cc') }};">{{ g.grade }}</div>
-    <div style="flex:1;background:#0d1120;border-radius:4px;height:24px;overflow:hidden;">
-      <div style="height:100%;width:{{ g.pct or 0 }}%;background:{{ grade_colors.get(g.grade, '#b0b8cc') }};border-radius:4px;transition:width 0.3s;"></div>
+    <div style="width:30px;font-size:1.1rem;font-weight:900;color:{{ grade_colors.get(g.grade, '#999') }};">{{ g.grade }}</div>
+    <div style="flex:1;background:#0a0a0a;border-radius:4px;height:24px;overflow:hidden;">
+      <div style="height:100%;width:{{ g.pct or 0 }}%;background:{{ grade_colors.get(g.grade, '#999') }};border-radius:4px;transition:width 0.3s;"></div>
     </div>
     <div style="width:100px;text-align:right;font-size:0.82rem;">
-      <span style="color:{{ grade_colors.get(g.grade, '#b0b8cc') }};font-weight:700;">{{ g.pct }}%</span>
-      <span style="color:#9aa0b8;"> ({{ g.correct }}/{{ g.total }})</span>
+      <span style="color:{{ grade_colors.get(g.grade, '#999') }};font-weight:700;">{{ g.pct }}%</span>
+      <span style="color:#777;"> ({{ g.correct }}/{{ g.total }})</span>
     </div>
   </div>
   {% endif %}
   {% endfor %}
   {% if total_graded == 0 %}
-  <div style="color:#9aa0b8;text-align:center;padding:30px 20px;">
+  <div style="color:#777;text-align:center;padding:30px 20px;">
     <p style="font-size:0.95rem;font-weight:600;margin-bottom:8px;">No graded predictions settled yet</p>
-    <p style="font-size:0.78rem;color:#555870;">Simulate individual games (not "Simulate All") to generate confidence grades.<br>
+    <p style="font-size:0.78rem;color:#555;">Simulate individual games (not "Simulate All") to generate confidence grades.<br>
     Once those games finish, results will appear here automatically.<br>
     Grades are assigned based on how many signals align: lineup data, pitcher matchup, weather, streaks, etc.</p>
   </div>
@@ -132,17 +132,17 @@ new Chart(ctx, {
       {
         label: 'Win %',
         data: dailyData.map(function(d){ return d.pct; }),
-        borderColor: '#64b5f6',
+        borderColor: '#ff6b2b',
         backgroundColor: 'rgba(100,181,246,0.1)',
         fill: true,
         tension: 0.3,
         pointRadius: 4,
-        pointBackgroundColor: '#64b5f6',
+        pointBackgroundColor: '#ff6b2b',
       },
       {
         label: 'Games',
         data: dailyData.map(function(d){ return d.total; }),
-        borderColor: '#555870',
+        borderColor: '#555',
         borderDash: [4,4],
         fill: false,
         tension: 0.3,
@@ -156,24 +156,24 @@ new Chart(ctx, {
     scales: {
       y: {
         beginAtZero: true, max: 100,
-        title: { display: true, text: 'Win %', color: '#9aa0b8' },
-        ticks: { color: '#9aa0b8' },
-        grid: { color: '#252836' }
+        title: { display: true, text: 'Win %', color: '#777' },
+        ticks: { color: '#777' },
+        grid: { color: '#1a1a1a' }
       },
       y1: {
         position: 'right',
         beginAtZero: true,
-        title: { display: true, text: 'Games', color: '#555870' },
-        ticks: { color: '#555870' },
+        title: { display: true, text: 'Games', color: '#555' },
+        ticks: { color: '#555' },
         grid: { display: false }
       },
       x: {
-        ticks: { color: '#9aa0b8', maxRotation: 45 },
-        grid: { color: '#252836' }
+        ticks: { color: '#777', maxRotation: 45 },
+        grid: { color: '#1a1a1a' }
       }
     },
     plugins: {
-      legend: { labels: { color: '#b0b8cc' } }
+      legend: { labels: { color: '#999' } }
     }
   }
 });
@@ -181,7 +181,7 @@ new Chart(ctx, {
 {% endif %}
 
 <div style="text-align:center;margin-top:20px;">
-  <a href="/accuracy" style="color:#64b5f6;font-size:0.85rem;">View Full Accuracy Page &rarr;</a>
+  <a href="/accuracy" style="color:#ff6b2b;font-size:0.85rem;">View Full Accuracy Page &rarr;</a>
 </div>
 
 </body>

@@ -1,13 +1,13 @@
 ﻿<!DOCTYPE html>
 <html lang="en">
 <head>
-<script>!function(){var t=localStorage.getItem("mlb_theme")||"dark",m={dark:{"--bg":"#0d1120","--bg2":"#1a1e2e","--bg3":"#252836","--border":"#252836","--text":"#e8eaf0","--text2":"#b0b8cc","--text3":"#9aa0b8","--accent":"#64b5f6","--card-bg":"#1a1e2e"},medium:{"--bg":"#1a1528","--bg2":"#241d38","--bg3":"#302848","--border":"#3a2f5a","--text":"#ede8f5","--text2":"#c0b8d8","--text3":"#a098c0","--accent":"#b39ddb","--card-bg":"#241d38"},light:{"--bg":"#f0f2f8","--bg2":"#ffffff","--bg3":"#e8eaf6","--border":"#d0d4e8","--text":"#1a1a2e","--text2":"#444466","--text3":"#6666aa","--accent":"#3949ab","--card-bg":"#ffffff"}}[t]||{};Object.entries(m).forEach(function(e){document.documentElement.style.setProperty(e[0],e[1])});document.addEventListener("DOMContentLoaded",function(){document.body.style.background=m["--bg"];document.body.style.color=m["--text"]})}();</script>
+<script>!function(){var t=localStorage.getItem("mlb_theme")||"dark",m={dark:{"--bg":"#0a0a0a","--bg2":"#111","--bg3":"#1a1a1a","--border":"#1a1a1a","--text":"#f0ece4","--text2":"#999","--text3":"#777","--accent":"#ff6b2b","--card-bg":"#111"},medium:{"--bg":"#1a1528","--bg2":"#241d38","--bg3":"#302848","--border":"#3a2f5a","--text":"#ede8f5","--text2":"#c0b8d8","--text3":"#a098c0","--accent":"#ffc107","--card-bg":"#241d38"},light:{"--bg":"#f0f2f8","--bg2":"#ffffff","--bg3":"#e8eaf6","--border":"#d0d4e8","--text":"#1a1a2e","--text2":"#444466","--text3":"#6666aa","--accent":"#3949ab","--card-bg":"#ffffff"}}[t]||{};Object.entries(m).forEach(function(e){document.documentElement.style.setProperty(e[0],e[1])});document.addEventListener("DOMContentLoaded",function(){document.body.style.background=m["--bg"];document.body.style.color=m["--text"]})}();</script>
   <meta charset="UTF-8">
   <meta name="csrf-token" content="{{ csrf_token() }}">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>All Games — MLB Simulator</title>
   <style>
-    :root { --bg: #0d1120; --text: #e8eaf0; }
+    :root { --bg: #0a0a0a; --text: #f0ece4; }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -19,18 +19,18 @@
       padding: 40px 20px;
     }
 
-    a.back { color: #64b5f6; text-decoration: none; font-size: 0.9rem; display: inline-block; margin-bottom: 28px; }
+    a.back { color: #ff6b2b; text-decoration: none; font-size: 0.9rem; display: inline-block; margin-bottom: 28px; }
     a.back:hover { text-decoration: underline; }
 
     header { text-align: center; margin-bottom: 36px; }
     header h1 { font-size: 2rem; font-weight: 800; }
-    header p  { color: #b0b8cc; margin-top: 6px; font-size: 0.95rem; }
+    header p  { color: #999; margin-top: 6px; font-size: 0.95rem; }
 
     /* ── Parlay box ── */
     .parlay-box {
       max-width: 820px;
       margin: 0 auto 40px auto;
-      background: linear-gradient(135deg, #1a1230, #0f1f35);
+      background: linear-gradient(135deg, #0f0800, #0f1f35);
       border: 1px solid #4a3a7a;
       border-radius: 16px;
       padding: 28px 32px;
@@ -48,7 +48,7 @@
     .parlay-title {
       font-size: 1.25rem;
       font-weight: 800;
-      color: #c084fc;
+      color: #ff8a50;
     }
 
     .parlay-title span { color: #ffffff; }
@@ -66,7 +66,7 @@
 
     .parlay-combined .lbl {
       font-size: 0.72rem;
-      color: #b0b8cc;
+      color: #999;
       text-transform: uppercase;
       letter-spacing: 0.5px;
       margin-top: 2px;
@@ -88,11 +88,11 @@
     }
 
     .pick-team  { font-weight: 700; font-size: 1rem; }
-    .pick-opp   { font-size: 0.8rem; color: #b0b8cc; margin-top: 2px; }
+    .pick-opp   { font-size: 0.8rem; color: #999; margin-top: 2px; }
     .pick-pct   { font-size: 1.2rem; font-weight: 800; color: #a78bfa; }
 
     .no-parlay {
-      color: #b0b8cc;
+      color: #999;
       font-style: italic;
       text-align: center;
       padding: 12px 0;
@@ -101,19 +101,19 @@
     /* ── Vegas odds line ── */
     .vegas-line {
       font-size: 0.77rem;
-      color: #b0b8cc;
+      color: #999;
       margin-top: 4px;
     }
     .edge-pos { color: #4caf50; font-weight: 700; }
     .edge-neg { color: #ef5350; font-weight: 700; }
-    .edge-flat { color: #b0b8cc; }
+    .edge-flat { color: #999; }
 
     /* Vegas comparison row in game cards */
     .vegas-row {
       display: flex;
       justify-content: space-between;
       font-size: 0.74rem;
-      color: #b0b8cc;
+      color: #999;
       margin-top: 8px;
       border-top: 1px solid rgba(255,255,255,0.05);
       padding-top: 7px;
@@ -126,7 +126,7 @@
     .disclaimer {
       margin-top: 16px;
       font-size: 0.73rem;
-      color: #9aa0b8;
+      color: #777;
       text-align: center;
     }
 
@@ -137,7 +137,7 @@
       font-size: 0.78rem;
       text-transform: uppercase;
       letter-spacing: 0.8px;
-      color: #b0b8cc;
+      color: #999;
       font-weight: 600;
     }
 
@@ -152,8 +152,8 @@
     }
 
     .game-card {
-      background: #1e2235;
-      border: 1px solid #353a52;
+      background: #111;
+      border: 1px solid #1e1e1e;
       border-radius: 12px;
       padding: 20px 22px;
       display: flex;
@@ -162,7 +162,7 @@
     }
 
     .game-card.parlay-pick-card {
-      border-color: #7c3aed;
+      border-color: #ff6b2b;
       background: #1a1730;
     }
 
@@ -180,37 +180,37 @@
 
     .team-name { font-weight: 700; font-size: 0.95rem; }
     .team-pct  { font-size: 1.5rem; font-weight: 800; line-height: 1; margin-top: 4px; }
-    .team-pct.away { color: #64b5f6; }
+    .team-pct.away { color: #ff6b2b; }
     .team-pct.home { color: #81c784; }
-    .team-label { font-size: 0.7rem; color: #b0b8cc; text-transform: uppercase; letter-spacing: 0.4px; }
+    .team-label { font-size: 0.7rem; color: #999; text-transform: uppercase; letter-spacing: 0.4px; }
 
-    .at-divider { color: #9aa0b8; font-size: 0.85rem; }
+    .at-divider { color: #777; font-size: 0.85rem; }
 
 
 
     /* ── Inning segments (F3/F5/F7) ── */
     .seg-row {
       display: flex; gap: 6px; margin-top: 8px;
-      padding-top: 8px; border-top: 1px solid #252836;
+      padding-top: 8px; border-top: 1px solid #1a1a1a;
     }
     .seg-cell {
-      flex: 1; background: #0d1120; border-radius: 8px;
+      flex: 1; background: #0a0a0a; border-radius: 8px;
       padding: 6px 8px; text-align: center; font-size: 0.7rem;
     }
-    .seg-label { color: #b0b8cc; text-transform: uppercase; letter-spacing: .4px; font-size: 0.62rem; }
-    .seg-away  { color: #64b5f6; font-weight: 700; font-size: 0.85rem; }
+    .seg-label { color: #999; text-transform: uppercase; letter-spacing: .4px; font-size: 0.62rem; }
+    .seg-away  { color: #ff6b2b; font-weight: 700; font-size: 0.85rem; }
     .seg-home  { color: #81c784; font-weight: 700; font-size: 0.85rem; }
-    .seg-tie   { color: #9aa0b8; font-size: 0.65rem; margin-top: 1px; }
+    .seg-tie   { color: #777; font-size: 0.65rem; margin-top: 1px; }
 
     /* ── O/U + run line rows ── */
     .market-row {
       display: flex; justify-content: space-between; align-items: flex-start;
-      margin-top: 6px; padding-top: 6px; border-top: 1px solid #252836;
+      margin-top: 6px; padding-top: 6px; border-top: 1px solid #1a1a1a;
       font-size: 0.72rem; gap: 8px;
     }
-    .market-label { color: #b0b8cc; font-size: 0.65rem; text-transform: uppercase;
+    .market-label { color: #999; font-size: 0.65rem; text-transform: uppercase;
                     letter-spacing: .4px; margin-bottom: 2px; }
-    .market-val   { color: #d8dce8; font-weight: 600; }
+    .market-val   { color: #ddd; font-weight: 600; }
     .ev-pos { color: #4caf50; font-weight: 700; }
     .ev-neg { color: #ef5350; font-weight: 600; }
     .hr-badge { display:inline-block; font-size:0.6rem; font-weight:700; padding:1px 7px;
@@ -219,9 +219,9 @@
     .hr-cold   { background:#0d1a2a; color:#81d4fa; border:1px solid #01579b; }
     .hr-neutral{ background:#1a1d28; color:#90a4ae; border:1px solid #455a64; }
     .wind-out  { background:#1a2a10; color:#b9f6ca; border:1px solid #1b5e20; }
-    .wind-in   { background:#1a1a2a; color:#b39ddb; border:1px solid #4527a0; }
+    .wind-in   { background:#1a1a2a; color:#ffc107; border:1px solid #4527a0; }
     .platoon-row { display:flex; justify-content:space-between; align-items:center;
-      font-size:0.72rem; color:#b0b8cc; padding:4px 0; border-top:1px solid #1a1d28; margin-top:4px; }
+      font-size:0.72rem; color:#999; padding:4px 0; border-top:1px solid #1a1d28; margin-top:4px; }
     .streak-hot  { display:inline-block; font-size:0.6rem; font-weight:800; padding:2px 8px;
       border-radius:4px; background:#3a1a00; color:#ff8f00; border:1px solid #e65100; }
     .streak-cold { display:inline-block; font-size:0.6rem; font-weight:800; padding:2px 8px;
@@ -234,33 +234,33 @@
       border-radius:4px; background:#2a2010; color:#ffcc80; border:1px solid #e65100; }
     .conf-bar-wrap { width:100%; height:8px; background:#1a1d28; border-radius:4px; overflow:hidden; margin:4px 0; }
     .conf-bar { height:100%; border-radius:4px; transition:width .3s; }
-    .conf-label { font-size:0.62rem; color:#b0b8cc; display:flex; justify-content:space-between; }
+    .conf-label { font-size:0.62rem; color:#999; display:flex; justify-content:space-between; }
     .platoon-bar-wrap { flex:1; margin:0 10px; height:6px; background:#1a1d28; border-radius:3px; overflow:hidden; }
     .platoon-bar { height:100%; border-radius:3px; }
     .form-hot      { display:inline-block; font-size:0.6rem; font-weight:700; padding:1px 7px; border-radius:4px; background:#1a2a10; color:#b9f6ca; border:1px solid #2e7d32; margin-left:4px; }
     .form-declining{ display:inline-block; font-size:0.6rem; font-weight:700; padding:1px 7px; border-radius:4px; background:#3a1a00; color:#ffcc80; border:1px solid #e65100; margin-left:4px; }
     .bp-depth-badge { display:inline-block; font-size:0.62rem; font-weight:700; padding:2px 8px;
       border-radius:4px; margin:2px; }
-    .bp-depth-elite  { background:#1a2a1a; color:#69f0ae; border:1px solid #2e7d32; }
+    .bp-depth-elite  { background:#1a1500; color:#69f0ae; border:1px solid #2e7d32; }
     .bp-depth-strong { background:#1a2520; color:#80cbc4; border:1px solid #00695c; }
     .bp-depth-average{ background:#1a1d28; color:#90a4ae; border:1px solid #455a64; }
     .bp-depth-weak   { background:#2a2010; color:#ffcc80; border:1px solid #e65100; }
     .bp-depth-thin   { background:#3a1a1a; color:#ef9a9a; border:1px solid #b71c1c; }
     .series-badge { display:inline-block; font-size:0.62rem; font-weight:700; padding:1px 8px;
-      border-radius:4px; background:#1a1a2a; color:#b39ddb; border:1px solid #3a2a6a;
+      border-radius:4px; background:#1a1a2a; color:#ffc107; border:1px solid #3a2000;
       margin-bottom:4px; }
     .il-badge { display:inline-block; font-size:0.6rem; font-weight:700; padding:1px 6px;
       border-radius:4px; background:#3a1a1a; color:#ef9a9a; border:1px solid #5a2a2a;
       margin-left:4px; vertical-align:middle; }
     .txn-badge { display:inline-block; font-size:0.6rem; font-weight:700; padding:1px 6px;
-      border-radius:4px; background:#1a2a1a; color:#a5d6a7; border:1px solid #2a4a2a;
+      border-radius:4px; background:#1a1500; color:#a5d6a7; border:1px solid #2a4a2a;
       margin-left:4px; vertical-align:middle; }
     .il-alert-row { font-size:0.72rem; color:#ef9a9a; padding:4px 8px 2px; }
     .txn-row { font-size:0.72rem; color:#a5d6a7; padding:2px 8px 4px; }
     .log-bet-btn {
       display:inline-block; margin-top:10px; padding:6px 14px; font-size:0.75rem;
       font-weight:700; border-radius:8px; cursor:pointer;
-      background:#14261a; color:#4caf50; border:1px solid #2a5a3a;
+      background:#14261a; color:#4caf50; border:1px solid #3a2800;
     }
     .log-bet-btn:hover { background:#1b3a24; }
     /* ── Print / PDF ── */
@@ -301,41 +301,41 @@
     }
     .log-bet-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:1000; align-items:center; justify-content:center; }
     .log-bet-modal.open { display:flex; }
-    .log-bet-box { background:#1a1e2e; border:1px solid #333650; border-radius:16px; padding:24px 28px; min-width:320px; max-width:460px; width:90%; }
+    .log-bet-box { background:#111; border:1px solid #222; border-radius:16px; padding:24px 28px; min-width:320px; max-width:460px; width:90%; }
     .log-bet-box h3 { font-size:1rem; font-weight:800; margin-bottom:16px; }
     .lbf-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
-    .lbf-grp label { display:block; font-size:0.65rem; color:#b0b8cc; text-transform:uppercase; letter-spacing:.4px; margin-bottom:4px; }
+    .lbf-grp label { display:block; font-size:0.65rem; color:#999; text-transform:uppercase; letter-spacing:.4px; margin-bottom:4px; }
     .lbf-grp input, .lbf-grp select {
-      width:100%; background:#0d1120; border:1px solid #333650; border-radius:7px;
-      color:#e8eaf0; padding:7px 9px; font-size:0.82rem;
+      width:100%; background:#0a0a0a; border:1px solid #222; border-radius:7px;
+      color:#f0ece4; padding:7px 9px; font-size:0.82rem;
     }
     .lbf-btns { display:flex; gap:10px; margin-top:14px; }
-    .lbf-submit { flex:1; background:#14261a; color:#4caf50; border:1px solid #2a5a3a; border-radius:8px; padding:9px; font-weight:700; cursor:pointer; font-size:0.85rem; }
-    .lbf-cancel { background:#1a1d28; color:#b0b8cc; border:1px solid #333650; border-radius:8px; padding:9px 16px; cursor:pointer; font-size:0.85rem; }
+    .lbf-submit { flex:1; background:#14261a; color:#4caf50; border:1px solid #3a2800; border-radius:8px; padding:9px; font-weight:700; cursor:pointer; font-size:0.85rem; }
+    .lbf-cancel { background:#1a1d28; color:#999; border:1px solid #222; border-radius:8px; padding:9px 16px; cursor:pointer; font-size:0.85rem; }
     .lbf-msg { font-size:0.78rem; margin-top:8px; }
     .lbf-msg.ok  { color:#4caf50; }
     .lbf-msg.err { color:#ef5350; }
     .log-bet-btn {
       display:inline-block; margin-top:10px; padding:6px 14px; font-size:0.75rem;
       font-weight:700; border-radius:8px; cursor:pointer;
-      background:#14261a; color:#4caf50; border:1px solid #2a5a3a;
+      background:#14261a; color:#4caf50; border:1px solid #3a2800;
     }
     .log-bet-btn:hover { background:#1b3a24; }
     .log-bet-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:1000; align-items:center; justify-content:center; }
     .log-bet-modal.open { display:flex; }
-    .log-bet-box { background:#1a1e2e; border:1px solid #333650; border-radius:16px; padding:24px 28px; min-width:320px; max-width:460px; width:90%; }
+    .log-bet-box { background:#111; border:1px solid #222; border-radius:16px; padding:24px 28px; min-width:320px; max-width:460px; width:90%; }
     .log-bet-box h3 { font-size:1rem; font-weight:800; margin-bottom:16px; }
     .lbf-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
-    .lbf-grp label { display:block; font-size:0.65rem; color:#b0b8cc; text-transform:uppercase; letter-spacing:.4px; margin-bottom:4px; }
-    .lbf-grp input, .lbf-grp select { width:100%; background:#0d1120; border:1px solid #333650; border-radius:7px; color:#e8eaf0; padding:7px 9px; font-size:0.82rem; }
+    .lbf-grp label { display:block; font-size:0.65rem; color:#999; text-transform:uppercase; letter-spacing:.4px; margin-bottom:4px; }
+    .lbf-grp input, .lbf-grp select { width:100%; background:#0a0a0a; border:1px solid #222; border-radius:7px; color:#f0ece4; padding:7px 9px; font-size:0.82rem; }
     .lbf-btns { display:flex; gap:10px; margin-top:14px; }
-    .lbf-submit { flex:1; background:#14261a; color:#4caf50; border:1px solid #2a5a3a; border-radius:8px; padding:9px; font-weight:700; cursor:pointer; font-size:0.85rem; }
-    .lbf-cancel { background:#1a1d28; color:#b0b8cc; border:1px solid #333650; border-radius:8px; padding:9px 16px; cursor:pointer; font-size:0.85rem; }
+    .lbf-submit { flex:1; background:#14261a; color:#4caf50; border:1px solid #3a2800; border-radius:8px; padding:9px; font-weight:700; cursor:pointer; font-size:0.85rem; }
+    .lbf-cancel { background:#1a1d28; color:#999; border:1px solid #222; border-radius:8px; padding:9px 16px; cursor:pointer; font-size:0.85rem; }
     .lbf-msg { font-size:0.78rem; margin-top:8px; }
     .lbf-msg.ok  { color:#4caf50; }
     .lbf-msg.err { color:#ef5350; }
     .kelly-badge {
-      display: inline-block; background: #1a2a1a; color: #66bb6a;
+      display: inline-block; background: #1a1500; color: #66bb6a;
       font-size: 0.62rem; padding: 1px 6px; border-radius: 4px;
       border: 1px solid #2a4a2a; margin-top: 2px;
     }
@@ -357,7 +357,7 @@
       align-items: center;
       margin-top: 10px;
       padding-top: 10px;
-      border-top: 1px solid #252836;
+      border-top: 1px solid #1a1a1a;
       gap: 8px;
     }
     .pitcher-block {
@@ -365,7 +365,7 @@
       align-items: center;
       gap: 8px;
       font-size: 0.78rem;
-      color: #b0b8cc;
+      color: #999;
       max-width: 46%;
     }
     .pitcher-block.home { flex-direction: row-reverse; text-align: right; }
@@ -373,14 +373,14 @@
       width: 36px; height: 36px;
       border-radius: 50%;
       object-fit: cover;
-      border: 1px solid #333650;
+      border: 1px solid #222;
       flex-shrink: 0;
     }
-    .pitcher-name { font-weight: 600; color: #d8dce8; font-size: 0.8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pitcher-name { font-weight: 600; color: #ddd; font-size: 0.8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .sharp-badge {
       display:inline-block; font-size:0.62rem; padding:1px 7px;
       border-radius:4px; font-weight:700; letter-spacing:.4px;
-      background:#1a2a3a; color:#29b6f6; border:1px solid #1565c0;
+      background:#1a0d00; color:#29b6f6; border:1px solid #cc5522;
     }
     .bp-badge {
       display: inline-block; font-size: 0.62rem; padding: 1px 7px;
@@ -391,7 +391,7 @@
     .bp-gassed { background: #3a1a1a; color: #ef5350; border: 1px solid #5a2a2a; }
     .umpire-badge {
       font-size: 0.7rem;
-      color: #b0b8cc;
+      color: #999;
       text-align: center;
       flex: 1;
       white-space: nowrap;
@@ -402,10 +402,10 @@
       height: 8px;
       border-radius: 4px;
       overflow: hidden;
-      background: #353a52;
+      background: #1e1e1e;
       display: flex;
     }
-    .bar-away { background: #2563eb; height: 100%; }
+    .bar-away { background: #ff6b2b; height: 100%; }
     .bar-home { background: #16a34a; height: 100%; flex: 1; }
 
     /* Score + weather row */
@@ -418,8 +418,8 @@
 
     .predicted-score { color: #ffffff; font-weight: 600; }
     .weather-badge {
-      background: #1e2a3a;
-      color: #64b5f6;
+      background: #1a0d00;
+      color: #ff6b2b;
       padding: 3px 8px;
       border-radius: 6px;
       font-size: 0.75rem;
@@ -428,7 +428,7 @@
     /* Pitcher row */
     .pitcher-row {
       font-size: 0.78rem;
-      color: #b0b8cc;
+      color: #999;
       display: flex;
       justify-content: space-between;
     }
@@ -442,13 +442,13 @@
       margin-left: 4px;
       vertical-align: middle;
     }
-    .hand-L { background: #1e3a2f; color: #4caf50; }
-    .hand-R { background: #1e2a3a; color: #64b5f6; }
+    .hand-L { background: #1a2a1a; color: #4caf50; }
+    .hand-R { background: #1a0d00; color: #ff6b2b; }
 
     .parlay-tag {
       font-size: 0.68rem;
       font-weight: 700;
-      background: #7c3aed;
+      background: #ff6b2b;
       color: #fff;
       padding: 2px 8px;
       border-radius: 10px;
@@ -459,8 +459,8 @@
     .best-bets-box {
       max-width: 820px;
       margin: 0 auto 28px auto;
-      background: #1e2235;
-      border: 1px solid #353a52;
+      background: #111;
+      border: 1px solid #1e1e1e;
       border-radius: 16px;
       padding: 24px 28px;
     }
@@ -476,7 +476,7 @@
       font-size: 0.72rem;
       text-transform: uppercase;
       letter-spacing: 0.6px;
-      color: #b0b8cc;
+      color: #999;
       font-weight: 600;
       margin-bottom: 8px;
     }
@@ -486,7 +486,7 @@
       align-items: center;
       justify-content: space-between;
       padding: 10px 14px;
-      background: #0d1120;
+      background: #0a0a0a;
       border-radius: 8px;
       margin-bottom: 6px;
     }
@@ -494,7 +494,7 @@
     .bet-row:last-child { margin-bottom: 0; }
 
     .bet-team  { font-weight: 700; font-size: 0.95rem; }
-    .bet-opp   { font-size: 0.78rem; color: #b0b8cc; margin-top: 2px; }
+    .bet-opp   { font-size: 0.78rem; color: #999; margin-top: 2px; }
     .bet-pct   { font-size: 1.3rem; font-weight: 800; }
     .bet-badge {
       font-size: 0.7rem;
@@ -508,20 +508,20 @@
     .conf-good     { background: #1b3a2a; color: #4caf50; border: 1px solid #4caf50; }
     .conf-moderate { background: #3a3010; color: #ffd54f; border: 1px solid #ffd54f; }
 
-    .no-bets { color: #b0b8cc; font-style: italic; text-align: center; padding: 12px 0; }
+    .no-bets { color: #999; font-style: italic; text-align: center; padding: 12px 0; }
 
     .bet-rule {
       margin-top: 14px;
       font-size: 0.72rem;
-      color: #9aa0b8;
-      border-top: 1px solid #353a52;
+      color: #777;
+      border-top: 1px solid #1e1e1e;
       padding-top: 12px;
     }
 
     footer {
       text-align: center;
       margin-top: 50px;
-      color: #9aa0b8;
+      color: #777;
       font-size: 0.78rem;
     }
 
@@ -530,53 +530,53 @@
       width: 100%; overflow-x: auto; white-space: nowrap;
       background: #0d1018; border-bottom: 1px solid #1e2230;
       padding: 8px 16px; margin-bottom: 0;
-      scrollbar-width: thin; scrollbar-color: #333650 transparent;
+      scrollbar-width: thin; scrollbar-color: #222 transparent;
       position: sticky; top: 0; z-index: 200;
     }
     #scoreboard-strip::-webkit-scrollbar { height: 4px; }
-    #scoreboard-strip::-webkit-scrollbar-thumb { background: #333650; border-radius: 2px; }
+    #scoreboard-strip::-webkit-scrollbar-thumb { background: #222; border-radius: 2px; }
     .sb-game {
       display: inline-flex; align-items: center; gap: 10px;
-      background: #1a1e2e; border: 1px solid #252836;
+      background: #111; border: 1px solid #1a1a1a;
       border-radius: 10px; padding: 6px 12px;
       margin-right: 8px; font-size: 0.78rem; cursor: default;
       vertical-align: middle; min-width: 170px;
       transition: border-color .2s;
     }
-    .sb-game:hover { border-color: #64b5f6; }
+    .sb-game:hover { border-color: #ff6b2b; }
     .sb-game.live { border-color: #ef5350; }
     .sb-game.final { opacity: .7; }
     .sb-teams { display: flex; flex-direction: column; gap: 2px; flex: 1; }
     .sb-team { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-    .sb-abbr { font-weight: 700; color: #d8dce8; width: 28px; }
+    .sb-abbr { font-weight: 700; color: #ddd; width: 28px; }
     .sb-score { font-weight: 800; font-size: 0.9rem; color: #fff; width: 20px; text-align: right; }
     .sb-score.winning { color: #4caf50; }
     .sb-status {
       font-size: 0.62rem; text-transform: uppercase; letter-spacing: .4px;
-      color: #b0b8cc; text-align: center; min-width: 36px;
+      color: #999; text-align: center; min-width: 36px;
     }
     .sb-status.live { color: #ef5350; font-weight: 700; animation: blink 1.4s infinite; }
-    .sb-status.final-txt { color: #9aa0b8; }
+    .sb-status.final-txt { color: #777; }
     @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.4} }
-    .sb-time { font-size: 0.65rem; color: #64b5f6; font-weight: 600; }
-    #scoreboard-loading { color: #9aa0b8; font-size: 0.78rem; padding: 8px 16px; }
+    .sb-time { font-size: 0.65rem; color: #ff6b2b; font-weight: 600; }
+    #scoreboard-loading { color: #777; font-size: 0.78rem; padding: 8px 16px; }
 
     /* ── Game start time badge ── */
     .game-time-badge {
       display: inline-block; font-size: 0.65rem; font-weight: 600;
-      color: #64b5f6; background: #0d1f35; border: 1px solid #1a3a5a;
+      color: #ff6b2b; background: #0d1f35; border: 1px solid #1a0d00;
       padding: 2px 7px; border-radius: 5px; margin-left: 6px;
       vertical-align: middle;
     }
     .game-time-badge.soon { color: #ffa726; border-color: #5a3a1a; background: #2a1f0d; }
   
 .nav-dropdown { position:relative; display:inline-block; }
-.nav-dropdown > a { color:#ffb74d;text-decoration:none;font-weight:600; }
+.nav-dropdown > a { color:#ffc107;text-decoration:none;font-weight:600; }
 .nav-dropdown-menu {
   visibility:hidden; opacity:0; pointer-events:none;
   position:absolute; top:100%; left:50%;
   transform:translateX(-50%);
-  background:#1e2235; border:1px solid #353a52; border-radius:10px;
+  background:#111; border:1px solid #1e1e1e; border-radius:10px;
   min-width:160px; z-index:999; padding:12px 0 6px 0; white-space:nowrap;
   box-shadow:0 8px 24px rgba(0,0,0,0.4);
   transition:opacity 0.15s, visibility 0.15s;
@@ -588,9 +588,9 @@
 }
 .nav-dropdown-menu a {
   display:block; padding:9px 16px; font-size:0.83rem; font-weight:600;
-  text-decoration:none; color:#e8eaf0;
+  text-decoration:none; color:#f0ece4;
 }
-.nav-dropdown-menu a:hover { background:#252a3a; }
+.nav-dropdown-menu a:hover { background:#1a1a1a; }
 </style>
 
 <body>
@@ -611,14 +611,14 @@
 } -%}
 
 
-<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 24px;background:#1e2235;border-bottom:1px solid #353a52;margin-bottom:0;">
+<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 24px;background:#111;border-bottom:1px solid #1e1e1e;margin-bottom:0;">
   <a href="/mlb" style="color:#fff;text-decoration:none;font-size:1.1rem;font-weight:800;">⚾ MLB Simulator</a>
   <div style="display:flex;gap:16px;font-size:0.85rem;align-items:center;flex-wrap:wrap;">
-    <a href="/mlb" style="color:#64b5f6;text-decoration:none;font-weight:600;">🎯 Games</a>
+    <a href="/mlb" style="color:#ff6b2b;text-decoration:none;font-weight:600;">🎯 Games</a>
     <span class="nav-dropdown"><a href="/bets">&#128176; My Bets &#9660;</a><div class="nav-dropdown-menu"><a href="/bets">&#128176; My Bets</a><a href="/bankroll">&#128200; Bankroll</a><a href="/calculator">&#129518; Calculator</a><a href="/parlay">&#127920; Parlay</a><a href="/my-picks">&#127919; My Picks</a></div></span>
-    <a href="/accuracy" style="color:#64b5f6;text-decoration:none;font-weight:600;">📊 Accuracy</a>
-    <a href="/confidence-history" style="color:#c084fc;text-decoration:none;font-weight:600;">📈 Confidence</a>
-    <a href="/prop-accuracy" style="color:#b39ddb;text-decoration:none;font-weight:600;">🎯 Props</a>
+    <a href="/accuracy" style="color:#ff6b2b;text-decoration:none;font-weight:600;">📊 Accuracy</a>
+    <a href="/confidence-history" style="color:#ff8a50;text-decoration:none;font-weight:600;">📈 Confidence</a>
+    <a href="/prop-accuracy" style="color:#ffc107;text-decoration:none;font-weight:600;">🎯 Props</a>
     <a href="/odds-history" style="color:#ffd54f;text-decoration:none;font-weight:600;">📋 Odds</a>
     {% if current_user.is_authenticated %}
       <a href="/settings" style="color:#aaa;text-decoration:none;font-weight:600;">👤 {{ current_user.username }}</a>
@@ -630,9 +630,9 @@
 </div>
 
 <!-- ── Live Scoreboard Bar ── -->
-<div id="scoreboard-bar" style="background:#12162a;border-bottom:1px solid #252836;padding:0;overflow:hidden;">
+<div id="scoreboard-bar" style="background:#080808;border-bottom:1px solid #1a1a1a;padding:0;overflow:hidden;">
   <div id="scoreboard-inner" style="display:flex;overflow-x:auto;gap:0;scrollbar-width:none;-ms-overflow-style:none;">
-    <div style="padding:7px 14px;font-size:0.7rem;color:#555870;white-space:nowrap;align-self:center;flex-shrink:0;">TODAY</div>
+    <div style="padding:7px 14px;font-size:0.7rem;color:#555;white-space:nowrap;align-self:center;flex-shrink:0;">TODAY</div>
   </div>
 </div>
 <script>
@@ -645,13 +645,13 @@
     s = (s||'').toLowerCase();
     if (s.includes('progress')||s.includes('live')) return '#ef5350';
     if (s.includes('final')) return '#4caf50';
-    return '#9aa0b8';
+    return '#777';
   }
   function renderScoreboard(games) {
     var inner = document.getElementById('scoreboard-inner');
     if (!inner) return;
     if (!games.length) { document.getElementById('scoreboard-bar').style.display='none'; return; }
-    var html = '<div style="padding:7px 14px;font-size:0.7rem;color:#555870;white-space:nowrap;align-self:center;flex-shrink:0;">TODAY</div>';
+    var html = '<div style="padding:7px 14px;font-size:0.7rem;color:#555;white-space:nowrap;align-self:center;flex-shrink:0;">TODAY</div>';
     games.forEach(function(g) {
       var s = (g.status||'').toLowerCase();
       var isLive = s.includes('progress')||s.includes('live');
@@ -668,11 +668,11 @@
       var scoreHome = (isLive||isFinal) ? '<b style="color:#fff;">'+esc(g.home_score)+'</b>' : '';
       var dot = '<span style="width:6px;height:6px;border-radius:50%;background:'+statusColor(g.status)+';display:inline-block;margin-right:5px;vertical-align:middle;'+(isLive?'animation:pulse 1.2s infinite;':'')+'" ></span>';
       var link = g.gamePk ? '/simulate/'+g.gamePk+'?sims=100000' : '#';
-      html += '<a href="'+link+'" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:5px 14px;border-left:1px solid #1e2235;text-decoration:none;flex-shrink:0;min-width:110px;">'
+      html += '<a href="'+link+'" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:5px 14px;border-left:1px solid #111;text-decoration:none;flex-shrink:0;min-width:110px;">'
         + '<div style="display:flex;align-items:center;gap:6px;font-size:0.72rem;white-space:nowrap;">'
-        + '<span style="color:#b0b8cc;">'+esc(abbr(g.away))+' '+scoreAway+'</span>'
-        + '<span style="color:#555870;font-size:0.65rem;">@</span>'
-        + '<span style="color:#b0b8cc;">'+scoreHome+' '+esc(abbr(g.home))+'</span>'
+        + '<span style="color:#999;">'+esc(abbr(g.away))+' '+scoreAway+'</span>'
+        + '<span style="color:#555;font-size:0.65rem;">@</span>'
+        + '<span style="color:#999;">'+scoreHome+' '+esc(abbr(g.home))+'</span>'
         + '</div>'
         + '<div style="font-size:0.63rem;margin-top:2px;">'+dot+'<span style="color:'+statusColor(g.status)+';">'+timeStr+'</span></div>'
         + '</a>';
@@ -691,27 +691,27 @@
 
 <!-- ── Live scoreboard strip ── -->
 <div id="scoreboard-strip">
-  <span id="scoreboard-loading" style="color:#9aa0b8;font-size:0.78rem;">⚾ Loading scores…</span>
+  <span id="scoreboard-loading" style="color:#777;font-size:0.78rem;">⚾ Loading scores…</span>
 </div>
 
 <div style="padding: 32px 20px 0;">
 
 <!-- Sport Selector -->
-<div style="display:flex;gap:0;max-width:500px;margin:0 auto 20px auto;border-radius:10px;overflow:hidden;border:1px solid #353a52;">
-  <a href="/mlb" style="flex:1;padding:10px 0;text-align:center;background:linear-gradient(135deg,#1a3a5a,#0d2a4a);color:#64b5f6;font-weight:700;font-size:0.85rem;text-decoration:none;border-right:1px solid #353a52;">
+<div style="display:flex;gap:0;max-width:500px;margin:0 auto 20px auto;border-radius:10px;overflow:hidden;border:1px solid #1e1e1e;">
+  <a href="/mlb" style="flex:1;padding:10px 0;text-align:center;background:linear-gradient(135deg,#1a0d00,#0a0a0a);color:#ff6b2b;font-weight:700;font-size:0.85rem;text-decoration:none;border-right:1px solid #1e1e1e;">
     ⚾ MLB
   </a>
-  <div style="flex:1;padding:10px 0;text-align:center;color:#555870;font-size:0.85rem;border-right:1px solid #353a52;cursor:default;position:relative;" title="Coming Aug 2026">
+  <div style="flex:1;padding:10px 0;text-align:center;color:#555;font-size:0.85rem;border-right:1px solid #1e1e1e;cursor:default;position:relative;" title="Coming Aug 2026">
     🏈 NFL
-    <span style="position:absolute;top:-1px;right:6px;font-size:0.55rem;background:#7c3aed;color:#fff;padding:1px 5px;border-radius:0 0 4px 4px;font-weight:700;">AUG</span>
+    <span style="position:absolute;top:-1px;right:6px;font-size:0.55rem;background:#ff6b2b;color:#fff;padding:1px 5px;border-radius:0 0 4px 4px;font-weight:700;">AUG</span>
   </div>
-  <div style="flex:1;padding:10px 0;text-align:center;color:#555870;font-size:0.85rem;border-right:1px solid #353a52;cursor:default;position:relative;" title="Coming Oct 2026">
+  <div style="flex:1;padding:10px 0;text-align:center;color:#555;font-size:0.85rem;border-right:1px solid #1e1e1e;cursor:default;position:relative;" title="Coming Oct 2026">
     🏀 NBA
-    <span style="position:absolute;top:-1px;right:6px;font-size:0.55rem;background:#7c3aed;color:#fff;padding:1px 5px;border-radius:0 0 4px 4px;font-weight:700;">OCT</span>
+    <span style="position:absolute;top:-1px;right:6px;font-size:0.55rem;background:#ff6b2b;color:#fff;padding:1px 5px;border-radius:0 0 4px 4px;font-weight:700;">OCT</span>
   </div>
-  <div style="flex:1;padding:10px 0;text-align:center;color:#555870;font-size:0.85rem;cursor:default;position:relative;" title="Coming Dec 2026">
+  <div style="flex:1;padding:10px 0;text-align:center;color:#555;font-size:0.85rem;cursor:default;position:relative;" title="Coming Dec 2026">
     🏒 NHL
-    <span style="position:absolute;top:-1px;right:6px;font-size:0.55rem;background:#7c3aed;color:#fff;padding:1px 5px;border-radius:0 0 4px 4px;font-weight:700;">DEC</span>
+    <span style="position:absolute;top:-1px;right:6px;font-size:0.55rem;background:#ff6b2b;color:#fff;padding:1px 5px;border-radius:0 0 4px 4px;font-weight:700;">DEC</span>
   </div>
 </div>
 
@@ -802,7 +802,7 @@
     <div>
       <div class="parlay-title">🎯 Best Parlay — <span>Teams ≥ 60% to Win</span></div>
       {% if parlay_picks %}
-        <div style="color:#b0b8cc; font-size:0.82rem; margin-top:6px;">
+        <div style="color:#999; font-size:0.82rem; margin-top:6px;">
           {{ parlay_picks|length }}-team parlay · all picks must win
         </div>
       {% endif %}
@@ -817,7 +817,7 @@
           EV {% if parlay_ev > 0 %}+{% endif %}${{ parlay_ev }} / $100
         </span>
       </div>
-      <div style="font-size:0.7rem;color:#b0b8cc;margin-top:4px;">
+      <div style="font-size:0.7rem;color:#999;margin-top:4px;">
         Fair odds: {{ parlay_true_odds }} · Book pays: {{ parlay_book_odds }}
       </div>
       {%- endif %}
@@ -847,25 +847,25 @@
 
 <!-- ── All Game Cards ── -->
 <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">
-  <span style="font-size:0.72rem;color:#b0b8cc;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Sort:</span>
-  <button class="sort-btn active" onclick="sortCards('top-pct')" style="background:#1a2a3a;color:#64b5f6;border:1px solid #1565c0;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:0.75rem;font-weight:700;">Win %</button>
-  <button class="sort-btn" onclick="sortCards('top-ev')" style="background:#252836;color:#b0b8cc;border:1px solid #333650;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:0.75rem;font-weight:700;">EV</button>
-  <button class="sort-btn" onclick="sortCards('ou')" style="background:#252836;color:#b0b8cc;border:1px solid #333650;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:0.75rem;font-weight:700;">O/U Total</button>
-  <span style="font-size:0.72rem;color:#b0b8cc;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-left:12px;">Filter:</span>
-  <button class="filter-btn active" onclick="filterCards(0)" style="background:#1a2a3a;color:#64b5f6;border:1px solid #1565c0;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:0.75rem;font-weight:700;">All</button>
-  <button class="filter-btn" onclick="filterCards(60)" style="background:#252836;color:#b0b8cc;border:1px solid #333650;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:0.75rem;font-weight:700;">60%+ Edge</button>
-  <button class="filter-btn" onclick="filterCards(65)" style="background:#252836;color:#b0b8cc;border:1px solid #333650;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:0.75rem;font-weight:700;">65%+ Edge</button>
-  <button class="filter-btn" onclick="filterCards(70)" style="background:#252836;color:#b0b8cc;border:1px solid #333650;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:0.75rem;font-weight:700;">70%+ Edge</button>
-  <span id="card-count" style="font-size:0.72rem;color:#b0b8cc;margin-left:auto;"></span>
-  <button onclick="printBestBets()" class="no-print" style="background:#1a2a10;color:#4caf50;border:1px solid #2a5a3a;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:0.75rem;font-weight:700;">🖨 Print Best Bets</button>
+  <span style="font-size:0.72rem;color:#999;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Sort:</span>
+  <button class="sort-btn active" onclick="sortCards('top-pct')" style="background:#1a0d00;color:#ff6b2b;border:1px solid #cc5522;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:0.75rem;font-weight:700;">Win %</button>
+  <button class="sort-btn" onclick="sortCards('top-ev')" style="background:#1a1a1a;color:#999;border:1px solid #222;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:0.75rem;font-weight:700;">EV</button>
+  <button class="sort-btn" onclick="sortCards('ou')" style="background:#1a1a1a;color:#999;border:1px solid #222;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:0.75rem;font-weight:700;">O/U Total</button>
+  <span style="font-size:0.72rem;color:#999;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-left:12px;">Filter:</span>
+  <button class="filter-btn active" onclick="filterCards(0)" style="background:#1a0d00;color:#ff6b2b;border:1px solid #cc5522;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:0.75rem;font-weight:700;">All</button>
+  <button class="filter-btn" onclick="filterCards(60)" style="background:#1a1a1a;color:#999;border:1px solid #222;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:0.75rem;font-weight:700;">60%+ Edge</button>
+  <button class="filter-btn" onclick="filterCards(65)" style="background:#1a1a1a;color:#999;border:1px solid #222;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:0.75rem;font-weight:700;">65%+ Edge</button>
+  <button class="filter-btn" onclick="filterCards(70)" style="background:#1a1a1a;color:#999;border:1px solid #222;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:0.75rem;font-weight:700;">70%+ Edge</button>
+  <span id="card-count" style="font-size:0.72rem;color:#999;margin-left:auto;"></span>
+  <button onclick="printBestBets()" class="no-print" style="background:#1a2a10;color:#4caf50;border:1px solid #3a2800;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:0.75rem;font-weight:700;">🖨 Print Best Bets</button>
 </div>
-<div class="section-title" style="display:flex;justify-content:space-between;align-items:center;">ALL GAMES TODAY <a href="/bets" style="font-size:0.78rem;font-weight:700;color:#4caf50;background:#14261a;border:1px solid #2a5a3a;border-radius:6px;padding:4px 10px;text-decoration:none;">💰 Bet Tracker</a></div>
+<div class="section-title" style="display:flex;justify-content:space-between;align-items:center;">ALL GAMES TODAY <a href="/bets" style="font-size:0.78rem;font-weight:700;color:#4caf50;background:#14261a;border:1px solid #3a2800;border-radius:6px;padding:4px 10px;text-decoration:none;">💰 Bet Tracker</a></div>
 
 {% if progressive is defined and progressive %}
 <div style="text-align:center;margin-bottom:20px;">
-  <div id="sim-progress" style="font-size:0.9rem;color:#64b5f6;font-weight:700;">Simulating games... <span id="sim-count">0</span>/{{ games|length }}</div>
-  <div style="width:300px;margin:10px auto;background:#252836;border-radius:8px;height:6px;overflow:hidden;">
-    <div id="sim-bar" style="width:0%;height:100%;background:#64b5f6;border-radius:8px;transition:width 0.3s;"></div>
+  <div id="sim-progress" style="font-size:0.9rem;color:#ff6b2b;font-weight:700;">Simulating games... <span id="sim-count">0</span>/{{ games|length }}</div>
+  <div style="width:300px;margin:10px auto;background:#1a1a1a;border-radius:8px;height:6px;overflow:hidden;">
+    <div id="sim-bar" style="width:0%;height:100%;background:#ff6b2b;border-radius:8px;transition:width 0.3s;"></div>
   </div>
 </div>
 {% endif %}
@@ -890,8 +890,8 @@
         </div>
       </div>
       <div id="body-{{ g.gamePk }}" style="text-align:center;padding:20px 0;">
-        <div class="spinner" style="display:inline-block;width:24px;height:24px;border:3px solid #353a52;border-top:3px solid #64b5f6;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
-        <div style="color:#b0b8cc;font-size:0.8rem;margin-top:8px;">Simulating...</div>
+        <div class="spinner" style="display:inline-block;width:24px;height:24px;border:3px solid #1e1e1e;border-top:3px solid #ff6b2b;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+        <div style="color:#999;font-size:0.8rem;margin-top:8px;">Simulating...</div>
       </div>
     </div>
     {% endfor %}
@@ -1043,7 +1043,7 @@
             <div style="font-size:0.65rem;color:#666">SP
               {%- if r.away_form and r.away_form.note %} · <span style="color:#ffcc80;">{{ r.away_form.note }}</span>{%- endif %}
             </div>
-            {%- if r.away_last_start %}<div style="font-size:0.6rem;color:#9aa0b8;margin-top:1px;">Last: {{ r.away_last_start }}</div>{%- endif %}
+            {%- if r.away_last_start %}<div style="font-size:0.6rem;color:#777;margin-top:1px;">Last: {{ r.away_last_start }}</div>{%- endif %}
           </div>
         </div>
         <div class="umpire-badge">
@@ -1067,7 +1067,7 @@
             <div style="font-size:0.65rem;color:#666">SP
               {%- if r.home_form and r.home_form.note %} · <span style="color:#ffcc80;">{{ r.home_form.note }}</span>{%- endif %}
             </div>
-            {%- if r.home_last_start %}<div style="font-size:0.6rem;color:#9aa0b8;margin-top:1px;">Last: {{ r.home_last_start }}</div>{%- endif %}
+            {%- if r.home_last_start %}<div style="font-size:0.6rem;color:#777;margin-top:1px;">Last: {{ r.home_last_start }}</div>{%- endif %}
           </div>
           {%- if r.home_pitcher_id %}
           <img class="pitcher-headshot"
@@ -1132,26 +1132,26 @@
             {%- if r.away_cover_pct and r.home_cover_pct %}
               {%- if r.away_cover_pct >= r.home_cover_pct %}
                 <div class="market-val">{{ r.away_team }} -1.5
-                  <span style="color:#9aa0b8;font-size:.65rem;">({{ r.away_cover_pct }}% cover · {{ r.away_rl_odds }})</span>
+                  <span style="color:#777;font-size:.65rem;">({{ r.away_cover_pct }}% cover · {{ r.away_rl_odds }})</span>
                 </div>
                 <div style="font-size:.65rem;color:{% if r.away_rl_edge > 0 %}#4caf50{% else %}#ef5350{% endif %};">
                   {% if r.away_rl_edge > 0 %}+{% endif %}{{ r.away_rl_edge }}% edge
                 </div>
               {%- else %}
                 <div class="market-val">{{ r.home_team }} -1.5
-                  <span style="color:#9aa0b8;font-size:.65rem;">({{ r.home_cover_pct }}% cover · {{ r.home_rl_odds }})</span>
+                  <span style="color:#777;font-size:.65rem;">({{ r.home_cover_pct }}% cover · {{ r.home_rl_odds }})</span>
                 </div>
                 <div style="font-size:.65rem;color:{% if r.home_rl_edge > 0 %}#4caf50{% else %}#ef5350{% endif %};">
                   {% if r.home_rl_edge > 0 %}+{% endif %}{{ r.home_rl_edge }}% edge
                 </div>
               {%- endif %}
             {%- else %}
-              <div class="market-val" style="color:#9aa0b8;">—</div>
+              <div class="market-val" style="color:#777;">—</div>
             {%- endif %}
           {%- else %}
             <div class="market-val">
               {%- if away_margin >= 0 %}{{ r.away_team }}{%- else %}{{ r.home_team }}{%- endif %} -1.5
-              <span style="color:#9aa0b8;font-size:.65rem;">(proj {{ "%.1f"|format(away_margin|abs) }} run margin)</span>
+              <span style="color:#777;font-size:.65rem;">(proj {{ "%.1f"|format(away_margin|abs) }} run margin)</span>
             </div>
           {%- endif %}
         </div>
@@ -1162,14 +1162,14 @@
           {%- if r.ou_line %}
             {%- if r.model_over_pct >= 50 %}
               <div class="market-val">OVER {{ r.ou_line }}
-                <span style="color:#9aa0b8;font-size:.65rem;">({{ r.model_over_pct }}% · {{ r.ou_over_odds }})</span>
+                <span style="color:#777;font-size:.65rem;">({{ r.model_over_pct }}% · {{ r.ou_over_odds }})</span>
               </div>
               <div style="font-size:.65rem;color:{% if r.ou_over_edge > 0 %}#4caf50{% else %}#ef5350{% endif %};">
                 {% if r.ou_over_edge > 0 %}+{% endif %}{{ r.ou_over_edge }}% edge
               </div>
             {%- else %}
               <div class="market-val">UNDER {{ r.ou_line }}
-                <span style="color:#9aa0b8;font-size:.65rem;">({{ r.model_under_pct }}% · {{ r.ou_under_odds }})</span>
+                <span style="color:#777;font-size:.65rem;">({{ r.model_under_pct }}% · {{ r.ou_under_odds }})</span>
               </div>
               <div style="font-size:.65rem;color:{% if r.ou_under_edge > 0 %}#4caf50{% else %}#ef5350{% endif %};">
                 {% if r.ou_under_edge > 0 %}+{% endif %}{{ r.ou_under_edge }}% edge
@@ -1177,7 +1177,7 @@
             {%- endif %}
           {%- else %}
             <div class="market-val">Proj {{ "%.1f"|format(proj_total) }} runs
-              <span style="color:#9aa0b8;font-size:.65rem;">(no Vegas line)</span>
+              <span style="color:#777;font-size:.65rem;">(no Vegas line)</span>
             </div>
           {%- endif %}
         </div>
@@ -1190,18 +1190,18 @@
           <div class="market-label">{{ r.away_pitcher_name }} K model</div>
           {%- if r.away_k_pred.model_k %}
           <div class="market-val">{{ r.away_k_pred.model_k }} Ks
-            <span style="color:#9aa0b8;font-size:.65rem;">({{ r.away_k_pred.model_k_low }}–{{ r.away_k_pred.model_k_high }})</span>
+            <span style="color:#777;font-size:.65rem;">({{ r.away_k_pred.model_k_low }}–{{ r.away_k_pred.model_k_high }})</span>
           </div>
-          <div style="color:#b0b8cc;font-size:.65rem;">~{{ r.away_k_pred.expected_ip }} IP expected</div>
+          <div style="color:#999;font-size:.65rem;">~{{ r.away_k_pred.expected_ip }} IP expected</div>
           {%- endif %}
         </div>
         <div style="text-align:right;">
           <div class="market-label">{{ r.home_pitcher_name }} K model</div>
           {%- if r.home_k_pred.model_k %}
           <div class="market-val">{{ r.home_k_pred.model_k }} Ks
-            <span style="color:#9aa0b8;font-size:.65rem;">({{ r.home_k_pred.model_k_low }}–{{ r.home_k_pred.model_k_high }})</span>
+            <span style="color:#777;font-size:.65rem;">({{ r.home_k_pred.model_k_low }}–{{ r.home_k_pred.model_k_high }})</span>
           </div>
-          <div style="color:#b0b8cc;font-size:.65rem;">~{{ r.home_k_pred.expected_ip }} IP expected</div>
+          <div style="color:#999;font-size:.65rem;">~{{ r.home_k_pred.expected_ip }} IP expected</div>
           {%- endif %}
         </div>
       </div>
@@ -1215,7 +1215,7 @@
           <div class="seg-label">F1 O/U 0.5</div>
           <div>
             <span class="seg-away">OVER {{ r.f1_over_pct }}%</span>
-            <span style="color:#b0b8cc;font-size:0.7rem;"> / </span>
+            <span style="color:#999;font-size:0.7rem;"> / </span>
             <span class="seg-home">UNDER {{ r.f1_under_pct }}%</span>
           </div>
         </div>
@@ -1225,7 +1225,7 @@
           <div class="seg-label">Thru {{ label[-1] }}</div>
           <div>
             <span class="seg-away">{{ seg.away_win_pct }}%</span>
-            <span style="color:#9aa0b8;font-size:.65rem;"> / </span>
+            <span style="color:#777;font-size:.65rem;"> / </span>
             <span class="seg-home">{{ seg.home_win_pct }}%</span>
           </div>
           {%- if seg.tie_pct > 0 %}
@@ -1243,7 +1243,7 @@
           · Platoon {{ r.away_platoon }}/100</span>
         <div class="platoon-bar-wrap">
           {%- set edge_pct = [50 + r.platoon_edge, 5] | max | min(95) %}
-          <div class="platoon-bar" style="width:{{ edge_pct }}%;background:{% if r.platoon_edge > 5 %}#4caf50{% elif r.platoon_edge < -5 %}#ef5350{% else %}#64b5f6{% endif %};"></div>
+          <div class="platoon-bar" style="width:{{ edge_pct }}%;background:{% if r.platoon_edge > 5 %}#4caf50{% elif r.platoon_edge < -5 %}#ef5350{% else %}#ff6b2b{% endif %};"></div>
         </div>
         <span>{{ r.home_team | truncate(10, true, '') }} vs {{ r.away_hand }}HP
           · {{ r.home_platoon }}/100</span>
@@ -1254,7 +1254,7 @@
       <div style="padding:6px 0 2px;">
         <div class="conf-label">
           <span>Confidence</span>
-          <span style="color:{% if r.confidence_score >= 70 %}#4caf50{% elif r.confidence_score >= 40 %}#ffa726{% else %}#b0b8cc{% endif %};font-weight:700;">
+          <span style="color:{% if r.confidence_score >= 70 %}#4caf50{% elif r.confidence_score >= 40 %}#ffa726{% else %}#999{% endif %};font-weight:700;">
             {% if r.confidence_score >= 70 %}HIGH{% elif r.confidence_score >= 40 %}MODERATE{% else %}LOW / TOSS-UP{% endif %}
             · {{ r.confidence_score }}/100
           </span>
@@ -1270,12 +1270,12 @@
         <div>
           <div class="market-label">Moneyline
             {%- if r.sharp_away %} <span class="sharp-badge">SHARP MOVE</span>{%- endif %}
-            {%- if r.away_open_odds and r.away_open_odds != r.away_avg_odds %} <span style="color:#9aa0b8;font-size:.62rem;">open {{ r.away_open_odds }}</span>{%- endif %}
+            {%- if r.away_open_odds and r.away_open_odds != r.away_avg_odds %} <span style="color:#777;font-size:.62rem;">open {{ r.away_open_odds }}</span>{%- endif %}
           </div>
           <div><span class="market-val">{{ r.away_avg_odds }}</span>
-            <span style="color:#b0b8cc;"> · {{ r.away_implied_pct }}% impl</span>
+            <span style="color:#999;"> · {{ r.away_implied_pct }}% impl</span>
             {%- if r.best_away_book and r.best_away_odds != r.away_avg_odds %}
-            <span style="color:#64b5f6;font-size:0.6rem;"> Best: {{ r.best_away_odds }} @ {{ r.best_away_book }}</span>
+            <span style="color:#ff6b2b;font-size:0.6rem;"> Best: {{ r.best_away_odds }} @ {{ r.best_away_book }}</span>
             {%- endif %}</div>
           {% if r.away_edge > 0 %}
             <div class="vegas-edge-pos">+{{ r.away_edge }}% edge</div>
@@ -1289,12 +1289,12 @@
         <div style="text-align:right;">
           <div class="market-label">Moneyline
             {%- if r.sharp_home %} <span class="sharp-badge">SHARP MOVE</span>{%- endif %}
-            {%- if r.home_open_odds and r.home_open_odds != r.home_avg_odds %} <span style="color:#9aa0b8;font-size:.62rem;">open {{ r.home_open_odds }}</span>{%- endif %}
+            {%- if r.home_open_odds and r.home_open_odds != r.home_avg_odds %} <span style="color:#777;font-size:.62rem;">open {{ r.home_open_odds }}</span>{%- endif %}
           </div>
           <div><span class="market-val">{{ r.home_avg_odds }}</span>
-            <span style="color:#b0b8cc;"> · {{ r.home_implied_pct }}% impl</span>
+            <span style="color:#999;"> · {{ r.home_implied_pct }}% impl</span>
             {%- if r.best_home_book and r.best_home_odds != r.home_avg_odds %}
-            <span style="color:#64b5f6;font-size:0.6rem;"> Best: {{ r.best_home_odds }} @ {{ r.best_home_book }}</span>
+            <span style="color:#ff6b2b;font-size:0.6rem;"> Best: {{ r.best_home_odds }} @ {{ r.best_home_book }}</span>
             {%- endif %}</div>
           {% if r.home_edge > 0 %}
             <div class="vegas-edge-pos">+{{ r.home_edge }}% edge</div>
@@ -1357,13 +1357,13 @@
       {%- endif %}
 
       {%- if r.away_cover_p15_pct %}
-      <div class="market-row" style="margin-top:6px;border-top:1px dashed #252836;padding-top:6px;">
+      <div class="market-row" style="margin-top:6px;border-top:1px dashed #1a1a1a;padding-top:6px;">
         <div>
-          <div class="market-label" style="color:#b39ddb;">Alt +1.5</div>
+          <div class="market-label" style="color:#ffc107;">Alt +1.5</div>
           <div class="market-val">{{ r.away_cover_p15_pct }}% · -2.5: {{ r.away_cover_m25_pct }}%</div>
         </div>
         <div style="text-align:right;">
-          <div class="market-label" style="color:#b39ddb;">Alt +1.5</div>
+          <div class="market-label" style="color:#ffc107;">Alt +1.5</div>
           <div class="market-val">{{ r.home_cover_p15_pct }}% · -2.5: {{ r.home_cover_m25_pct }}%</div>
         </div>
       </div>
@@ -1448,13 +1448,13 @@ async function submitBet() {
   Data: MLB Stats API + Open-Meteo · Predictions for entertainment only
 </footer>
 
-<div id="refresh-bar" style="position:fixed;bottom:0;left:0;right:0;background:#1a1e2e;border-top:1px solid #252836;
-  padding:8px 20px;display:flex;justify-content:space-between;align-items:center;font-size:0.78rem;color:#b0b8cc;z-index:500;">
+<div id="refresh-bar" style="position:fixed;bottom:0;left:0;right:0;background:#111;border-top:1px solid #1a1a1a;
+  padding:8px 20px;display:flex;justify-content:space-between;align-items:center;font-size:0.78rem;color:#999;z-index:500;">
   <span>🔄 Auto-refresh in <strong id="refresh-countdown">10:00</strong></span>
   <span>
-    <button onclick="location.reload()" style="background:#1a3a5a;color:#64b5f6;border:1px solid #1565c0;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:0.75rem;">Refresh Now</button>
+    <button onclick="location.reload()" style="background:#1a0d00;color:#ff6b2b;border:1px solid #cc5522;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:0.75rem;">Refresh Now</button>
     &nbsp;
-    <button onclick="toggleAutoRefresh()" id="ar-toggle" style="background:#252836;color:#b0b8cc;border:1px solid #333650;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:0.75rem;">Pause</button>
+    <button onclick="toggleAutoRefresh()" id="ar-toggle" style="background:#1a1a1a;color:#999;border:1px solid #222;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:0.75rem;">Pause</button>
   </span>
 </div>
 <div style="height:40px;"></div><!-- spacer for fixed bar -->
@@ -1473,21 +1473,21 @@ let _currentFilter = 0;
 function sortCards(key) {
   _currentSort = key;
   document.querySelectorAll('.sort-btn').forEach(b => {
-    b.style.background = '#252836'; b.style.color = '#b0b8cc'; b.style.borderColor = '#333650';
+    b.style.background = '#1a1a1a'; b.style.color = '#999'; b.style.borderColor = '#222';
     b.classList.remove('active');
   });
-  event.target.style.background = '#1a2a3a'; event.target.style.color = '#64b5f6';
-  event.target.style.borderColor = '#1565c0'; event.target.classList.add('active');
+  event.target.style.background = '#1a0d00'; event.target.style.color = '#ff6b2b';
+  event.target.style.borderColor = '#cc5522'; event.target.classList.add('active');
   applySort();
 }
 
 function filterCards(minPct) {
   _currentFilter = minPct;
   document.querySelectorAll('.filter-btn').forEach(b => {
-    b.style.background = '#252836'; b.style.color = '#b0b8cc'; b.style.borderColor = '#333650';
+    b.style.background = '#1a1a1a'; b.style.color = '#999'; b.style.borderColor = '#222';
   });
-  event.target.style.background = '#1a2a3a'; event.target.style.color = '#64b5f6';
-  event.target.style.borderColor = '#1565c0';
+  event.target.style.background = '#1a0d00'; event.target.style.color = '#ff6b2b';
+  event.target.style.borderColor = '#cc5522';
   applySort();
 }
 
@@ -1567,7 +1567,7 @@ function toggleMode() {
   function toggleAutoRefresh() {
     paused = !paused;
     btn.textContent = paused ? 'Resume' : 'Pause';
-    btn.style.color = paused ? '#ffa726' : '#b0b8cc';
+    btn.style.color = paused ? '#ffa726' : '#999';
   }
   window.toggleAutoRefresh = toggleAutoRefresh;
 
@@ -1625,7 +1625,7 @@ function toggleMode() {
     const strip = document.getElementById('scoreboard-strip');
     strip.innerHTML = '';
     if (!games || !games.length) {
-      strip.innerHTML = '<span style="color:#9aa0b8;font-size:0.78rem;padding:8px 16px;">No games found for today.</span>';
+      strip.innerHTML = '<span style="color:#777;font-size:0.78rem;padding:8px 16px;">No games found for today.</span>';
       return;
     }
 
@@ -1680,7 +1680,7 @@ function toggleMode() {
       buildStrip(games);
     } catch(e) {
       document.getElementById('scoreboard-strip').innerHTML =
-        '<span style="color:#9aa0b8;font-size:0.78rem;padding:8px 16px;">Scores unavailable.</span>';
+        '<span style="color:#777;font-size:0.78rem;padding:8px 16px;">Scores unavailable.</span>';
     }
   }
 
@@ -1779,21 +1779,21 @@ function csrfFetch(url,opts){opts=opts||{};opts.headers=Object.assign({'X-CSRFTo
     var html = '';
 
     // Pitcher info
-    html += '<div style="display:flex;justify-content:space-between;font-size:0.78rem;color:#b0b8cc;">';
-    html += '<span>' + (d.away_pitcher_name || 'TBD') + ' <span style="color:#555870;">' + (d.away_era || '') + ' ERA</span></span>';
-    html += '<span><span style="color:#555870;">' + (d.home_era || '') + ' ERA</span> ' + (d.home_pitcher_name || 'TBD') + '</span>';
+    html += '<div style="display:flex;justify-content:space-between;font-size:0.78rem;color:#999;">';
+    html += '<span>' + (d.away_pitcher_name || 'TBD') + ' <span style="color:#555;">' + (d.away_era || '') + ' ERA</span></span>';
+    html += '<span><span style="color:#555;">' + (d.home_era || '') + ' ERA</span> ' + (d.home_pitcher_name || 'TBD') + '</span>';
     html += '</div>';
 
     // Runs
-    html += '<div style="display:flex;justify-content:space-between;font-size:0.78rem;color:#b0b8cc;border-top:1px solid #252836;padding-top:8px;margin-top:4px;">';
-    html += '<span>Avg Runs: <b style="color:#64b5f6;">' + (d.avg_away_runs || '—') + '</b></span>';
+    html += '<div style="display:flex;justify-content:space-between;font-size:0.78rem;color:#999;border-top:1px solid #1a1a1a;padding-top:8px;margin-top:4px;">';
+    html += '<span>Avg Runs: <b style="color:#ff6b2b;">' + (d.avg_away_runs || '—') + '</b></span>';
     html += '<span>Total: <b style="color:#ffd54f;">' + (d.avg_total_runs || '—') + '</b></span>';
     html += '<span>Avg Runs: <b style="color:#81c784;">' + (d.avg_home_runs || '—') + '</b></span>';
     html += '</div>';
 
     // Cover %
     if (d.away_cover_pct !== undefined) {
-      html += '<div style="display:flex;justify-content:space-between;font-size:0.72rem;color:#b0b8cc;margin-top:4px;">';
+      html += '<div style="display:flex;justify-content:space-between;font-size:0.72rem;color:#999;margin-top:4px;">';
       html += '<span>-1.5: ' + d.away_cover_pct + '%</span>';
       html += '<span>-1.5: ' + d.home_cover_pct + '%</span>';
       html += '</div>';
@@ -1801,7 +1801,7 @@ function csrfFetch(url,opts){opts=opts||{};opts.headers=Object.assign({'X-CSRFTo
 
     // Vegas odds
     if (d.away_avg_odds) {
-      html += '<div style="display:flex;justify-content:space-between;font-size:0.74rem;color:#b0b8cc;margin-top:8px;border-top:1px solid rgba(255,255,255,0.05);padding-top:7px;">';
+      html += '<div style="display:flex;justify-content:space-between;font-size:0.74rem;color:#999;margin-top:8px;border-top:1px solid rgba(255,255,255,0.05);padding-top:7px;">';
       html += '<div><div style="font-weight:600;color:#b0bec5;">Vegas ' + d.away_avg_odds + '</div>';
       if (d.away_edge !== null && d.away_edge !== undefined) {
         var ec = d.away_edge > 0 ? '#4caf50' : '#ef5350';
@@ -1818,7 +1818,7 @@ function csrfFetch(url,opts){opts=opts||{};opts.headers=Object.assign({'X-CSRFTo
 
     // O/U
     if (d.ou_line) {
-      html += '<div style="display:flex;justify-content:space-between;font-size:0.72rem;color:#b0b8cc;margin-top:4px;">';
+      html += '<div style="display:flex;justify-content:space-between;font-size:0.72rem;color:#999;margin-top:4px;">';
       html += '<span>O/U ' + d.ou_line + '</span>';
       html += '<span>Over ' + (d.model_over_pct || '—') + '%</span>';
       html += '<span>Under ' + (d.model_under_pct || '—') + '%</span>';
@@ -1827,17 +1827,17 @@ function csrfFetch(url,opts){opts=opts||{};opts.headers=Object.assign({'X-CSRFTo
 
     // F5
     if (d.f5) {
-      html += '<div style="display:flex;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid #252836;">';
-      html += '<div style="flex:1;background:#0d1120;border-radius:8px;padding:6px 8px;text-align:center;font-size:0.7rem;">';
-      html += '<div style="color:#b0b8cc;text-transform:uppercase;letter-spacing:.4px;font-size:0.62rem;">F5</div>';
-      html += '<div style="color:#64b5f6;font-weight:700;font-size:0.85rem;">' + d.f5.away_win_pct + '%</div>';
+      html += '<div style="display:flex;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid #1a1a1a;">';
+      html += '<div style="flex:1;background:#0a0a0a;border-radius:8px;padding:6px 8px;text-align:center;font-size:0.7rem;">';
+      html += '<div style="color:#999;text-transform:uppercase;letter-spacing:.4px;font-size:0.62rem;">F5</div>';
+      html += '<div style="color:#ff6b2b;font-weight:700;font-size:0.85rem;">' + d.f5.away_win_pct + '%</div>';
       html += '<div style="color:#81c784;font-weight:700;font-size:0.85rem;">' + d.f5.home_win_pct + '%</div>';
       html += '</div></div>';
     }
 
     // Link to full sim
     html += '<div style="text-align:center;margin-top:8px;">';
-    html += '<a href="/simulate/' + pk + '" style="color:#64b5f6;font-size:0.78rem;text-decoration:none;font-weight:600;">View Full Analysis →</a>';
+    html += '<a href="/simulate/' + pk + '" style="color:#ff6b2b;font-size:0.78rem;text-decoration:none;font-weight:600;">View Full Analysis →</a>';
     html += '</div>';
 
     if (body) body.innerHTML = html;
@@ -1957,7 +1957,7 @@ function csrfFetch(url,opts){opts=opts||{};opts.headers=Object.assign({'X-CSRFTo
 
     var html = '<div class="parlay-header"><div>';
     html += '<div class="parlay-title">🎯 Best Parlay — <span>Teams ≥ 60% to Win</span></div>';
-    html += '<div style="color:#b0b8cc;font-size:0.82rem;margin-top:6px;">' + picks.length + '-team parlay \xb7 all picks must win</div>';
+    html += '<div style="color:#999;font-size:0.82rem;margin-top:6px;">' + picks.length + '-team parlay \xb7 all picks must win</div>';
     html += '</div><div class="parlay-combined">';
     html += '<div class="pct">' + combinedPct + '%</div>';
     html += '<div class="lbl">combined probability</div>';

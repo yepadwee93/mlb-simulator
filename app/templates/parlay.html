@@ -1,119 +1,119 @@
 ﻿<!DOCTYPE html>
 <html lang="en">
 <head>
-<script>!function(){var t=localStorage.getItem("mlb_theme")||"dark",m={dark:{"--bg":"#0d1120","--bg2":"#1a1e2e","--bg3":"#252836","--border":"#252836","--text":"#e8eaf0","--text2":"#b0b8cc","--text3":"#9aa0b8","--accent":"#64b5f6","--card-bg":"#1a1e2e"},medium:{"--bg":"#1a1528","--bg2":"#241d38","--bg3":"#302848","--border":"#3a2f5a","--text":"#ede8f5","--text2":"#c0b8d8","--text3":"#a098c0","--accent":"#b39ddb","--card-bg":"#241d38"},light:{"--bg":"#f0f2f8","--bg2":"#ffffff","--bg3":"#e8eaf6","--border":"#d0d4e8","--text":"#1a1a2e","--text2":"#444466","--text3":"#6666aa","--accent":"#3949ab","--card-bg":"#ffffff"}}[t]||{};Object.entries(m).forEach(function(e){document.documentElement.style.setProperty(e[0],e[1])});document.addEventListener("DOMContentLoaded",function(){document.body.style.background=m["--bg"];document.body.style.color=m["--text"]})}();</script>
+<script>!function(){var t=localStorage.getItem("mlb_theme")||"dark",m={dark:{"--bg":"#0a0a0a","--bg2":"#111","--bg3":"#1a1a1a","--border":"#1a1a1a","--text":"#f0ece4","--text2":"#999","--text3":"#777","--accent":"#ff6b2b","--card-bg":"#111"},medium:{"--bg":"#1a1528","--bg2":"#241d38","--bg3":"#302848","--border":"#3a2f5a","--text":"#ede8f5","--text2":"#c0b8d8","--text3":"#a098c0","--accent":"#ffc107","--card-bg":"#241d38"},light:{"--bg":"#f0f2f8","--bg2":"#ffffff","--bg3":"#e8eaf6","--border":"#d0d4e8","--text":"#1a1a2e","--text2":"#444466","--text3":"#6666aa","--accent":"#3949ab","--card-bg":"#ffffff"}}[t]||{};Object.entries(m).forEach(function(e){document.documentElement.style.setProperty(e[0],e[1])});document.addEventListener("DOMContentLoaded",function(){document.body.style.background=m["--bg"];document.body.style.color=m["--text"]})}();</script>
   <meta charset="UTF-8">
   <meta name="csrf-token" content="{{ csrf_token() }}">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Parlay Builder — MLB Simulator</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #0d1120; color: #e8eaf0; font-family: 'Segoe UI', Arial, sans-serif; padding-bottom: 40px; }
-    a { color: #64b5f6; text-decoration: none; }
+    body { background: #0a0a0a; color: #f0ece4; font-family: 'Segoe UI', Arial, sans-serif; padding-bottom: 40px; }
+    a { color: #ff6b2b; text-decoration: none; }
 
     .page-body { max-width: 960px; margin: 0 auto; padding: 0 16px; }
     h1 { font-size: 1.5rem; font-weight: 800; margin-bottom: 4px; }
-    .subtitle { color: #b0b8cc; font-size: 0.88rem; margin-bottom: 24px; }
+    .subtitle { color: #999; font-size: 0.88rem; margin-bottom: 24px; }
 
     .layout { display: grid; grid-template-columns: 1fr 340px; gap: 20px; align-items: start; }
     @media (max-width: 720px) { .layout { grid-template-columns: 1fr; } }
 
     /* ── Game picker ── */
     .section-title { font-size: 0.72rem; text-transform: uppercase; letter-spacing: .6px;
-                     color: #9aa0b8; font-weight: 700; margin-bottom: 10px; }
+                     color: #777; font-weight: 700; margin-bottom: 10px; }
     .game-card {
-      background: #1a1e2e; border: 1px solid #252836; border-radius: 12px;
+      background: #111; border: 1px solid #1a1a1a; border-radius: 12px;
       padding: 12px 16px; margin-bottom: 10px; cursor: pointer;
       transition: border-color 0.15s, background 0.15s;
     }
-    .game-card:hover { border-color: #353a52; }
-    .game-card.selected-away { border-color: #64b5f6; background: #152236; }
+    .game-card:hover { border-color: #1e1e1e; }
+    .game-card.selected-away { border-color: #ff6b2b; background: #152236; }
     .game-card.selected-home { border-color: #81c784; background: #132418; }
 
     .matchup { display: flex; align-items: center; gap: 8px; font-size: 0.88rem; }
     .team-btn {
-      flex: 1; padding: 8px 10px; border-radius: 8px; border: 1px solid #252836;
-      background: #0d1120; color: #e8eaf0; cursor: pointer; font-size: 0.82rem;
+      flex: 1; padding: 8px 10px; border-radius: 8px; border: 1px solid #1a1a1a;
+      background: #0a0a0a; color: #f0ece4; cursor: pointer; font-size: 0.82rem;
       font-weight: 600; text-align: center; transition: all 0.15s;
     }
-    .team-btn:hover { border-color: #64b5f6; color: #64b5f6; }
-    .team-btn.active-away { background: #1a3a5a; border-color: #64b5f6; color: #64b5f6; }
+    .team-btn:hover { border-color: #ff6b2b; color: #ff6b2b; }
+    .team-btn.active-away { background: #1a0d00; border-color: #ff6b2b; color: #ff6b2b; }
     .team-btn.active-home { background: #1a3a28; border-color: #81c784; color: #81c784; }
-    .at-sign { color: #555870; font-size: 0.8rem; }
+    .at-sign { color: #555; font-size: 0.8rem; }
     .odds-row { display: flex; justify-content: space-between; font-size: 0.7rem;
-                color: #9aa0b8; margin-top: 6px; padding-top: 6px; border-top: 1px solid #1e2235; }
-    .sp-name { font-size: 0.68rem; color: #555870; display: block; margin-top: 2px; }
+                color: #777; margin-top: 6px; padding-top: 6px; border-top: 1px solid #111; }
+    .sp-name { font-size: 0.68rem; color: #555; display: block; margin-top: 2px; }
 
     /* ── Parlay slip (right column) ── */
-    .slip { background: #1a1e2e; border: 1px solid #252836; border-radius: 14px;
+    .slip { background: #111; border: 1px solid #1a1a1a; border-radius: 14px;
             padding: 18px; position: sticky; top: 16px; }
     .slip-title { font-size: 1rem; font-weight: 800; margin-bottom: 14px;
                   display: flex; align-items: center; gap: 8px; }
-    .slip-empty { color: #555870; font-size: 0.82rem; text-align: center; padding: 24px 0; }
+    .slip-empty { color: #555; font-size: 0.82rem; text-align: center; padding: 24px 0; }
 
     .leg-item { display: flex; align-items: center; gap: 8px; padding: 8px 0;
-                border-bottom: 1px solid #1e2235; font-size: 0.82rem; }
+                border-bottom: 1px solid #111; font-size: 0.82rem; }
     .leg-item:last-child { border-bottom: none; }
-    .leg-team { flex: 1; font-weight: 600; color: #e8eaf0; }
+    .leg-team { flex: 1; font-weight: 600; color: #f0ece4; }
     .leg-odds { color: #ffd54f; font-size: 0.78rem; font-weight: 700; }
-    .leg-pct  { color: #9aa0b8; font-size: 0.72rem; }
-    .remove-btn { background: none; border: none; color: #555870; cursor: pointer;
+    .leg-pct  { color: #777; font-size: 0.72rem; }
+    .remove-btn { background: none; border: none; color: #555; cursor: pointer;
                   font-size: 0.9rem; padding: 2px 6px; border-radius: 4px; }
     .remove-btn:hover { color: #ef5350; background: #3a1a1a; }
 
     /* ── Results panel ── */
-    .results { margin-top: 16px; border-top: 1px solid #252836; padding-top: 16px; }
+    .results { margin-top: 16px; border-top: 1px solid #1a1a1a; padding-top: 16px; }
     .result-row { display: flex; justify-content: space-between; align-items: center;
                   padding: 6px 0; font-size: 0.82rem; }
-    .result-label { color: #9aa0b8; }
-    .result-val { font-weight: 700; color: #e8eaf0; }
+    .result-label { color: #777; }
+    .result-val { font-weight: 700; color: #f0ece4; }
 
     .stake-row { display: flex; align-items: center; gap: 8px; margin: 14px 0 10px 0; }
-    .stake-row label { font-size: 0.72rem; color: #9aa0b8; white-space: nowrap; }
+    .stake-row label { font-size: 0.72rem; color: #777; white-space: nowrap; }
     .stake-input {
-      width: 90px; background: #0d1120; border: 1px solid #333650; border-radius: 8px;
-      color: #e8eaf0; padding: 7px 10px; font-size: 0.88rem; text-align: right;
+      width: 90px; background: #0a0a0a; border: 1px solid #222; border-radius: 8px;
+      color: #f0ece4; padding: 7px 10px; font-size: 0.88rem; text-align: right;
     }
-    .stake-input:focus { outline: none; border-color: #64b5f6; }
+    .stake-input:focus { outline: none; border-color: #ff6b2b; }
 
     .ev-badge { display: inline-block; padding: 4px 12px; border-radius: 20px;
                 font-size: 0.78rem; font-weight: 700; margin-top: 10px; width: 100%;
                 text-align: center; }
     .ev-pos { background: #1b4332; color: #4caf50; border: 1px solid #2e7d32; }
     .ev-neg { background: #3a1a1a; color: #ef5350; border: 1px solid #c62828; }
-    .ev-zero { background: #1a1e2e; color: #b0b8cc; border: 1px solid #252836; }
+    .ev-zero { background: #111; color: #999; border: 1px solid #1a1a1a; }
 
     .payout-big { font-size: 1.6rem; font-weight: 900; color: #ffd54f;
                   text-align: center; margin: 10px 0 4px 0; }
-    .payout-sub { font-size: 0.7rem; color: #9aa0b8; text-align: center; }
+    .payout-sub { font-size: 0.7rem; color: #777; text-align: center; }
 
     .clear-btn {
-      width: 100%; padding: 9px; background: transparent; border: 1px solid #353a52;
-      color: #b0b8cc; border-radius: 8px; cursor: pointer; font-size: 0.8rem;
+      width: 100%; padding: 9px; background: transparent; border: 1px solid #1e1e1e;
+      color: #999; border-radius: 8px; cursor: pointer; font-size: 0.8rem;
       font-weight: 600; margin-top: 12px; transition: all 0.15s;
     }
     .clear-btn:hover { background: #3a1a1a; color: #ef5350; border-color: #ef5350; }
 
     .manual-leg { display: flex; gap: 8px; margin-top: 12px; }
     .manual-leg input {
-      flex: 1; background: #0d1120; border: 1px solid #333650; border-radius: 8px;
-      color: #e8eaf0; padding: 7px 10px; font-size: 0.82rem;
+      flex: 1; background: #0a0a0a; border: 1px solid #222; border-radius: 8px;
+      color: #f0ece4; padding: 7px 10px; font-size: 0.82rem;
     }
-    .manual-leg input:focus { outline: none; border-color: #64b5f6; }
+    .manual-leg input:focus { outline: none; border-color: #ff6b2b; }
     .add-btn {
-      padding: 7px 14px; background: #1a3a5a; border: 1px solid #1565c0;
-      color: #64b5f6; border-radius: 8px; cursor: pointer; font-size: 0.8rem;
+      padding: 7px 14px; background: #1a0d00; border: 1px solid #cc5522;
+      color: #ff6b2b; border-radius: 8px; cursor: pointer; font-size: 0.8rem;
       font-weight: 600; white-space: nowrap;
     }
-    .add-btn:hover { background: #1565c0; color: #fff; }
+    .add-btn:hover { background: #cc5522; color: #fff; }
   
 .nav-dropdown { position:relative; display:inline-block; }
-.nav-dropdown > a { color:#ffb74d;text-decoration:none;font-weight:600; }
+.nav-dropdown > a { color:#ffc107;text-decoration:none;font-weight:600; }
 .nav-dropdown-menu {
   visibility:hidden; opacity:0; pointer-events:none;
   position:absolute; top:100%; left:50%;
   transform:translateX(-50%);
-  background:#1e2235; border:1px solid #353a52; border-radius:10px;
+  background:#111; border:1px solid #1e1e1e; border-radius:10px;
   min-width:160px; z-index:999; padding:12px 0 6px 0; white-space:nowrap;
   box-shadow:0 8px 24px rgba(0,0,0,0.4);
   transition:opacity 0.15s, visibility 0.15s;
@@ -125,22 +125,22 @@
 }
 .nav-dropdown-menu a {
   display:block; padding:9px 16px; font-size:0.83rem; font-weight:600;
-  text-decoration:none; color:#e8eaf0;
+  text-decoration:none; color:#f0ece4;
 }
-.nav-dropdown-menu a:hover { background:#252a3a; }
+.nav-dropdown-menu a:hover { background:#1a1a1a; }
 </style>
 
 <body>
 
 <!-- Nav -->
-<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 24px;background:#1e2235;border-bottom:1px solid #353a52;margin-bottom:28px;">
+<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 24px;background:#111;border-bottom:1px solid #1e1e1e;margin-bottom:28px;">
   <a href="/mlb" style="color:#fff;text-decoration:none;font-size:1.1rem;font-weight:800;">⚾ MLB Simulator</a>
   <div style="display:flex;gap:16px;font-size:0.85rem;align-items:center;flex-wrap:wrap;">
-    <a href="/mlb" style="color:#64b5f6;text-decoration:none;font-weight:600;">🎯 Games</a>
+    <a href="/mlb" style="color:#ff6b2b;text-decoration:none;font-weight:600;">🎯 Games</a>
     <span class="nav-dropdown"><a href="/bets">&#128176; My Bets &#9660;</a><div class="nav-dropdown-menu"><a href="/bets">&#128176; My Bets</a><a href="/bankroll">&#128200; Bankroll</a><a href="/calculator">&#129518; Calculator</a><a href="/parlay">&#127920; Parlay</a><a href="/my-picks">&#127919; My Picks</a></div></span>
-    <a href="/accuracy" style="color:#64b5f6;text-decoration:none;font-weight:600;">📊 Accuracy</a>
-    <a href="/confidence-history" style="color:#c084fc;text-decoration:none;font-weight:600;">📈 Confidence</a>
-    <a href="/prop-accuracy" style="color:#b39ddb;text-decoration:none;font-weight:600;">🎯 Props</a>
+    <a href="/accuracy" style="color:#ff6b2b;text-decoration:none;font-weight:600;">📊 Accuracy</a>
+    <a href="/confidence-history" style="color:#ff8a50;text-decoration:none;font-weight:600;">📈 Confidence</a>
+    <a href="/prop-accuracy" style="color:#ffc107;text-decoration:none;font-weight:600;">🎯 Props</a>
     <a href="/odds-history" style="color:#ffd54f;text-decoration:none;font-weight:600;">📋 Odds</a>
     {% if current_user.is_authenticated %}
       <a href="/settings" style="color:#aaa;text-decoration:none;font-weight:600;">👤 {{ current_user.username }}</a>
@@ -152,9 +152,9 @@
 </div>
 
 <!-- ── Live Scoreboard Bar ── -->
-<div id="scoreboard-bar" style="background:#12162a;border-bottom:1px solid #252836;padding:0;overflow:hidden;">
+<div id="scoreboard-bar" style="background:#080808;border-bottom:1px solid #1a1a1a;padding:0;overflow:hidden;">
   <div id="scoreboard-inner" style="display:flex;overflow-x:auto;gap:0;scrollbar-width:none;-ms-overflow-style:none;">
-    <div style="padding:7px 14px;font-size:0.7rem;color:#555870;white-space:nowrap;align-self:center;flex-shrink:0;">TODAY</div>
+    <div style="padding:7px 14px;font-size:0.7rem;color:#555;white-space:nowrap;align-self:center;flex-shrink:0;">TODAY</div>
   </div>
 </div>
 <script>
@@ -167,13 +167,13 @@
     s = (s||'').toLowerCase();
     if (s.includes('progress')||s.includes('live')) return '#ef5350';
     if (s.includes('final')) return '#4caf50';
-    return '#9aa0b8';
+    return '#777';
   }
   function renderScoreboard(games) {
     var inner = document.getElementById('scoreboard-inner');
     if (!inner) return;
     if (!games.length) { document.getElementById('scoreboard-bar').style.display='none'; return; }
-    var html = '<div style="padding:7px 14px;font-size:0.7rem;color:#555870;white-space:nowrap;align-self:center;flex-shrink:0;">TODAY</div>';
+    var html = '<div style="padding:7px 14px;font-size:0.7rem;color:#555;white-space:nowrap;align-self:center;flex-shrink:0;">TODAY</div>';
     games.forEach(function(g) {
       var s = (g.status||'').toLowerCase();
       var isLive = s.includes('progress')||s.includes('live');
@@ -190,11 +190,11 @@
       var scoreHome = (isLive||isFinal) ? '<b style="color:#fff;">'+esc(g.home_score)+'</b>' : '';
       var dot = '<span style="width:6px;height:6px;border-radius:50%;background:'+statusColor(g.status)+';display:inline-block;margin-right:5px;vertical-align:middle;'+(isLive?'animation:pulse 1.2s infinite;':'')+'" ></span>';
       var link = g.gamePk ? '/simulate/'+g.gamePk+'?sims=100000' : '#';
-      html += '<a href="'+link+'" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:5px 14px;border-left:1px solid #1e2235;text-decoration:none;flex-shrink:0;min-width:110px;">'
+      html += '<a href="'+link+'" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:5px 14px;border-left:1px solid #111;text-decoration:none;flex-shrink:0;min-width:110px;">'
         + '<div style="display:flex;align-items:center;gap:6px;font-size:0.72rem;white-space:nowrap;">'
-        + '<span style="color:#b0b8cc;">'+esc(abbr(g.away))+' '+scoreAway+'</span>'
-        + '<span style="color:#555870;font-size:0.65rem;">@</span>'
-        + '<span style="color:#b0b8cc;">'+scoreHome+' '+esc(abbr(g.home))+'</span>'
+        + '<span style="color:#999;">'+esc(abbr(g.away))+' '+scoreAway+'</span>'
+        + '<span style="color:#555;font-size:0.65rem;">@</span>'
+        + '<span style="color:#999;">'+scoreHome+' '+esc(abbr(g.home))+'</span>'
         + '</div>'
         + '<div style="font-size:0.63rem;margin-top:2px;">'+dot+'<span style="color:'+statusColor(g.status)+';">'+timeStr+'</span></div>'
         + '</a>';
@@ -249,7 +249,7 @@
         </div>
         {% endfor %}
       {% else %}
-        <div style="color:#555870; padding:32px 0; text-align:center; font-size:0.88rem;">
+        <div style="color:#555; padding:32px 0; text-align:center; font-size:0.88rem;">
           No games scheduled today.
         </div>
       {% endif %}
@@ -268,7 +268,7 @@
     <!-- Right: parlay slip -->
     <div>
       <div class="slip">
-        <div class="slip-title">🎟 Parlay Slip <span id="leg-count-badge" style="background:#252836;color:#b0b8cc;font-size:0.72rem;padding:2px 8px;border-radius:20px;font-weight:600;">0 legs</span></div>
+        <div class="slip-title">🎟 Parlay Slip <span id="leg-count-badge" style="background:#1a1a1a;color:#999;font-size:0.72rem;padding:2px 8px;border-radius:20px;font-weight:600;">0 legs</span></div>
 
         <div id="slip-legs">
           <div class="slip-empty" id="slip-empty-msg">Click teams above to add legs</div>
