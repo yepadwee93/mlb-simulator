@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sports Simulator — Your Edge Starts Here</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0a0a0a;
+      color: #f0ece4;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      min-height: 100vh;
+    }
+
+    /* ── Top bar ── */
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 28px;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    .logo {
+      font-size: 1.3rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, #ff6b2b, #ffc107);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      letter-spacing: -0.5px;
+    }
+    .top-links { display: flex; gap: 16px; font-size: 0.85rem; }
+    .top-links a { color: #888; text-decoration: none; font-weight: 600; transition: color 0.15s; }
+    .top-links a:hover { color: #f0ece4; }
+
+    /* ── Hero ── */
+    .hero {
+      text-align: center;
+      padding: 60px 20px 40px;
+      background: radial-gradient(ellipse at 50% 0%, rgba(255,107,43,0.08) 0%, transparent 60%);
+    }
+    .hero h1 {
+      font-size: 2.8rem;
+      font-weight: 900;
+      line-height: 1.1;
+      margin-bottom: 14px;
+    }
+    .hero h1 span {
+      background: linear-gradient(135deg, #ff6b2b, #ffc107);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero p {
+      color: #888;
+      font-size: 1rem;
+      max-width: 500px;
+      margin: 0 auto 30px;
+      line-height: 1.6;
+    }
+    .hero-stats {
+      display: flex;
+      justify-content: center;
+      gap: 40px;
+      margin-bottom: 10px;
+    }
+    .hero-stat { text-align: center; }
+    .hero-stat .num {
+      font-size: 1.8rem;
+      font-weight: 800;
+      color: #ff6b2b;
+    }
+    .hero-stat .lbl {
+      font-size: 0.72rem;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-top: 2px;
+    }
+
+    /* ── Sport cards ── */
+    .sports-section {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 20px 20px 60px;
+    }
+    .section-label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #555;
+      font-weight: 700;
+      margin-bottom: 16px;
+      padding-left: 4px;
+    }
+    .sports-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .sport-card {
+      background: #111;
+      border: 1px solid #1e1e1e;
+      border-radius: 16px;
+      padding: 28px 24px;
+      text-decoration: none;
+      color: #f0ece4;
+      transition: border-color 0.2s, transform 0.15s, box-shadow 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+    .sport-card:hover {
+      border-color: #333;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    }
+    .sport-card.live { border-color: #ff6b2b33; }
+    .sport-card.live:hover { border-color: #ff6b2b; }
+    .sport-card.coming { opacity: 0.6; cursor: default; }
+    .sport-card.coming:hover { transform: none; box-shadow: none; border-color: #1e1e1e; }
+
+    .sport-icon { font-size: 2.4rem; margin-bottom: 12px; }
+    .sport-name { font-size: 1.2rem; font-weight: 800; margin-bottom: 4px; }
+    .sport-status {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .sport-status.live { color: #ff6b2b; }
+    .sport-status.coming { color: #555; }
+    .sport-desc {
+      font-size: 0.82rem;
+      color: #777;
+      margin-top: 10px;
+      line-height: 1.5;
+    }
+
+    .sport-badge {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      font-size: 0.62rem;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 20px;
+      letter-spacing: 0.3px;
+    }
+    .badge-live {
+      background: #ff6b2b22;
+      color: #ff6b2b;
+      border: 1px solid #ff6b2b44;
+    }
+    .badge-coming {
+      background: #ffffff08;
+      color: #555;
+      border: 1px solid #222;
+    }
+
+    .sport-models {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 14px;
+    }
+    .model-tag {
+      font-size: 0.65rem;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-weight: 600;
+    }
+    .model-tag.active {
+      background: #ff6b2b18;
+      color: #ff8a50;
+      border: 1px solid #ff6b2b33;
+    }
+    .model-tag.coming-tag {
+      background: #ffffff06;
+      color: #444;
+      border: 1px solid #1e1e1e;
+    }
+
+    /* ── Bottom features ── */
+    .features {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 0 20px 60px;
+    }
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+    .feature-card {
+      background: #111;
+      border: 1px solid #1e1e1e;
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .feature-icon { font-size: 1.4rem; margin-bottom: 10px; }
+    .feature-title { font-size: 0.88rem; font-weight: 700; margin-bottom: 6px; }
+    .feature-desc { font-size: 0.78rem; color: #666; line-height: 1.5; }
+
+    /* ── Footer ── */
+    footer {
+      text-align: center;
+      padding: 30px 20px;
+      border-top: 1px solid #1a1a1a;
+      color: #444;
+      font-size: 0.75rem;
+    }
+
+    @media (max-width: 600px) {
+      .sports-grid { grid-template-columns: 1fr; }
+      .features-grid { grid-template-columns: 1fr; }
+      .hero h1 { font-size: 2rem; }
+      .hero-stats { gap: 24px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="top-bar">
+  <div class="logo">SPORTS SIM</div>
+  <div class="top-links">
+    {% if username %}
+      <a href="/settings">{{ username }}</a>
+      <a href="/logout" style="color:#ef5350;">Logout</a>
+    {% else %}
+      <a href="/login" style="color:#ff6b2b;">Login</a>
+      <a href="/register">Register</a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="hero">
+  <h1>Your <span>Edge</span> Starts Here</h1>
+  <p>Monte Carlo simulations, multi-model consensus, and real-time odds — all in one place. Pick a sport and find your edge.</p>
+  <div class="hero-stats">
+    <div class="hero-stat">
+      <div class="num">4</div>
+      <div class="lbl">Prediction Models</div>
+    </div>
+    <div class="hero-stat">
+      <div class="num">141+</div>
+      <div class="lbl">Sim Functions</div>
+    </div>
+    <div class="hero-stat">
+      <div class="num">100k</div>
+      <div class="lbl">Sims Per Game</div>
+    </div>
+  </div>
+</div>
+
+<div class="sports-section">
+  <div class="section-label">Pick your sport</div>
+  <div class="sports-grid" id="sports-grid">
+
+    <a href="/mlb" class="sport-card live" id="home-card-mlb" data-sport="mlb">
+      <span class="sport-badge badge-live">● LIVE</span>
+      <div class="sport-icon">⚾</div>
+      <div class="sport-name">MLB Baseball</div>
+      <div class="sport-status live">Season in progress</div>
+      <div class="sport-desc">Full game simulation with pitcher/batter matchups, ballpark factors, weather, and real-time odds comparison.</div>
+      <div class="sport-models">
+        <span class="model-tag active">Monte Carlo</span>
+        <span class="model-tag active">Elo</span>
+        <span class="model-tag active">Markov Chain</span>
+        <span class="model-tag active">Log5</span>
+      </div>
+    </a>
+
+    <div class="sport-card coming" id="home-card-nfl" data-sport="nfl">
+      <span class="sport-badge badge-coming">AUG 2026</span>
+      <div class="sport-icon">🏈</div>
+      <div class="sport-name">NFL Football</div>
+      <div class="sport-status coming">Coming August 2026</div>
+      <div class="sport-desc">Drive-chain simulation with QB models, DVOA efficiency, turnovers, and weather/surface impact.</div>
+      <div class="sport-models">
+        <span class="model-tag coming-tag">Monte Carlo</span>
+        <span class="model-tag coming-tag">Elo</span>
+        <span class="model-tag coming-tag">Drive Chain</span>
+        <span class="model-tag coming-tag">DVOA</span>
+        <span class="model-tag coming-tag">Turnover</span>
+        <span class="model-tag coming-tag">Log5</span>
+      </div>
+    </div>
+
+    <div class="sport-card coming" id="home-card-nba" data-sport="nba">
+      <span class="sport-badge badge-coming">OCT 2026</span>
+      <div class="sport-icon">🏀</div>
+      <div class="sport-name">NBA Basketball</div>
+      <div class="sport-status coming">Coming October 2026</div>
+      <div class="sport-desc">Possession-based sim with Four Factors, pace-adjusted efficiency, rest/travel impact, and player impact scoring.</div>
+      <div class="sport-models">
+        <span class="model-tag coming-tag">Monte Carlo</span>
+        <span class="model-tag coming-tag">Elo</span>
+        <span class="model-tag coming-tag">Four Factors</span>
+        <span class="model-tag coming-tag">Pace Model</span>
+        <span class="model-tag coming-tag">Rest/Travel</span>
+        <span class="model-tag coming-tag">Log5</span>
+      </div>
+    </div>
+
+    <div class="sport-card coming" id="home-card-nhl" data-sport="nhl">
+      <span class="sport-badge badge-coming">DEC 2026</span>
+      <div class="sport-icon">🏒</div>
+      <div class="sport-name">NHL Hockey</div>
+      <div class="sport-status coming">Coming December 2026</div>
+      <div class="sport-desc">Shot-based simulation with expected goals (xG), goalie models, Corsi/Fenwick possession, and special teams analysis.</div>
+      <div class="sport-models">
+        <span class="model-tag coming-tag">Monte Carlo</span>
+        <span class="model-tag coming-tag">Elo</span>
+        <span class="model-tag coming-tag">xG Model</span>
+        <span class="model-tag coming-tag">Goalie</span>
+        <span class="model-tag coming-tag">Corsi</span>
+        <span class="model-tag coming-tag">Log5</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="features">
+  <div class="section-label">Built for bettors</div>
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-icon">📊</div>
+      <div class="feature-title">Model vs Vegas</div>
+      <div class="feature-desc">Compare sim probabilities against live sportsbook odds to find real edges.</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🎲</div>
+      <div class="feature-title">SGP Builder</div>
+      <div class="feature-desc">Same Game Parlays with correlated probabilities — not just multiplied odds.</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">📈</div>
+      <div class="feature-title">Track Everything</div>
+      <div class="feature-desc">Bet tracker, bankroll management, confidence history, and model accuracy reports.</div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  Data: MLB Stats API · Predictions for entertainment only · Not financial advice
+</footer>
+
+<script>
+(function() {
+  var favs = [];
+  try { favs = JSON.parse(localStorage.getItem('fav_sports') || '["mlb"]'); } catch(e) { favs = ['mlb']; }
+  var grid = document.getElementById('sports-grid');
+  if (!grid) return;
+  var allSports = ['mlb','nfl','nba','nhl'];
+  var ordered = favs.concat(allSports.filter(function(s) { return favs.indexOf(s) < 0; }));
+  ordered.forEach(function(s) {
+    var card = document.getElementById('home-card-' + s);
+    if (card) grid.appendChild(card);
+  });
+})();
+</script>
+</body>
+</html>
