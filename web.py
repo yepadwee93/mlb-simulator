@@ -2150,8 +2150,18 @@ def accuracy_page():
             return None
         correct = sum(1 for r in settled if str(r.get("correct_pick")) == "1")
         wrong = len(settled) - correct
-        best = max(settled, key=lambda r: max(float(r.get("away_win_pct") or 50), float(r.get("home_win_pct") or 50)))
-        worst = min(settled, key=lambda r: max(float(r.get("away_win_pct") or 50), float(r.get("home_win_pct") or 50)))
+        best = max(
+            settled,
+            key=lambda r: max(
+                float(r.get("away_win_pct") or 50), float(r.get("home_win_pct") or 50)
+            ),
+        )
+        worst = min(
+            settled,
+            key=lambda r: max(
+                float(r.get("away_win_pct") or 50), float(r.get("home_win_pct") or 50)
+            ),
+        )
         return {
             "label": day_label,
             "date": day_date,
@@ -2161,11 +2171,16 @@ def accuracy_page():
             "pct": round(correct / len(settled) * 100, 1) if settled else 0,
             "best_pick": best.get("predicted_winner", ""),
             "best_matchup": f"{best.get('away_team', '')} @ {best.get('home_team', '')}",
-            "best_conf": round(max(float(best.get("away_win_pct") or 50), float(best.get("home_win_pct") or 50)), 1),
+            "best_conf": round(
+                max(float(best.get("away_win_pct") or 50), float(best.get("home_win_pct") or 50)), 1
+            ),
             "best_correct": str(best.get("correct_pick")) == "1",
             "worst_pick": worst.get("predicted_winner", ""),
             "worst_matchup": f"{worst.get('away_team', '')} @ {worst.get('home_team', '')}",
-            "worst_conf": round(max(float(worst.get("away_win_pct") or 50), float(worst.get("home_win_pct") or 50)), 1),
+            "worst_conf": round(
+                max(float(worst.get("away_win_pct") or 50), float(worst.get("home_win_pct") or 50)),
+                1,
+            ),
             "worst_correct": str(worst.get("correct_pick")) == "1",
         }
 
@@ -2515,19 +2530,27 @@ def export_accuracy_csv():
     w.writerow(["Date", "Away", "Home", "Pick", "Away%", "Home%", "Winner", "Score", "Result"])
     for r in rows:
         correct = r.get("correct_pick")
-        result = "Correct" if str(correct) == "1" else ("Wrong" if str(correct) == "0" else "Pending")
-        score = f"{r.get('actual_away_runs', '')}-{r.get('actual_home_runs', '')}" if r.get("actual_away_runs") is not None else ""
-        w.writerow([
-            r.get("game_date", ""),
-            r.get("away_team", ""),
-            r.get("home_team", ""),
-            r.get("predicted_winner", ""),
-            r.get("away_win_pct", ""),
-            r.get("home_win_pct", ""),
-            r.get("actual_winner", ""),
-            score,
-            result,
-        ])
+        result = (
+            "Correct" if str(correct) == "1" else ("Wrong" if str(correct) == "0" else "Pending")
+        )
+        score = (
+            f"{r.get('actual_away_runs', '')}-{r.get('actual_home_runs', '')}"
+            if r.get("actual_away_runs") is not None
+            else ""
+        )
+        w.writerow(
+            [
+                r.get("game_date", ""),
+                r.get("away_team", ""),
+                r.get("home_team", ""),
+                r.get("predicted_winner", ""),
+                r.get("away_win_pct", ""),
+                r.get("home_win_pct", ""),
+                r.get("actual_winner", ""),
+                score,
+                result,
+            ]
+        )
     resp = app.make_response(si.getvalue())
     resp.headers["Content-Type"] = "text/csv"
     resp.headers["Content-Disposition"] = "attachment; filename=accuracy.csv"
@@ -2543,21 +2566,37 @@ def export_bets_csv():
     bets = get_all_bets(user_id=_uid())
     si = io.StringIO()
     w = csv.writer(si)
-    w.writerow(["Date", "Away", "Home", "Bet On", "Type", "Odds", "Amount", "Edge", "Result", "Payout", "CLV"])
+    w.writerow(
+        [
+            "Date",
+            "Away",
+            "Home",
+            "Bet On",
+            "Type",
+            "Odds",
+            "Amount",
+            "Edge",
+            "Result",
+            "Payout",
+            "CLV",
+        ]
+    )
     for b in bets:
-        w.writerow([
-            b.get("game_date", ""),
-            b.get("away_team", ""),
-            b.get("home_team", ""),
-            b.get("bet_on", ""),
-            b.get("bet_type", ""),
-            b.get("odds", ""),
-            b.get("amount", ""),
-            b.get("model_edge", ""),
-            b.get("result", ""),
-            b.get("payout", ""),
-            b.get("clv", ""),
-        ])
+        w.writerow(
+            [
+                b.get("game_date", ""),
+                b.get("away_team", ""),
+                b.get("home_team", ""),
+                b.get("bet_on", ""),
+                b.get("bet_type", ""),
+                b.get("odds", ""),
+                b.get("amount", ""),
+                b.get("model_edge", ""),
+                b.get("result", ""),
+                b.get("payout", ""),
+                b.get("clv", ""),
+            ]
+        )
     resp = app.make_response(si.getvalue())
     resp.headers["Content-Type"] = "text/csv"
     resp.headers["Content-Disposition"] = "attachment; filename=bets.csv"
@@ -2573,23 +2612,44 @@ def export_odds_csv():
     rows = get_odds_history(limit=1000)
     si = io.StringIO()
     w = csv.writer(si)
-    w.writerow(["Date", "Away", "Home", "Away ML", "Home ML", "Away ML Open", "Home ML Open", "O/U", "Model Away%", "Model Home%", "Winner", "Score"])
+    w.writerow(
+        [
+            "Date",
+            "Away",
+            "Home",
+            "Away ML",
+            "Home ML",
+            "Away ML Open",
+            "Home ML Open",
+            "O/U",
+            "Model Away%",
+            "Model Home%",
+            "Winner",
+            "Score",
+        ]
+    )
     for r in rows:
-        score = f"{r.get('actual_away_runs', '')}-{r.get('actual_home_runs', '')}" if r.get("actual_away_runs") is not None else ""
-        w.writerow([
-            r.get("game_date", ""),
-            r.get("away_team", ""),
-            r.get("home_team", ""),
-            r.get("away_ml", ""),
-            r.get("home_ml", ""),
-            r.get("away_ml_open", ""),
-            r.get("home_ml_open", ""),
-            r.get("over_under", ""),
-            r.get("model_away_pct", ""),
-            r.get("model_home_pct", ""),
-            r.get("actual_winner", ""),
-            score,
-        ])
+        score = (
+            f"{r.get('actual_away_runs', '')}-{r.get('actual_home_runs', '')}"
+            if r.get("actual_away_runs") is not None
+            else ""
+        )
+        w.writerow(
+            [
+                r.get("game_date", ""),
+                r.get("away_team", ""),
+                r.get("home_team", ""),
+                r.get("away_ml", ""),
+                r.get("home_ml", ""),
+                r.get("away_ml_open", ""),
+                r.get("home_ml_open", ""),
+                r.get("over_under", ""),
+                r.get("model_away_pct", ""),
+                r.get("model_home_pct", ""),
+                r.get("actual_winner", ""),
+                score,
+            ]
+        )
     resp = app.make_response(si.getvalue())
     resp.headers["Content-Type"] = "text/csv"
     resp.headers["Content-Disposition"] = "attachment; filename=odds_history.csv"
