@@ -301,23 +301,23 @@
 
       <button onclick="setTheme('dark')" id="theme-btn-dark"
         style="border:2px solid transparent;border-radius:12px;padding:16px 10px;cursor:pointer;background:#141010;color:#f0ece4;font-size:0.82rem;font-weight:600;transition:.2s;">
-        <div style="width:100%;height:36px;background:linear-gradient(135deg,#111,#141010);border-radius:6px;margin-bottom:8px;"></div>
+        <div style="width:100%;height:36px;background:linear-gradient(135deg,#1a1212,#141010);border-radius:6px;margin-bottom:8px;"></div>
         🌑 Dark
-        <div style="font-size:0.68rem;color:#777;margin-top:4px;">Deep navy · current default</div>
+        <div style="font-size:0.68rem;color:#777;margin-top:4px;">Warm charcoal · default</div>
       </button>
 
       <button onclick="setTheme('medium')" id="theme-btn-medium"
-        style="border:2px solid transparent;border-radius:12px;padding:16px 10px;cursor:pointer;background:#1e1a2e;color:#ede8f5;font-size:0.82rem;font-weight:600;transition:.2s;">
-        <div style="width:100%;height:36px;background:linear-gradient(135deg,#2a2040,#1e1a2e);border-radius:6px;margin-bottom:8px;"></div>
+        style="border:2px solid transparent;border-radius:12px;padding:16px 10px;cursor:pointer;background:#1c1614;color:#f0ece4;font-size:0.82rem;font-weight:600;transition:.2s;">
+        <div style="width:100%;height:36px;background:linear-gradient(135deg,#262020,#1c1614);border-radius:6px;margin-bottom:8px;"></div>
         🌆 Medium
-        <div style="font-size:0.68rem;color:#b0a8c8;margin-top:4px;">Warm purple · easier on eyes</div>
+        <div style="font-size:0.68rem;color:#998880;margin-top:4px;">Warm smoke · easier on eyes</div>
       </button>
 
       <button onclick="setTheme('light')" id="theme-btn-light"
-        style="border:2px solid transparent;border-radius:12px;padding:16px 10px;cursor:pointer;background:#f5f5f5;color:#1a1a2e;font-size:0.82rem;font-weight:600;transition:.2s;">
-        <div style="width:100%;height:36px;background:linear-gradient(135deg,#e8eaf6,#f5f5f5);border-radius:6px;margin-bottom:8px;"></div>
+        style="border:2px solid transparent;border-radius:12px;padding:16px 10px;cursor:pointer;background:#f5f0e8;color:#2a1a14;font-size:0.82rem;font-weight:600;transition:.2s;">
+        <div style="width:100%;height:36px;background:linear-gradient(135deg,#ebe4d8,#f5f0e8);border-radius:6px;margin-bottom:8px;"></div>
         ☀️ Light
-        <div style="font-size:0.68rem;color:#555;margin-top:4px;">White · soft &amp; bright</div>
+        <div style="font-size:0.68rem;color:#8a7a6a;margin-top:4px;">Warm cream · soft &amp; easy</div>
       </button>
 
     </div>
@@ -329,36 +329,36 @@
 const THEMES = {
   dark: {
     '--bg':       '#141010',
-    '--bg2':      '#111',
+    '--bg2':      '#1a1212',
     '--bg3':      '#241818',
-    '--border':   '#241818',
+    '--border':   '#2a1a1a',
     '--text':     '#f0ece4',
     '--text2':    '#999',
     '--text3':    '#777',
     '--accent':   '#e53935',
-    '--card-bg':  '#111',
+    '--card-bg':  '#1a1212',
   },
   medium: {
-    '--bg':       '#1a1528',
-    '--bg2':      '#241d38',
-    '--bg3':      '#302848',
-    '--border':   '#3a2f5a',
-    '--text':     '#ede8f5',
-    '--text2':    '#c0b8d8',
-    '--text3':    '#a098c0',
+    '--bg':       '#1c1614',
+    '--bg2':      '#262020',
+    '--bg3':      '#302624',
+    '--border':   '#3a2e2c',
+    '--text':     '#f0ece4',
+    '--text2':    '#c0b0a8',
+    '--text3':    '#998880',
     '--accent':   '#ffc107',
-    '--card-bg':  '#241d38',
+    '--card-bg':  '#262020',
   },
   light: {
-    '--bg':       '#f0f2f8',
-    '--bg2':      '#ffffff',
-    '--bg3':      '#e8eaf6',
-    '--border':   '#d0d4e8',
-    '--text':     '#1a1a2e',
-    '--text2':    '#444466',
-    '--text3':    '#6666aa',
-    '--accent':   '#3949ab',
-    '--card-bg':  '#ffffff',
+    '--bg':       '#f5f0e8',
+    '--bg2':      '#faf7f2',
+    '--bg3':      '#ebe4d8',
+    '--border':   '#d8cfc0',
+    '--text':     '#2a1a14',
+    '--text2':    '#5a4a40',
+    '--text3':    '#8a7a6a',
+    '--accent':   '#c62828',
+    '--card-bg':  '#faf7f2',
   },
 };
 
