@@ -995,6 +995,15 @@ def logout():
 
 
 @app.route("/")
+def home():
+    """Landing page hub — pick a sport or jump into today's action."""
+    return render_template(
+        "home.html",
+        username=current_user.username if current_user.is_authenticated else None,
+    )
+
+
+@app.route("/mlb")
 def index():
     # Allow browsing any date via ?date=2026-06-28
     selected = request.args.get("date", _today_est().isoformat())
