@@ -8,17 +8,17 @@
   <title>Bet Tracker — MLB Simulator</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #141010; color: #f0ece4; font-family: 'Segoe UI', Arial, sans-serif; padding: 32px 20px; }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', Arial, sans-serif; padding: 32px 20px; }
     a { color: #e53935; text-decoration: none; }
     a:hover { text-decoration: underline; }
     .back { display: inline-block; margin-bottom: 24px; font-size: 0.9rem; }
     h1 { font-size: 1.6rem; font-weight: 800; margin-bottom: 6px; }
-    .subtitle { color: #999; font-size: 0.9rem; margin-bottom: 28px; }
+    .subtitle { color: var(--text2); font-size: 0.9rem; margin-bottom: 28px; }
 
     /* ── Summary cards ── */
     .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 28px; }
-    .stat-card { background: #1e1616; border: 1px solid #241818; border-radius: 12px; padding: 14px 16px; }
-    .stat-label { font-size: 0.68rem; color: #999; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
+    .stat-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+    .stat-label { font-size: 0.68rem; color: var(--text2); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
     .stat-val { font-size: 1.5rem; font-weight: 800; }
     .green { color: #4caf50; }
     .red   { color: #ef5350; }
@@ -27,35 +27,35 @@
 
     /* ── By bet type ── */
     .type-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-bottom: 28px; }
-    .type-card { background: #1e1616; border: 1px solid #241818; border-radius: 10px; padding: 12px 14px; font-size: 0.82rem; }
-    .type-name { font-weight: 700; color: #ddd; margin-bottom: 6px; font-size: 0.9rem; }
-    .type-row  { display: flex; justify-content: space-between; color: #999; margin-top: 3px; }
+    .type-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; font-size: 0.82rem; }
+    .type-name { font-weight: 700; color: var(--text); margin-bottom: 6px; font-size: 0.9rem; }
+    .type-row  { display: flex; justify-content: space-between; color: var(--text2); margin-top: 3px; }
 
     /* ── Bets table ── */
-    .section-title { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: #999; margin-bottom: 10px; }
+    .section-title { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: var(--text2); margin-bottom: 10px; }
     .bets-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
-    .bets-table th { text-align: left; color: #999; font-size: 0.68rem; text-transform: uppercase; letter-spacing: .4px; padding: 8px 10px; border-bottom: 1px solid #241818; }
-    .bets-table td { padding: 9px 10px; border-bottom: 1px solid #1a1d28; vertical-align: middle; }
-    .bets-table tr:hover td { background: #1e1616; }
+    .bets-table th { text-align: left; color: var(--text2); font-size: 0.68rem; text-transform: uppercase; letter-spacing: .4px; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+    .bets-table td { padding: 9px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    .bets-table tr:hover td { background: var(--card-bg); }
     .badge { display: inline-block; font-size: 0.65rem; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
     .badge-win  { background: #1b3a2a; color: #4caf50; border: 1px solid #1a2838; }
     .badge-loss { background: #3a1a1a; color: #ef5350; border: 1px solid #5a2a2a; }
-    .badge-push { background: #241818; color: #999; border: 1px solid #2a1c1c; }
-    .badge-open { background: #120a1e; color: #e53935; border: 1px solid #1a1028; }
-    .badge-type { background: #120a1e; color: #4a9eff; border: 1px solid #2a1838; font-size: 0.6rem; }
-    .no-bets { color: #999; text-align: center; padding: 40px; }
+    .badge-push { background: var(--bg3); color: var(--text2); border: 1px solid var(--border); }
+    .badge-open { background: var(--bg3); color: #e53935; border: 1px solid #1a1028; }
+    .badge-type { background: var(--bg3); color: #4a9eff; border: 1px solid #2a1838; font-size: 0.6rem; }
+    .no-bets { color: var(--text2); text-align: center; padding: 40px; }
 
     /* ── Log bet form ── */
-    .log-form { background: #1e1616; border: 1px solid #241818; border-radius: 14px; padding: 20px 24px; margin-bottom: 28px; }
-    .log-form h3 { font-size: 0.95rem; font-weight: 700; color: #ddd; margin-bottom: 16px; }
+    .log-form { background: var(--card-bg); border: 1px solid var(--border); border-radius: 14px; padding: 20px 24px; margin-bottom: 28px; }
+    .log-form h3 { font-size: 0.95rem; font-weight: 700; color: var(--text); margin-bottom: 16px; }
     .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
-    .form-group label { display: block; font-size: 0.68rem; color: #999; text-transform: uppercase; letter-spacing: .4px; margin-bottom: 5px; }
+    .form-group label { display: block; font-size: 0.68rem; color: var(--text2); text-transform: uppercase; letter-spacing: .4px; margin-bottom: 5px; }
     .form-group input, .form-group select {
-      width: 100%; background: #141010; border: 1px solid #2a1c1c; border-radius: 8px;
-      color: #f0ece4; padding: 8px 10px; font-size: 0.85rem;
+      width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+      color: var(--text); padding: 8px 10px; font-size: 0.85rem;
     }
     .form-group input:focus, .form-group select:focus { outline: none; border-color: #e53935; }
-    .btn-log { margin-top: 16px; background: #1a1028; color: #e53935; border: 1px solid #c62828;
+    .btn-log { margin-top: 16px; background: var(--bg3); color: #e53935; border: 1px solid #c62828;
                border-radius: 8px; padding: 9px 20px; font-size: 0.85rem; font-weight: 700;
                cursor: pointer; }
     .btn-log:hover { background: #2a1838; }
@@ -84,7 +84,7 @@
     var inner = document.getElementById('scoreboard-inner');
     if (!inner) return;
     if (!games.length) { document.getElementById('scoreboard-bar').style.display='none'; return; }
-    var html = '<div style="padding:7px 14px;font-size:0.7rem;color:#555;white-space:nowrap;align-self:center;flex-shrink:0;">TODAY</div>';
+    var html = '<div style="padding:7px 14px;font-size:0.7rem;color:var(--text3);white-space:nowrap;align-self:center;flex-shrink:0;">TODAY</div>';
     games.forEach(function(g) {
       var s = (g.status||'').toLowerCase();
       var isLive = s.includes('progress')||s.includes('live');
@@ -97,15 +97,15 @@
       } else if (isFinal) {
         timeStr = 'Final';
       }
-      var scoreAway = (isLive||isFinal) ? '<b style="color:#fff;">'+esc(g.away_score)+'</b>' : '';
-      var scoreHome = (isLive||isFinal) ? '<b style="color:#fff;">'+esc(g.home_score)+'</b>' : '';
+      var scoreAway = (isLive||isFinal) ? '<b style="color:var(--text);">'+esc(g.away_score)+'</b>' : '';
+      var scoreHome = (isLive||isFinal) ? '<b style="color:var(--text);">'+esc(g.home_score)+'</b>' : '';
       var dot = '<span style="width:6px;height:6px;border-radius:50%;background:'+statusColor(g.status)+';display:inline-block;margin-right:5px;vertical-align:middle;'+(isLive?'animation:pulse 1.2s infinite;':'')+'" ></span>';
       var link = g.gamePk ? '/simulate/'+g.gamePk+'?sims=100000' : '#';
-      html += '<a href="'+link+'" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:5px 14px;border-left:1px solid #111;text-decoration:none;flex-shrink:0;min-width:110px;">'
+      html += '<a href="'+link+'" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:5px 14px;border-left:1px solid var(--border);text-decoration:none;flex-shrink:0;min-width:110px;">'
         + '<div style="display:flex;align-items:center;gap:6px;font-size:0.72rem;white-space:nowrap;">'
-        + '<span style="color:#999;">'+esc(abbr(g.away))+' '+scoreAway+'</span>'
-        + '<span style="color:#555;font-size:0.65rem;">@</span>'
-        + '<span style="color:#999;">'+scoreHome+' '+esc(abbr(g.home))+'</span>'
+        + '<span style="color: var(--text2);">'+esc(abbr(g.away))+' '+scoreAway+'</span>'
+        + '<span style="color:var(--text3);font-size:0.65rem;">@</span>'
+        + '<span style="color: var(--text2);">'+scoreHome+' '+esc(abbr(g.home))+'</span>'
         + '</div>'
         + '<div style="font-size:0.63rem;margin-top:2px;">'+dot+'<span style="color:'+statusColor(g.status)+';">'+timeStr+'</span></div>'
         + '</a>';
@@ -139,13 +139,13 @@
   <span id="settle-msg" style="font-size:0.78rem;color:#4caf50;"></span>
 </div>
 <p class="subtitle">Log your bets, track results, measure your edge over the book.</p>
-<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;background:#1e1616;border:1px solid #241818;border-radius:10px;padding:12px 16px;">
-  <span style="font-size:0.82rem;color:#999;">Unit Size:</span>
-  <span style="font-size:0.82rem;color:#999;">$</span>
-  <input id="unit-size" type="number" value="100" min="1" style="width:80px;background:#141010;border:1px solid #2a1c1c;border-radius:6px;color:#f0ece4;padding:5px 8px;font-size:0.85rem;">
-  <button onclick="saveUnit()" style="background:#1a1028;color:#e53935;border:1px solid #c62828;border-radius:6px;padding:5px 12px;cursor:pointer;font-size:0.78rem;font-weight:700;">Save</button>
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;background: var(--card-bg);border: 1px solid var(--border);border-radius:10px;padding:12px 16px;">
+  <span style="font-size:0.82rem;color: var(--text2);">Unit Size:</span>
+  <span style="font-size:0.82rem;color: var(--text2);">$</span>
+  <input id="unit-size" type="number" value="100" min="1" style="width:80px;background: var(--bg);border:1px solid var(--border);border-radius:6px;color: var(--text);padding:5px 8px;font-size:0.85rem;">
+  <button onclick="saveUnit()" style="background:var(--bg3);color:#e53935;border:1px solid #c62828;border-radius:6px;padding:5px 12px;cursor:pointer;font-size:0.78rem;font-weight:700;">Save</button>
   <span id="unit-msg" style="font-size:0.78rem;color:#4caf50;"></span>
-  <span style="margin-left:auto;font-size:0.78rem;color:#999;">All Kelly % outputs = units to bet based on this size.</span>
+  <span style="margin-left:auto;font-size:0.78rem;color: var(--text2);">All Kelly % outputs = units to bet based on this size.</span>
 </div>
 
 <!-- Summary stats -->
@@ -258,8 +258,30 @@
   <div class="msg" id="lb-msg"></div>
 </div>
 
+<!-- Bet Grade Breakdown -->
+{% if grade_counts %}
+{% set grade_colors = {'A': '#4caf50', 'B': '#42a5f5', 'C': '#ffa726', 'D': '#ef9a9a', 'F': '#ef5350'} %}
+<div class="section-title">Bet Grades</div>
+<div style="display:flex;gap:10px;margin-bottom:24px;flex-wrap:wrap;">
+  {% for g in ['A', 'B', 'C', 'D', 'F'] %}
+  {% if grade_counts.get(g) %}
+  {% set gc = grade_counts[g] %}
+  {% set gpct = (gc.wins / gc.total * 100) | round(1) if gc.total > 0 else 0 %}
+  <div style="background:var(--card-bg);border:1px solid var(--border);border-radius:10px;padding:10px 16px;min-width:90px;text-align:center;">
+    <div style="font-size:1.3rem;font-weight:900;color:{{ grade_colors.get(g, '#999') }};">{{ g }}</div>
+    <div style="font-size:0.78rem;color:var(--text);">{{ gc.total }} bets</div>
+    <div style="font-size:0.72rem;color:{% if gpct >= 55 %}#4caf50{% elif gpct >= 45 %}#ffa726{% else %}#ef5350{% endif %};font-weight:700;">{{ gpct }}% win</div>
+  </div>
+  {% endif %}
+  {% endfor %}
+</div>
+{% endif %}
+
 <!-- Recent bets table -->
-<div class="section-title">Recent Bets</div>
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0;">
+  <div class="section-title" style="margin-bottom:0;">Recent Bets</div>
+  <a href="/export/bets.csv" style="font-size:0.75rem;color:#ffc107;border:1px solid var(--border);padding:5px 12px;border-radius:8px;text-decoration:none;font-weight:600;">Export CSV</a>
+</div>
 {% if recent_bets %}
 <table class="bets-table">
   <thead>
@@ -268,6 +290,7 @@
       <th>Matchup</th>
       <th>Bet</th>
       <th>Type</th>
+      <th>Grade</th>
       <th>Odds</th>
       <th>Amount</th>
       <th>Edge</th>
@@ -277,12 +300,18 @@
     </tr>
   </thead>
   <tbody>
+    {% set grade_colors = {'A': '#4caf50', 'B': '#42a5f5', 'C': '#ffa726', 'D': '#ef9a9a', 'F': '#ef5350'} %}
     {% for b in recent_bets %}
     <tr>
-      <td style="color:#999;">{{ b.game_date }}</td>
+      <td style="color: var(--text2);">{{ b.game_date }}</td>
       <td>{{ b.away_team }} @ {{ b.home_team }}</td>
       <td style="font-weight:600;">{{ b.bet_on }}</td>
       <td><span class="badge badge-type">{{ b.bet_type }}</span></td>
+      <td>
+        <span style="font-weight:900;color:{{ grade_colors.get(b.grade, '#999') }};" title="{{ b.grade_reasons | join(', ') if b.grade_reasons else 'No data' }}">
+          {{ b.grade or '—' }}
+        </span>
+      </td>
       <td>{{ b.odds }}</td>
       <td>${{ b.amount }}</td>
       <td>{% if b.model_edge %}<span class="{% if b.model_edge|float > 0 %}green{% else %}red{% endif %}">{{ b.model_edge }}%</span>{% else %}—{% endif %}</td>
@@ -295,7 +324,7 @@
           <span style="display:inline-flex;gap:3px;margin-left:4px;">
             <button onclick="markResult({{ b.id }},'win')" style="background:#1b3a2a;color:#4caf50;border:1px solid #1a2838;border-radius:4px;padding:1px 6px;font-size:0.6rem;cursor:pointer;font-weight:700;">W</button>
             <button onclick="markResult({{ b.id }},'loss')" style="background:#3a1a1a;color:#ef5350;border:1px solid #5a2a2a;border-radius:4px;padding:1px 6px;font-size:0.6rem;cursor:pointer;font-weight:700;">L</button>
-            <button onclick="markResult({{ b.id }},'push')" style="background:#241818;color:#999;border:1px solid #2a1c1c;border-radius:4px;padding:1px 6px;font-size:0.6rem;cursor:pointer;font-weight:700;">P</button>
+            <button onclick="markResult({{ b.id }},'push')" style="background: var(--bg3);color: var(--text2);border:1px solid var(--border);border-radius:4px;padding:1px 6px;font-size:0.6rem;cursor:pointer;font-weight:700;">P</button>
           </span>
         {% endif %}
       </td>

@@ -288,9 +288,14 @@ def get_game_notes(user_id):
     return {r["game_pk"]: r for r in (res.data or [])}
 
 
-def get_all_predictions():
-    """Returns all predictions, newest first."""
-    res = supa().table("predictions").select("*").order("logged_at", desc=True).execute()
+def get_all_predictions(date_from=None, date_to=None):
+    """Returns all predictions, newest first. Optionally filtered by game_date range."""
+    q = supa().table("predictions").select("*")
+    if date_from:
+        q = q.gte("game_date", str(date_from))
+    if date_to:
+        q = q.lte("game_date", str(date_to))
+    res = q.order("logged_at", desc=True).execute()
     return res.data or []
 
 
@@ -366,14 +371,14 @@ def get_single_game_predictions():
     return res.data or []
 
 
-def get_accuracy_stats():
+def get_accuracy_stats(date_from=None, date_to=None):
     """
     Accuracy metrics for the /accuracy page.
     Counts all simulations (single + bulk/simulate-all).
     Returns dict with total_predictions, results_available, correct_picks,
     accuracy_pct, avg_run_diff_error, by_confidence, recent, all_single.
     """
-    all_rows = get_all_predictions()
+    all_rows = get_all_predictions(date_from=date_from, date_to=date_to)
     completed = [r for r in all_rows if r.get("correct_pick") is not None]
 
     if not completed:
@@ -432,13 +437,18 @@ def get_accuracy_stats():
     }
 
 
-def get_confidence_history():
+def get_confidence_history(date_from=None, date_to=None):
     """
     Returns confidence grade accuracy over time.
     Groups settled predictions by grade (A/B/C/D) and computes win rate for each.
     Also returns daily data for charting.
     """
-    all_preds = supa().table("predictions").select("*").execute()
+    q = supa().table("predictions").select("*")
+    if date_from:
+        q = q.gte("game_date", str(date_from))
+    if date_to:
+        q = q.lte("game_date", str(date_to))
+    all_preds = q.execute()
     rows = [
         r
         for r in (all_preds.data or [])

@@ -8,30 +8,30 @@
   <title>Odds History — MLB Simulator</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #141010; color: #f0ece4; font-family: 'Segoe UI', Arial, sans-serif; padding-bottom: 60px; }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', Arial, sans-serif; padding-bottom: 60px; }
     a { color: #e53935; text-decoration: none; }
     .page { max-width: 900px; margin: 0 auto; padding: 0 16px; }
     h1 { font-size: 1.4rem; font-weight: 800; margin-bottom: 6px; }
-    .subtitle { color: #999; font-size: 0.88rem; margin-bottom: 24px; }
-    .section { background: #1e1616; border: 1px solid #241818; border-radius: 14px; overflow: hidden; }
+    .subtitle { color: var(--text2); font-size: 0.88rem; margin-bottom: 24px; }
+    .section { background: var(--card-bg); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
     table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
     thead th { padding: 10px 14px; text-align: left; font-size: 0.68rem; font-weight: 700;
-               text-transform: uppercase; letter-spacing: .4px; color: #777;
-               border-bottom: 1px solid #241818; background: #141010; white-space: nowrap; }
-    tbody td { padding: 10px 14px; border-bottom: 1px solid #1a1d28; }
+               text-transform: uppercase; letter-spacing: .4px; color: var(--text3);
+               border-bottom: 1px solid var(--border); background: var(--bg); white-space: nowrap; }
+    tbody td { padding: 10px 14px; border-bottom: 1px solid var(--border); }
     tbody tr:last-child td { border-bottom: none; }
-    tbody tr:hover td { background: #141010; }
-    .team-cell { font-weight: 600; color: #f0ece4; }
+    tbody tr:hover td { background: var(--bg); }
+    .team-cell { font-weight: 600; color: var(--text); }
     .vs { color: #555; margin: 0 4px; }
     .ml { font-weight: 700; }
     .ml-fav  { color: #ef5350; }
     .ml-dog  { color: #81c784; }
-    .implied { font-size: 0.75rem; color: #777; }
+    .implied { font-size: 0.75rem; color: var(--text3); }
     .ou { color: #ffd54f; font-weight: 600; }
-    .date-cell { color: #777; font-size: 0.78rem; white-space: nowrap; }
-    .no-data { text-align: center; padding: 60px; color: #777; font-size: 0.9rem; }
+    .date-cell { color: var(--text3); font-size: 0.78rem; white-space: nowrap; }
+    .no-data { text-align: center; padding: 60px; color: var(--text3); font-size: 0.9rem; }
     .filter-bar { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
-    .filter-bar input { background: #1e1616; border: 1px solid #2a1c1c; color: #f0ece4;
+    .filter-bar input { background: var(--card-bg); border: 1px solid var(--border); color: var(--text);
                         padding: 7px 12px; border-radius: 8px; font-size: 0.82rem; width: 220px; }
     .filter-bar input:focus { outline: none; border-color: #e53935; }
     .count { font-size: 0.78rem; color: #555; }
@@ -62,28 +62,28 @@ function csrfFetch(url,opts={}){opts.headers=Object.assign({'X-CSRFToken':getCsr
   <!-- Summary Stats -->
   {% if stats and stats.settled > 0 %}
   <div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
-    <div style="background:#1e1616;border:1px solid #241818;border-radius:10px;padding:12px 18px;flex:1;min-width:140px;">
-      <div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:.4px;color:#777;font-weight:700;">Games Tracked</div>
-      <div style="font-size:1.4rem;font-weight:800;color:#f0ece4;">{{ stats.total }}</div>
-      <div style="font-size:0.72rem;color:#555;">{{ stats.settled }} settled</div>
+    <div style="background: var(--card-bg);border: 1px solid var(--border);border-radius:10px;padding:12px 18px;flex:1;min-width:140px;">
+      <div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:.4px;color: var(--text3);font-weight:700;">Games Tracked</div>
+      <div style="font-size:1.4rem;font-weight:800;color: var(--text);">{{ stats.total }}</div>
+      <div style="font-size:0.72rem;color:var(--text3);">{{ stats.settled }} settled</div>
     </div>
-    <div style="background:#1e1616;border:1px solid #241818;border-radius:10px;padding:12px 18px;flex:1;min-width:140px;">
-      <div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:.4px;color:#777;font-weight:700;">Vegas Favorite</div>
+    <div style="background: var(--card-bg);border: 1px solid var(--border);border-radius:10px;padding:12px 18px;flex:1;min-width:140px;">
+      <div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:.4px;color: var(--text3);font-weight:700;">Vegas Favorite</div>
       <div style="font-size:1.4rem;font-weight:800;color:{% if stats.vegas_pct >= 55 %}#81c784{% else %}#ef9a9a{% endif %};">{{ stats.vegas_pct }}%</div>
-      <div style="font-size:0.72rem;color:#555;">{{ stats.vegas_correct }}/{{ stats.settled }} correct</div>
+      <div style="font-size:0.72rem;color:var(--text3);">{{ stats.vegas_correct }}/{{ stats.settled }} correct</div>
     </div>
-    <div style="background:#1e1616;border:1px solid #241818;border-radius:10px;padding:12px 18px;flex:1;min-width:140px;">
-      <div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:.4px;color:#777;font-weight:700;">Our Model</div>
+    <div style="background: var(--card-bg);border: 1px solid var(--border);border-radius:10px;padding:12px 18px;flex:1;min-width:140px;">
+      <div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:.4px;color: var(--text3);font-weight:700;">Our Model</div>
       <div style="font-size:1.4rem;font-weight:800;color:{% if stats.model_pct >= 55 %}#81c784{% else %}#ef9a9a{% endif %};">{{ stats.model_pct }}%</div>
-      <div style="font-size:0.72rem;color:#555;">{{ stats.model_correct }}/{{ stats.settled }} correct</div>
+      <div style="font-size:0.72rem;color:var(--text3);">{{ stats.model_correct }}/{{ stats.settled }} correct</div>
     </div>
-    <div style="background:#1e1616;border:1px solid #241818;border-radius:10px;padding:12px 18px;flex:1;min-width:140px;">
-      <div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:.4px;color:#777;font-weight:700;">Edge</div>
+    <div style="background: var(--card-bg);border: 1px solid var(--border);border-radius:10px;padding:12px 18px;flex:1;min-width:140px;">
+      <div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:.4px;color: var(--text3);font-weight:700;">Edge</div>
       {% set edge = stats.model_pct - stats.vegas_pct %}
       <div style="font-size:1.4rem;font-weight:800;color:{% if edge > 0 %}#81c784{% elif edge < 0 %}#ef9a9a{% else %}#999{% endif %};">
         {% if edge > 0 %}+{% endif %}{{ edge | round(1) }}%
       </div>
-      <div style="font-size:0.72rem;color:#555;">Model vs Vegas</div>
+      <div style="font-size:0.72rem;color:var(--text3);">Model vs Vegas</div>
     </div>
   </div>
   {% endif %}
@@ -92,15 +92,16 @@ function csrfFetch(url,opts={}){opts.headers=Object.assign({'X-CSRFToken':getCsr
   <div class="filter-bar">
     <input type="text" id="search" placeholder="Search team…" oninput="filterRows()">
     <form method="get" action="/odds-history" style="display:flex;gap:6px;align-items:center;">
-      <input type="date" name="from" value="{{ date_from }}" style="background:#1e1616;border:1px solid #2a1c1c;color:#f0ece4;padding:6px 10px;border-radius:8px;font-size:0.8rem;">
-      <span style="color:#555;font-size:0.8rem;">to</span>
-      <input type="date" name="to" value="{{ date_to }}" style="background:#1e1616;border:1px solid #2a1c1c;color:#f0ece4;padding:6px 10px;border-radius:8px;font-size:0.8rem;">
-      <button type="submit" style="background:#1a1028;border:1px solid #c62828;color:#e53935;padding:6px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;">Filter</button>
+      <input type="date" name="from" value="{{ date_from }}" style="background: var(--card-bg);border:1px solid var(--border);color: var(--text);padding:6px 10px;border-radius:8px;font-size:0.8rem;">
+      <span style="color:var(--text3);font-size:0.8rem;">to</span>
+      <input type="date" name="to" value="{{ date_to }}" style="background: var(--card-bg);border:1px solid var(--border);color: var(--text);padding:6px 10px;border-radius:8px;font-size:0.8rem;">
+      <button type="submit" style="background:var(--bg3);border:1px solid #c62828;color:#e53935;padding:6px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;">Filter</button>
       {% if date_from or date_to %}
       <a href="/odds-history" style="font-size:0.78rem;color:#ef9a9a;">Clear</a>
       {% endif %}
     </form>
     <span class="count" id="row-count">{{ rows | length }} games</span>
+    <a href="/export/odds.csv" style="font-size:0.75rem;color:#ffc107;border:1px solid var(--border);padding:5px 12px;border-radius:8px;text-decoration:none;font-weight:600;margin-left:auto;">Export CSV</a>
   </div>
 
   {% if rows %}
@@ -134,7 +135,7 @@ function csrfFetch(url,opts={}){opts.headers=Object.assign({'X-CSRFToken':getCsr
                 {% if r.away_ml > 0 %}+{% endif %}{{ r.away_ml }}
               </span>
               {% if r.away_ml_open and r.away_ml_open != r.away_ml %}
-              <div style="font-size:0.65rem;color:#555;">open {{ r.away_ml_open }}</div>
+              <div style="font-size:0.65rem;color:var(--text3);">open {{ r.away_ml_open }}</div>
               {% endif %}
             {% else %}—{% endif %}
           </td>
@@ -144,7 +145,7 @@ function csrfFetch(url,opts={}){opts.headers=Object.assign({'X-CSRFToken':getCsr
                 {% if r.home_ml > 0 %}+{% endif %}{{ r.home_ml }}
               </span>
               {% if r.home_ml_open and r.home_ml_open != r.home_ml %}
-              <div style="font-size:0.65rem;color:#555;">open {{ r.home_ml_open }}</div>
+              <div style="font-size:0.65rem;color:var(--text3);">open {{ r.home_ml_open }}</div>
               {% endif %}
             {% else %}—{% endif %}
           </td>
@@ -156,17 +157,17 @@ function csrfFetch(url,opts={}){opts.headers=Object.assign({'X-CSRFToken':getCsr
               <div style="font-weight:600;color:{% if model_pick == vegas_fav %}#999{% else %}#ffd54f{% endif %};">
                 {{ model_pick }}
               </div>
-              <div style="font-size:0.7rem;color:#777;">
+              <div style="font-size:0.7rem;color: var(--text3);">
                 {{ r.model_away_pct }}% / {{ r.model_home_pct }}%
               </div>
             {% else %}—{% endif %}
           </td>
           <td>
             {% if r.actual_winner %}
-              <div style="font-weight:700;color:#f0ece4;">
+              <div style="font-weight:700;color: var(--text);">
                 {{ r.actual_winner }}
                 {% if r.actual_away_runs is not none and r.actual_home_runs is not none %}
-                <span style="font-weight:400;color:#777;font-size:0.75rem;">{{ r.actual_away_runs }}-{{ r.actual_home_runs }}</span>
+                <span style="font-weight:400;color: var(--text3);font-size:0.75rem;">{{ r.actual_away_runs }}-{{ r.actual_home_runs }}</span>
                 {% endif %}
               </div>
               <div style="display:flex;gap:4px;margin-top:2px;">
@@ -182,7 +183,7 @@ function csrfFetch(url,opts={}){opts.headers=Object.assign({'X-CSRFToken':getCsr
                 {% endif %}
               </div>
             {% else %}
-              <span style="color:#555;font-size:0.78rem;">Pending</span>
+              <span style="color:var(--text3);font-size:0.78rem;">Pending</span>
             {% endif %}
           </td>
         </tr>

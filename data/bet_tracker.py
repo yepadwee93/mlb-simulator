@@ -204,6 +204,79 @@ def update_closing_lines(odds_map, user_id=None, csv_path=None):
             ).eq("id", bet["id"]).execute()
 
 
+# ── Grading ──────────────────────────────────────────────────────
+
+
+def grade_bet(bet):
+    """Grade a bet A-F based on edge, EV, Kelly, CLV, and odds value."""
+    score = 0
+    reasons = []
+
+    edge = bet.get("model_edge")
+    if edge is not None:
+        edge = float(edge)
+        if edge >= 10:
+            score += 30
+            reasons.append(f"Edge {edge:+.1f}%")
+        elif edge >= 5:
+            score += 20
+            reasons.append(f"Edge {edge:+.1f}%")
+        elif edge >= 2:
+            score += 10
+            reasons.append(f"Edge {edge:+.1f}%")
+        elif edge < 0:
+            score -= 10
+            reasons.append("Negative edge")
+
+    ev = bet.get("ev")
+    if ev is not None:
+        ev = float(ev)
+        if ev >= 10:
+            score += 25
+        elif ev >= 5:
+            score += 15
+        elif ev >= 0:
+            score += 5
+        else:
+            score -= 10
+
+    kelly = bet.get("kelly")
+    if kelly is not None:
+        kelly = float(kelly)
+        if kelly >= 5:
+            score += 20
+            reasons.append(f"Kelly {kelly:.1f}%")
+        elif kelly >= 2:
+            score += 10
+        elif kelly <= 0:
+            score -= 10
+
+    clv = bet.get("clv")
+    if clv is not None:
+        clv = float(clv)
+        if clv >= 3:
+            score += 25
+            reasons.append(f"CLV +{clv:.1f}")
+        elif clv >= 1:
+            score += 15
+        elif clv < -1:
+            score -= 10
+            reasons.append(f"CLV {clv:.1f}")
+
+    if score >= 70:
+        grade = "A"
+    elif score >= 50:
+        grade = "B"
+    elif score >= 30:
+        grade = "C"
+    elif score >= 10:
+        grade = "D"
+    else:
+        grade = "F"
+
+    return {"grade": grade, "score": score, "reasons": reasons}
+
+
 # ── Read ─────────────────────────────────────────────────────────
 
 
@@ -266,8 +339,24 @@ def get_bet_stats(user_id=None, csv_path=None):
     clv_vals = [float(b["clv"]) for b in bets if b.get("clv") is not None]
     avg_clv = round(sum(clv_vals) / len(clv_vals), 2) if clv_vals else None
 
+    for b in bets:
+        g = grade_bet(b)
+        b["grade"] = g["grade"]
+        b["grade_score"] = g["score"]
+        b["grade_reasons"] = g["reasons"]
+
+    grade_counts = {}
+    for b in bets:
+        gr = b.get("grade", "F")
+        if gr not in grade_counts:
+            grade_counts[gr] = {"total": 0, "wins": 0}
+        grade_counts[gr]["total"] += 1
+        if b.get("result") == "win":
+            grade_counts[gr]["wins"] += 1
+
     return {
         "bets": bets,
+        "grade_counts": grade_counts,
         "total_bets": len(bets),
         "settled": settled,
         "pending": pending_count,

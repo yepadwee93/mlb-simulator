@@ -8,38 +8,41 @@
   <title>Model Accuracy — MLB Simulator</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #141010; color: #f0ece4; font-family: 'Segoe UI', Arial, sans-serif; padding: 32px 20px; }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', Arial, sans-serif; padding: 32px 20px; }
     a { color: #e53935; text-decoration: none; }
     a:hover { text-decoration: underline; }
     .back { display: inline-block; margin-bottom: 24px; font-size: 0.9rem; }
     h1 { font-size: 1.6rem; font-weight: 800; margin-bottom: 6px; }
-    .subtitle { color: #999; font-size: 0.9rem; margin-bottom: 28px; }
+    .subtitle { color: var(--text2); font-size: 0.9rem; margin-bottom: 28px; }
     .green { color: #4caf50; } .red { color: #ef5350; } .blue { color: #e53935; } .gold { color: #ffa726; }
     .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 28px; }
-    .stat-card { background: #1e1616; border: 1px solid #241818; border-radius: 12px; padding: 14px 16px; }
-    .stat-label { font-size: 0.68rem; color: #999; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
+    .stat-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+    .stat-label { font-size: 0.68rem; color: var(--text2); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
     .stat-val { font-size: 1.5rem; font-weight: 800; }
-    .section { background: #1e1616; border: 1px solid #241818; border-radius: 14px; padding: 20px 24px; margin-bottom: 24px; }
-    .section-title { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: #999; margin-bottom: 14px; }
+    .section { background: var(--card-bg); border: 1px solid var(--border); border-radius: 14px; padding: 20px 24px; margin-bottom: 24px; }
+    .section-title { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: var(--text2); margin-bottom: 14px; }
     .bucket-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
-    .bucket-label { width: 60px; font-size: 0.8rem; color: #ddd; font-weight: 600; flex-shrink: 0; }
-    .bucket-bar-wrap { flex: 1; background: #141010; border-radius: 4px; height: 18px; overflow: hidden; }
+    .bucket-label { width: 60px; font-size: 0.8rem; color: var(--text); font-weight: 600; flex-shrink: 0; }
+    .bucket-bar-wrap { flex: 1; background: var(--bg); border-radius: 4px; height: 18px; overflow: hidden; }
     .bucket-bar { height: 100%; border-radius: 4px; }
-    .bucket-stats { width: 100px; text-align: right; font-size: 0.78rem; color: #999; flex-shrink: 0; }
+    .bucket-stats { width: 100px; text-align: right; font-size: 0.78rem; color: var(--text2); flex-shrink: 0; }
     .bucket-pct { font-weight: 700; margin-left: 6px; }
     .pred-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
-    .pred-table th { text-align: left; color: #999; font-size: 0.68rem; text-transform: uppercase; letter-spacing: .4px; padding: 7px 10px; border-bottom: 1px solid #241818; }
-    .pred-table td { padding: 8px 10px; border-bottom: 1px solid #1a1d28; }
-    .pred-table tr:hover td { background: #141010; }
+    .pred-table th { text-align: left; color: var(--text2); font-size: 0.68rem; text-transform: uppercase; letter-spacing: .4px; padding: 7px 10px; border-bottom: 1px solid var(--border); }
+    .pred-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); }
+    .pred-table tr:hover td { background: var(--bg); }
     .badge { display: inline-block; font-size: 0.65rem; font-weight: 700; padding: 2px 7px; border-radius: 4px; }
     .badge-win  { background: #1b3a2a; color: #4caf50; border: 1px solid #1a2838; }
     .badge-loss { background: #3a1a1a; color: #ef5350; border: 1px solid #5a2a2a; }
-    .badge-pend { background: #120a1e; color: #e53935; border: 1px solid #1a1028; }
-    .no-data { color: #999; text-align: center; padding: 40px; }
+    .badge-pend { background: var(--bg3); color: #e53935; border: 1px solid #1a1028; }
+    .no-data { color: var(--text2); text-align: center; padding: 40px; }
     nav { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
-    nav a { font-size: 0.82rem; color: #999; padding: 5px 12px; border-radius: 6px; border: 1px solid #241818; }
-    nav a:hover { color: #f0ece4; border-color: #777; text-decoration: none; }
-  
+    nav a { font-size: 0.82rem; color: var(--text2); padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border); }
+    nav a:hover { color: var(--text); border-color: var(--text3); text-decoration: none; }
+    .date-quick-btn { display:inline-block;font-size:0.78rem;color:var(--text2);padding:6px 14px;border-radius:8px;border:1px solid var(--border);text-decoration:none;font-weight:600;transition:all 0.15s; }
+    .date-quick-btn:hover { color:var(--text);border-color:var(--text3);text-decoration:none; }
+    .date-quick-btn.active { background:#c62828;color:#fff;border-color:#c62828; }
+
 </style>
 
 <body>
@@ -61,7 +64,7 @@
     var inner = document.getElementById('scoreboard-inner');
     if (!inner) return;
     if (!games.length) { document.getElementById('scoreboard-bar').style.display='none'; return; }
-    var html = '<div style="padding:7px 14px;font-size:0.7rem;color:#555;white-space:nowrap;align-self:center;flex-shrink:0;">TODAY</div>';
+    var html = '<div style="padding:7px 14px;font-size:0.7rem;color:var(--text3);white-space:nowrap;align-self:center;flex-shrink:0;">TODAY</div>';
     games.forEach(function(g) {
       var s = (g.status||'').toLowerCase();
       var isLive = s.includes('progress')||s.includes('live');
@@ -74,15 +77,15 @@
       } else if (isFinal) {
         timeStr = 'Final';
       }
-      var scoreAway = (isLive||isFinal) ? '<b style="color:#fff;">'+esc(g.away_score)+'</b>' : '';
-      var scoreHome = (isLive||isFinal) ? '<b style="color:#fff;">'+esc(g.home_score)+'</b>' : '';
+      var scoreAway = (isLive||isFinal) ? '<b style="color:var(--text);">'+esc(g.away_score)+'</b>' : '';
+      var scoreHome = (isLive||isFinal) ? '<b style="color:var(--text);">'+esc(g.home_score)+'</b>' : '';
       var dot = '<span style="width:6px;height:6px;border-radius:50%;background:'+statusColor(g.status)+';display:inline-block;margin-right:5px;vertical-align:middle;'+(isLive?'animation:pulse 1.2s infinite;':'')+'" ></span>';
       var link = g.gamePk ? '/simulate/'+g.gamePk+'?sims=100000' : '#';
-      html += '<a href="'+link+'" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:5px 14px;border-left:1px solid #111;text-decoration:none;flex-shrink:0;min-width:110px;">'
+      html += '<a href="'+link+'" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:5px 14px;border-left:1px solid var(--border);text-decoration:none;flex-shrink:0;min-width:110px;">'
         + '<div style="display:flex;align-items:center;gap:6px;font-size:0.72rem;white-space:nowrap;">'
-        + '<span style="color:#999;">'+esc(abbr(g.away))+' '+scoreAway+'</span>'
-        + '<span style="color:#555;font-size:0.65rem;">@</span>'
-        + '<span style="color:#999;">'+scoreHome+' '+esc(abbr(g.home))+'</span>'
+        + '<span style="color: var(--text2);">'+esc(abbr(g.away))+' '+scoreAway+'</span>'
+        + '<span style="color:var(--text3);font-size:0.65rem;">@</span>'
+        + '<span style="color: var(--text2);">'+scoreHome+' '+esc(abbr(g.home))+'</span>'
         + '</div>'
         + '<div style="font-size:0.63rem;margin-top:2px;">'+dot+'<span style="color:'+statusColor(g.status)+';">'+timeStr+'</span></div>'
         + '</a>';
@@ -109,6 +112,61 @@
 </style>
 <h1>📊 Model Accuracy</h1>
 <p class="subtitle">Track how well the Monte Carlo model predicts real game outcomes.</p>
+
+<!-- Date Filter Bar -->
+<div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;align-items:center;">
+  <a href="/accuracy?from={{ today }}&to={{ today }}" class="date-quick-btn{% if date_from == today and date_to == today %} active{% endif %}">Today</a>
+  <a href="/accuracy?from={{ yesterday }}&to={{ yesterday }}" class="date-quick-btn{% if date_from == yesterday and date_to == yesterday %} active{% endif %}">Yesterday</a>
+  <a href="/accuracy?from={{ last_7 }}&to={{ today }}" class="date-quick-btn{% if date_from == last_7 and date_to == today %} active{% endif %}">Last 7 Days</a>
+  <a href="/accuracy?from={{ last_30 }}&to={{ today }}" class="date-quick-btn{% if date_from == last_30 and date_to == today %} active{% endif %}">Last 30 Days</a>
+  <a href="/accuracy" class="date-quick-btn{% if not date_from and not date_to %} active{% endif %}">All Time</a>
+  <span style="color:var(--text3);font-size:0.75rem;margin:0 4px;">|</span>
+  <form method="get" action="/accuracy" style="display:flex;gap:6px;align-items:center;">
+    <input type="date" name="from" value="{{ date_from }}" style="background:var(--card-bg);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:8px;font-size:0.8rem;">
+    <span style="color:var(--text3);font-size:0.8rem;">to</span>
+    <input type="date" name="to" value="{{ date_to }}" style="background:var(--card-bg);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:8px;font-size:0.8rem;">
+    <button type="submit" style="background:var(--bg3);border:1px solid #c62828;color:#e53935;padding:6px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;">Filter</button>
+    {% if date_from or date_to %}
+    <a href="/accuracy" style="font-size:0.78rem;color:#ef9a9a;">Clear</a>
+    {% endif %}
+  </form>
+</div>
+{% if date_from or date_to %}
+<div style="font-size:0.78rem;color:var(--text2);margin-bottom:14px;">
+  Showing: {% if date_from and date_to and date_from == date_to %}{{ date_from }}{% elif date_from and date_to %}{{ date_from }} to {{ date_to }}{% elif date_from %}From {{ date_from }}{% else %}Through {{ date_to }}{% endif %}
+</div>
+{% endif %}
+
+<!-- Daily Recap Cards -->
+{% if not date_from and not date_to %}
+{% macro recap_card(recap) %}
+{% if recap %}
+<div style="background:var(--card-bg);border:1px solid var(--border);border-radius:14px;padding:16px 20px;flex:1;min-width:280px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+    <span style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);">{{ recap.label }} · {{ recap.date }}</span>
+    <span style="font-size:1.3rem;font-weight:900;color:{% if recap.pct >= 60 %}#4caf50{% elif recap.pct >= 50 %}#ffa726{% else %}#ef5350{% endif %};">{{ recap.pct }}%</span>
+  </div>
+  <div style="font-size:1.6rem;font-weight:900;color:var(--text);margin-bottom:8px;">{{ recap.correct }}-{{ recap.wrong }}</div>
+  <div style="font-size:0.75rem;color:var(--text2);margin-bottom:4px;">
+    Best: <span style="font-weight:700;color:{% if recap.best_correct %}#4caf50{% else %}#ef5350{% endif %};">{{ recap.best_pick }}</span>
+    <span style="color:var(--text3);">({{ recap.best_conf }}%) · {{ recap.best_matchup }}</span>
+    {% if recap.best_correct %}<span style="color:#4caf50;">&#10003;</span>{% else %}<span style="color:#ef5350;">&#10007;</span>{% endif %}
+  </div>
+  <div style="font-size:0.75rem;color:var(--text2);">
+    Lowest: <span style="font-weight:700;color:{% if recap.worst_correct %}#4caf50{% else %}#ef5350{% endif %};">{{ recap.worst_pick }}</span>
+    <span style="color:var(--text3);">({{ recap.worst_conf }}%) · {{ recap.worst_matchup }}</span>
+    {% if recap.worst_correct %}<span style="color:#4caf50;">&#10003;</span>{% else %}<span style="color:#ef5350;">&#10007;</span>{% endif %}
+  </div>
+</div>
+{% endif %}
+{% endmacro %}
+{% if today_recap or yesterday_recap %}
+<div style="display:flex;gap:14px;margin-bottom:24px;flex-wrap:wrap;">
+  {{ recap_card(today_recap) }}
+  {{ recap_card(yesterday_recap) }}
+</div>
+{% endif %}
+{% endif %}
 
 <div class="summary-grid">
   <div class="stat-card">
@@ -154,7 +212,7 @@
     </div>
   </div>
   {% endfor %}
-  <div style="font-size:0.72rem;color:#777;margin-top:12px;">
+  <div style="font-size:0.72rem;color: var(--text3);margin-top:12px;">
     💡 A well-calibrated model shows ~60% accuracy at 60% confidence, ~70% at 70%, etc.
   </div>
 </div>
@@ -202,7 +260,7 @@
 {% if settled | length >= 3 %}
 <div class="section" style="margin-bottom:24px;">
   <div class="section-title">📊 Model Confidence History</div>
-  <div style="font-size:0.72rem;color:#777;margin-bottom:12px;">
+  <div style="font-size:0.72rem;color: var(--text3);margin-bottom:12px;">
     Rolling 5-game accuracy vs model confidence over time · green = correct · red = wrong
   </div>
   <canvas id="history-chart" style="width:100%;height:260px;"></canvas>
@@ -294,7 +352,7 @@
     });
   })();
   </script>
-  <div style="display:flex;gap:16px;font-size:0.7rem;color:#777;margin-top:10px;flex-wrap:wrap;">
+  <div style="display:flex;gap:16px;font-size:0.7rem;color: var(--text3);margin-top:10px;flex-wrap:wrap;">
     <span><span style="display:inline-block;width:10px;height:10px;background:rgba(76,175,80,0.4);border:1px solid #4caf50;border-radius:2px;margin-right:4px;"></span>Correct</span>
     <span><span style="display:inline-block;width:10px;height:10px;background:rgba(239,83,80,0.4);border:1px solid #ef5350;border-radius:2px;margin-right:4px;"></span>Wrong</span>
     <span><span style="display:inline-block;width:16px;height:2px;background:#ffd54f;margin-right:4px;vertical-align:middle;"></span>5-game rolling accuracy</span>
@@ -304,7 +362,10 @@
 {% endif %}
 {% endif %}
 
-<div class="section-title" style="margin-bottom:10px;">My Simulations</div>
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+  <div class="section-title" style="margin-bottom:0;">My Simulations</div>
+  <a href="/export/accuracy.csv" style="font-size:0.75rem;color:#ffc107;border:1px solid var(--border);padding:5px 12px;border-radius:8px;text-decoration:none;font-weight:600;">Export CSV</a>
+</div>
 {% if all_single %}
 <div class="section" style="padding:0;overflow-x:auto;">
 <table class="pred-table">
@@ -316,7 +377,7 @@
   <tbody>
     {% for r in all_single %}
     <tr>
-      <td style="color:#999;white-space:nowrap;">{{ r.game_date }}</td>
+      <td style="color: var(--text2);white-space:nowrap;">{{ r.game_date }}</td>
       <td style="white-space:nowrap;">{{ r.away_team }} @ {{ r.home_team }}</td>
       <td style="font-weight:600;">{{ r.predicted_winner }}</td>
       <td>
@@ -324,7 +385,7 @@
         <span class="{% if conf >= 65 %}green{% elif conf >= 60 %}gold{% else %}blue{% endif %}">{{ "%.1f"|format(conf) }}%</span>
       </td>
       <td>{{ r.actual_winner or '—' }}</td>
-      <td style="color:#999;">
+      <td style="color: var(--text2);">
         {% if r.actual_away_runs is not none and r.actual_away_runs != '' %}{{ r.actual_away_runs }}-{{ r.actual_home_runs }}{% else %}—{% endif %}
       </td>
       <td>

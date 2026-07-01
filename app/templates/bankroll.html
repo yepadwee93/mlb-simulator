@@ -8,31 +8,31 @@
   <title>Bankroll — MLB Simulator</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #141010; color: #f0ece4; font-family: 'Segoe UI', Arial, sans-serif; padding: 32px 20px; }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', Arial, sans-serif; padding: 32px 20px; }
     a { color: #e53935; text-decoration: none; } a:hover { text-decoration: underline; }
     .back { display: inline-block; margin-bottom: 24px; font-size: 0.9rem; }
     h1 { font-size: 1.6rem; font-weight: 800; margin-bottom: 6px; }
-    .subtitle { color: #999; font-size: 0.9rem; margin-bottom: 28px; }
+    .subtitle { color: var(--text2); font-size: 0.9rem; margin-bottom: 28px; }
     .green { color: #4caf50; } .red { color: #ef5350; } .blue { color: #e53935; } .gold { color: #ffa726; }
     .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 28px; }
-    .stat-card { background: #1e1616; border: 1px solid #241818; border-radius: 12px; padding: 14px 16px; }
-    .stat-label { font-size: 0.68rem; color: #999; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
+    .stat-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+    .stat-label { font-size: 0.68rem; color: var(--text2); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
     .stat-val { font-size: 1.4rem; font-weight: 800; }
-    .section { background: #1e1616; border: 1px solid #241818; border-radius: 14px; padding: 20px 24px; margin-bottom: 24px; }
-    .section-title { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: #999; margin-bottom: 14px; }
+    .section { background: var(--card-bg); border: 1px solid var(--border); border-radius: 14px; padding: 20px 24px; margin-bottom: 24px; }
+    .section-title { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: var(--text2); margin-bottom: 14px; }
     .setup-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
-    .setup-row label { font-size: 0.8rem; color: #999; }
-    .setup-row input { background: #141010; border: 1px solid #2a1c1c; border-radius: 8px; color: #f0ece4; padding: 8px 12px; font-size: 0.9rem; width: 120px; }
-    .btn { background: #1a1028; color: #e53935; border: 1px solid #c62828; border-radius: 8px; padding: 8px 18px; font-size: 0.85rem; font-weight: 700; cursor: pointer; }
+    .setup-row label { font-size: 0.8rem; color: var(--text2); }
+    .setup-row input { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 8px 12px; font-size: 0.9rem; width: 120px; }
+    .btn { background: var(--bg3); color: #e53935; border: 1px solid #c62828; border-radius: 8px; padding: 8px 18px; font-size: 0.85rem; font-weight: 700; cursor: pointer; }
     .btn:hover { background: #2a1838; }
     nav { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
-    nav a { font-size: 0.82rem; color: #999; padding: 5px 12px; border-radius: 6px; border: 1px solid #241818; }
-    nav a:hover { color: #f0ece4; border-color: #777; text-decoration: none; }
+    nav a { font-size: 0.82rem; color: var(--text2); padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border); }
+    nav a:hover { color: var(--text); border-color: var(--text3); text-decoration: none; }
     .proj-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-top: 16px; }
-    .proj-card { background: #141010; border-radius: 10px; padding: 14px; text-align: center; }
-    .proj-period { font-size: 0.7rem; color: #999; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+    .proj-card { background: var(--bg); border-radius: 10px; padding: 14px; text-align: center; }
+    .proj-period { font-size: 0.7rem; color: var(--text2); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
     .proj-val { font-size: 1.2rem; font-weight: 800; }
-    .drawdown-bar-wrap { background: #141010; border-radius: 4px; height: 10px; overflow: hidden; margin-top: 6px; }
+    .drawdown-bar-wrap { background: var(--bg); border-radius: 4px; height: 10px; overflow: hidden; margin-top: 6px; }
     .drawdown-bar { height: 100%; background: #ef5350; border-radius: 4px; }
   
 </style>
@@ -56,7 +56,7 @@
     var inner = document.getElementById('scoreboard-inner');
     if (!inner) return;
     if (!games.length) { document.getElementById('scoreboard-bar').style.display='none'; return; }
-    var html = '<div style="padding:7px 14px;font-size:0.7rem;color:#555;white-space:nowrap;align-self:center;flex-shrink:0;">TODAY</div>';
+    var html = '<div style="padding:7px 14px;font-size:0.7rem;color:var(--text3);white-space:nowrap;align-self:center;flex-shrink:0;">TODAY</div>';
     games.forEach(function(g) {
       var s = (g.status||'').toLowerCase();
       var isLive = s.includes('progress')||s.includes('live');
@@ -69,15 +69,15 @@
       } else if (isFinal) {
         timeStr = 'Final';
       }
-      var scoreAway = (isLive||isFinal) ? '<b style="color:#fff;">'+esc(g.away_score)+'</b>' : '';
-      var scoreHome = (isLive||isFinal) ? '<b style="color:#fff;">'+esc(g.home_score)+'</b>' : '';
+      var scoreAway = (isLive||isFinal) ? '<b style="color:var(--text);">'+esc(g.away_score)+'</b>' : '';
+      var scoreHome = (isLive||isFinal) ? '<b style="color:var(--text);">'+esc(g.home_score)+'</b>' : '';
       var dot = '<span style="width:6px;height:6px;border-radius:50%;background:'+statusColor(g.status)+';display:inline-block;margin-right:5px;vertical-align:middle;'+(isLive?'animation:pulse 1.2s infinite;':'')+'" ></span>';
       var link = g.gamePk ? '/simulate/'+g.gamePk+'?sims=100000' : '#';
-      html += '<a href="'+link+'" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:5px 14px;border-left:1px solid #111;text-decoration:none;flex-shrink:0;min-width:110px;">'
+      html += '<a href="'+link+'" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:5px 14px;border-left:1px solid var(--border);text-decoration:none;flex-shrink:0;min-width:110px;">'
         + '<div style="display:flex;align-items:center;gap:6px;font-size:0.72rem;white-space:nowrap;">'
-        + '<span style="color:#999;">'+esc(abbr(g.away))+' '+scoreAway+'</span>'
-        + '<span style="color:#555;font-size:0.65rem;">@</span>'
-        + '<span style="color:#999;">'+scoreHome+' '+esc(abbr(g.home))+'</span>'
+        + '<span style="color: var(--text2);">'+esc(abbr(g.away))+' '+scoreAway+'</span>'
+        + '<span style="color:var(--text3);font-size:0.65rem;">@</span>'
+        + '<span style="color: var(--text2);">'+scoreHome+' '+esc(abbr(g.home))+'</span>'
         + '</div>'
         + '<div style="font-size:0.63rem;margin-top:2px;">'+dot+'<span style="color:'+statusColor(g.status)+';">'+timeStr+'</span></div>'
         + '</a>';
@@ -112,7 +112,7 @@
   <div class="section-title">Setup</div>
   <div class="setup-row">
     <label>Starting Bankroll:</label>
-    <span style="color:#999;">$</span>
+    <span style="color: var(--text2);">$</span>
     <input id="start-br" type="number" value="1000" min="1">
     <button class="btn" onclick="saveBankroll()">Save & Recalculate</button>
     <span id="br-msg" style="font-size:0.78rem;color:#4caf50;"></span>
@@ -255,7 +255,7 @@ function recalculate(startBR) {
     const clvHtml = avgClv !== null
       ? `<div class="stat-card"><div class="stat-label">Avg CLV</div>
           <div class="stat-val ${avgClv >= 0 ? 'green' : 'red'}">${avgClv >= 0 ? '+' : ''}${avgClv.toFixed(1)}%</div>
-          <div style="font-size:0.7rem;color:#777;margin-top:3px;">${clvPositive}/${clvBets.length} beat close</div></div>`
+          <div style="font-size:0.7rem;color: var(--text3);margin-top:3px;">${clvPositive}/${clvBets.length} beat close</div></div>`
       : '';
     document.getElementById('br-stats').innerHTML += clvHtml;
 
@@ -270,11 +270,11 @@ function recalculate(startBR) {
     });
     const dailyKeys = Object.keys(dailyPL).sort();
     if (dailyKeys.length > 0) {
-      let dailyHtml = '<div class="section"><div class="section-title">📅 Daily P&L</div><div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:0.8rem;"><thead><tr><th style="text-align:left;color:#777;padding:6px 10px;border-bottom:1px solid #241818;">Date</th><th style="text-align:center;color:#777;padding:6px 10px;border-bottom:1px solid #241818;">Record</th><th style="text-align:right;color:#777;padding:6px 10px;border-bottom:1px solid #241818;">P&L</th></tr></thead><tbody>';
+      let dailyHtml = '<div class="section"><div class="section-title">📅 Daily P&L</div><div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:0.8rem;"><thead><tr><th style="text-align:left;color: var(--text3);padding:6px 10px;border-bottom: 1px solid var(--border);">Date</th><th style="text-align:center;color: var(--text3);padding:6px 10px;border-bottom: 1px solid var(--border);">Record</th><th style="text-align:right;color: var(--text3);padding:6px 10px;border-bottom: 1px solid var(--border);">P&L</th></tr></thead><tbody>';
       dailyKeys.reverse().forEach(d => {
         const day = dailyPL[d];
         const plColor = day.pl >= 0 ? '#4caf50' : '#ef5350';
-        dailyHtml += '<tr><td style="padding:6px 10px;border-bottom:1px solid #111;color:#999;">' + d + '</td><td style="text-align:center;padding:6px 10px;border-bottom:1px solid #111;">' + day.w + '-' + day.l + '</td><td style="text-align:right;padding:6px 10px;border-bottom:1px solid #111;font-weight:700;color:' + plColor + ';">' + (day.pl >= 0 ? '+' : '') + '$' + day.pl.toFixed(2) + '</td></tr>';
+        dailyHtml += '<tr><td style="padding:6px 10px;border-bottom:1px solid var(--border);color: var(--text2);">' + d + '</td><td style="text-align:center;padding:6px 10px;border-bottom:1px solid var(--border);">' + day.w + '-' + day.l + '</td><td style="text-align:right;padding:6px 10px;border-bottom:1px solid var(--border);font-weight:700;color:' + plColor + ';">' + (day.pl >= 0 ? '+' : '') + '$' + day.pl.toFixed(2) + '</td></tr>';
       });
       dailyHtml += '</tbody></table></div></div>';
       document.getElementById('projections').parentElement.insertAdjacentHTML('afterend', dailyHtml);
@@ -300,12 +300,12 @@ function recalculate(startBR) {
       return `<div class="proj-card">
         <div class="proj-period">${p.label}</div>
         <div class="proj-val ${diff >= 0 ? 'green' : 'red'}">$${proj.toFixed(0)}</div>
-        <div style="font-size:0.7rem;color:#999;margin-top:3px;">${diff >= 0 ? '+' : ''}$${diff.toFixed(0)}</div>
+        <div style="font-size:0.7rem;color: var(--text2);margin-top:3px;">${diff >= 0 ? '+' : ''}$${diff.toFixed(0)}</div>
       </div>`;
     }).join('');
 
     if (settled.length === 0) {
-      document.getElementById('br-stats').innerHTML += `<div style="grid-column:1/-1;color:#777;font-size:0.82rem;padding:8px 0;">Log settled bets in the Bet Tracker to see your bankroll curve.</div>`;
+      document.getElementById('br-stats').innerHTML += `<div style="grid-column:1/-1;color: var(--text3);font-size:0.82rem;padding:8px 0;">Log settled bets in the Bet Tracker to see your bankroll curve.</div>`;
     }
   });
 }
