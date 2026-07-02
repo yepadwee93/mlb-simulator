@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>!function(){var t=localStorage.getItem("mlb_theme")||"dark",m={dark:{"--bg":"#141010","--bg2":"#1a1212","--bg3":"#241818","--border":"#2a1a1a","--text":"#f0ece4","--text2":"#999","--text3":"#777","--accent":"#e53935","--card-bg":"#1a1212"},medium:{"--bg":"#1c1614","--bg2":"#262020","--bg3":"#302624","--border":"#3a2e2c","--text":"#f0ece4","--text2":"#c0b0a8","--text3":"#998880","--accent":"#ffc107","--card-bg":"#262020"},light:{"--bg":"#f5f0e8","--bg2":"#faf7f2","--bg3":"#ebe4d8","--border":"#d8cfc0","--text":"#2a1a14","--text2":"#5a4a40","--text3":"#8a7a6a","--accent":"#c62828","--card-bg":"#faf7f2"}}[t]||{};Object.entries(m).forEach(function(e){document.documentElement.style.setProperty(e[0],e[1])});document.addEventListener("DOMContentLoaded",function(){document.body.style.background=m["--bg"];document.body.style.color=m["--text"]})}();</script>
+  <meta charset="UTF-8">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NFL Week {{ week }} Simulations — Sports Simulator</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', Arial, sans-serif; padding-bottom: 60px; }
+    a { color: #e53935; text-decoration: none; }
+    .page { max-width: 1000px; margin: 0 auto; padding: 0 16px; }
+    h1 { font-size: 1.5rem; font-weight: 800; margin-bottom: 4px; }
+    .subtitle { color: var(--text2); font-size: 0.88rem; margin-bottom: 24px; }
+    .progress-bar { background: var(--bg3); border-radius: 6px; height: 8px; overflow: hidden; margin-bottom: 20px; }
+    .progress-fill { height: 100%; background: linear-gradient(90deg, #e53935, #ff8a50); border-radius: 6px; transition: width 0.3s; }
+    .progress-text { font-size: 0.78rem; color: var(--text2); margin-bottom: 8px; }
+
+    .games-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+
+    .sim-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px;
+      transition: border-color 0.15s;
+    }
+    .sim-card:hover { border-color: #e53935; }
+    .sim-card.loading { opacity: 0.6; }
+
+    .sim-matchup { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+    .sim-team { text-align: center; flex: 1; }
+    .sim-team-logo { width: 36px; height: 36px; object-fit: contain; margin-bottom: 4px; }
+    .sim-team-name { font-size: 0.85rem; font-weight: 700; }
+    .sim-team-record { font-size: 0.68rem; color: var(--text3); }
+    .sim-team-pct { font-size: 1.6rem; font-weight: 800; margin-top: 4px; }
+    .sim-vs { color: var(--text3); font-size: 0.82rem; font-weight: 600; padding: 0 8px; }
+
+    .sim-bar { display: flex; height: 6px; border-radius: 3px; overflow: hidden; margin-bottom: 10px; }
+    .sim-bar-away { background: #e53935; }
+    .sim-bar-home { background: #81c784; flex: 1; }
+
+    .sim-score { text-align: center; font-size: 0.88rem; font-weight: 700; color: #ffd54f; margin-bottom: 6px; }
+    .sim-spread { text-align: center; font-size: 0.72rem; color: var(--text3); margin-bottom: 8px; }
+
+    .sim-models { display: flex; gap: 4px; justify-content: center; flex-wrap: wrap; margin-bottom: 8px; }
+    .sim-model-tag {
+      font-size: 0.6rem;
+      padding: 2px 6px;
+      border-radius: 6px;
+      font-weight: 600;
+      background: var(--bg);
+      color: var(--text2);
+    }
+    .sim-model-tag.agree { color: #4caf50; }
+    .sim-model-tag.disagree { color: #ef5350; }
+
+    .sim-odds { display: flex; gap: 8px; justify-content: center; margin-top: 8px; }
+    .sim-odds-tag { font-size: 0.65rem; color: var(--text3); background: var(--bg); padding: 2px 8px; border-radius: 6px; }
+
+    .sim-pick {
+      text-align: center;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+    }
+    .sim-pick-label { font-size: 0.65rem; color: var(--text3); text-transform: uppercase; letter-spacing: 0.4px; }
+    .sim-pick-team { font-size: 0.95rem; font-weight: 800; margin-top: 2px; }
+
+    .sim-loading {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--text3);
+      font-size: 0.85rem;
+    }
+    .spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 2px solid var(--border);
+      border-top-color: #e53935;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .best-bets-box {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px 24px;
+      margin-top: 24px;
+    }
+    .best-bets-title { font-size: 1rem; font-weight: 800; margin-bottom: 14px; }
+    .best-bet-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .best-bet-row:last-child { border-bottom: none; }
+    .best-bet-team { font-weight: 700; font-size: 0.9rem; }
+    .best-bet-detail { font-size: 0.72rem; color: var(--text3); }
+    .best-bet-pct { font-size: 1.2rem; font-weight: 800; }
+    .best-bet-tier {
+      font-size: 0.6rem;
+      padding: 2px 8px;
+      border-radius: 8px;
+      font-weight: 700;
+      text-transform: uppercase;
+      margin-left: 8px;
+    }
+    .tier-strong { background: #e5393522; color: #ef5350; border: 1px solid #e5393544; }
+    .tier-good { background: #4caf5022; color: #4caf50; border: 1px solid #4caf5044; }
+
+    @media (max-width: 768px) {
+      .page { padding: 0 8px; }
+      .games-grid { grid-template-columns: 1fr; }
+      h1 { font-size: 1.3rem; }
+    }
+  </style>
+</head>
+<body>
+
+{% include "_navbar.html" %}
+
+<div class="page">
+  <h1>🏈 NFL Week {{ week }} — Simulate All</h1>
+  <p class="subtitle">Running 5,000 simulations per game with 5 prediction models.</p>
+
+  <div class="progress-text" id="prog-text">Simulating 0 / {{ games|length }} games...</div>
+  <div class="progress-bar">
+    <div class="progress-fill" id="prog-fill" style="width:0%;"></div>
+  </div>
+
+  <div class="games-grid" id="games-grid">
+    {% for g in games %}
+    <div class="sim-card loading" id="card-{{ g.game_id }}" data-game-id="{{ g.game_id }}">
+      <div class="sim-matchup">
+        <div class="sim-team">
+          {% if g.away.logo %}<img class="sim-team-logo" src="{{ g.away.logo }}" loading="lazy">{% endif %}
+          <div class="sim-team-name">{{ g.away.short_name or g.away.abbr }}</div>
+          <div class="sim-team-record">{{ g.away.record }}</div>
+          <div class="sim-team-pct away" id="away-pct-{{ g.game_id }}" style="color:#e53935;">—</div>
+        </div>
+        <div class="sim-vs">@</div>
+        <div class="sim-team">
+          {% if g.home.logo %}<img class="sim-team-logo" src="{{ g.home.logo }}" loading="lazy">{% endif %}
+          <div class="sim-team-name">{{ g.home.short_name or g.home.abbr }}</div>
+          <div class="sim-team-record">{{ g.home.record }}</div>
+          <div class="sim-team-pct home" id="home-pct-{{ g.game_id }}" style="color:#81c784;">—</div>
+        </div>
+      </div>
+      <div class="sim-loading" id="loading-{{ g.game_id }}">
+        <span class="spinner"></span> Simulating...
+      </div>
+      <div id="result-{{ g.game_id }}" style="display:none;"></div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="best-bets-box" id="best-bets" style="display:none;">
+    <div class="best-bets-title">🎯 Best Bets This Week</div>
+    <div id="best-bets-list"></div>
+  </div>
+</div>
+
+<script>
+function getCsrfToken(){return document.cookie.split(';').map(function(c){return c.trim();}).find(function(c){return c.startsWith('csrf_token=');})?.split('=')[1]||'';}
+function csrfFetch(url,opts){opts=opts||{};opts.headers=Object.assign({'X-CSRFToken':getCsrfToken()},opts.headers||{});return fetch(url,opts);}
+
+(function() {
+  var cards = document.querySelectorAll('.sim-card[data-game-id]');
+  var total = cards.length;
+  var done = 0;
+  var allResults = [];
+
+  function updateProgress() {
+    done++;
+    var pct = Math.round(done / total * 100);
+    document.getElementById('prog-fill').style.width = pct + '%';
+    document.getElementById('prog-text').textContent = 'Simulated ' + done + ' / ' + total + ' games' + (done === total ? ' ✓' : '...');
+    if (done === total) showBestBets();
+  }
+
+  function showBestBets() {
+    var strong = allResults.filter(function(r) { return r.pct >= 65; });
+    strong.sort(function(a, b) { return b.pct - a.pct; });
+    if (strong.length === 0) return;
+
+    document.getElementById('best-bets').style.display = '';
+    var html = '';
+    strong.forEach(function(r) {
+      var tierClass = r.pct >= 70 ? 'tier-strong' : 'tier-good';
+      var tierLabel = r.pct >= 70 ? 'STRONG' : 'GOOD';
+      var pctColor = r.pct >= 70 ? '#ef5350' : '#4caf50';
+      html += '<div class="best-bet-row">'
+        + '<div><div class="best-bet-team">' + r.team + '</div>'
+        + '<div class="best-bet-detail">vs ' + r.opp + ' · ' + r.venue + '</div></div>'
+        + '<div style="display:flex;align-items:center;">'
+        + '<span class="best-bet-pct" style="color:' + pctColor + ';">' + r.pct + '%</span>'
+        + '<span class="best-bet-tier ' + tierClass + '">' + tierLabel + '</span>'
+        + '</div></div>';
+    });
+    document.getElementById('best-bets-list').innerHTML = html;
+  }
+
+  function renderCard(gid, data) {
+    var card = document.getElementById('card-' + gid);
+    card.classList.remove('loading');
+    document.getElementById('loading-' + gid).style.display = 'none';
+    document.getElementById('away-pct-' + gid).textContent = data.away_win_pct + '%';
+    document.getElementById('home-pct-' + gid).textContent = data.home_win_pct + '%';
+
+    var winner = data.predicted_winner;
+    var winPct = Math.max(data.home_win_pct, data.away_win_pct);
+    var loser = winner === data.home_team ? data.away_team : data.home_team;
+
+    allResults.push({ team: winner, opp: loser, pct: winPct, venue: data.venue || '' });
+
+    var modelIcons = { monte_carlo: '🎲', elo: '📊', dvoa: '📈', turnover: '🔄', log5: '📐' };
+    var modelsHtml = '';
+    if (data.models) {
+      Object.keys(data.models).forEach(function(k) {
+        var m = data.models[k];
+        var mFav = m.away_pct > 50 ? data.away_team : data.home_team;
+        var agree = (mFav === winner);
+        modelsHtml += '<span class="sim-model-tag ' + (agree ? 'agree' : 'disagree') + '">'
+          + (modelIcons[k] || '📈') + ' ' + Math.max(m.away_pct, m.home_pct) + '%</span>';
+      });
+    }
+
+    var oddsHtml = '';
+    if (data.spread_line) {
+      oddsHtml += '<span class="sim-odds-tag">Spread: ' + data.spread_line + '</span>';
+    }
+    if (data.over_under_line) {
+      oddsHtml += '<span class="sim-odds-tag">O/U: ' + data.over_under_line + '</span>';
+    }
+
+    var pickColor = winPct >= 70 ? '#ef5350' : winPct >= 60 ? '#4caf50' : '#ffd54f';
+
+    var html = '<div class="sim-bar"><div class="sim-bar-away" style="width:' + data.away_win_pct + '%"></div><div class="sim-bar-home"></div></div>'
+      + '<div class="sim-score">' + data.away_team + ' ' + data.away_avg_pts + ' — ' + data.home_avg_pts + ' ' + data.home_team + '</div>'
+      + '<div class="sim-spread">Spread: ' + data.home_team + ' ' + (data.predicted_spread > 0 ? '-' : '+') + Math.abs(data.predicted_spread) + ' · Total: ' + data.predicted_total + '</div>'
+      + '<div class="sim-models">' + modelsHtml + '</div>'
+      + (oddsHtml ? '<div class="sim-odds">' + oddsHtml + '</div>' : '')
+      + '<div class="sim-pick"><div class="sim-pick-label">Model Pick · ' + data.models_agree + '/5 agree</div>'
+      + '<div class="sim-pick-team" style="color:' + pickColor + ';">' + winner + ' (' + winPct + '%)</div></div>';
+
+    var resultDiv = document.getElementById('result-' + gid);
+    resultDiv.innerHTML = html;
+    resultDiv.style.display = '';
+
+    // Make card clickable
+    card.style.cursor = 'pointer';
+    card.onclick = function() { window.location.href = '/nfl/game/' + gid; };
+  }
+
+  // Simulate games sequentially to avoid overwhelming the server
+  var queue = Array.from(cards).map(function(c) { return c.dataset.gameId; });
+  var concurrency = 2;
+  var idx = 0;
+
+  function next() {
+    if (idx >= queue.length) return;
+    var gid = queue[idx++];
+    csrfFetch('/api/nfl-sim/' + gid + '?week={{ week }}')
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.error) {
+          document.getElementById('loading-' + gid).innerHTML = '<span style="color:#ef5350;">Error: ' + data.error + '</span>';
+          document.getElementById('card-' + gid).classList.remove('loading');
+        } else {
+          renderCard(gid, data);
+        }
+        updateProgress();
+        next();
+      })
+      .catch(function(e) {
+        document.getElementById('loading-' + gid).innerHTML = '<span style="color:#ef5350;">Failed to simulate</span>';
+        document.getElementById('card-' + gid).classList.remove('loading');
+        updateProgress();
+        next();
+      });
+  }
+
+  for (var i = 0; i < Math.min(concurrency, queue.length); i++) next();
+})();
+</script>
+</body>
+</html>

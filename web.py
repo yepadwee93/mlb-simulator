@@ -2987,26 +2987,118 @@ def nfl_schedule():
     )
 
 
+@app.route("/nfl/simulate-all")
+@login_required
+def nfl_simulate_all():
+    """NFL simulate-all page — loads schedule, sims each game via AJAX."""
+    from data.nfl_api import get_current_week, get_nfl_schedule
+
+    week = request.args.get("week", type=int)
+    if week is None:
+        week = get_current_week()
+
+    today = _today_est()
+    year = today.year if today.month >= 3 else today.year - 1
+    games = get_nfl_schedule(week=week, season_type=2, year=year)
+
+    return render_template(
+        "nfl_all_results.html",
+        games=games,
+        week=week,
+        username=current_user.username,
+    )
+
+
+@app.route("/api/nfl-sim/<game_id>")
+@login_required
+def api_nfl_sim(game_id):
+    """Simulate one NFL game and return JSON for the grid card."""
+    from data.nfl_api import get_current_week, get_nfl_schedule, get_team_stats
+    from simulation.nfl_engine import simulate_game
+
+    week = request.args.get("week", type=int)
+    if week is None:
+        week = get_current_week()
+
+    games = get_nfl_schedule(week=week, season_type=2)
+    game = next((g for g in games if str(g["game_id"]) == str(game_id)), None)
+
+    if not game:
+        for wk in range(1, 23):
+            if wk == week:
+                continue
+            games = get_nfl_schedule(week=wk, season_type=2)
+            game = next((g for g in games if str(g["game_id"]) == str(game_id)), None)
+            if game:
+                break
+
+    if not game:
+        return jsonify({"error": "Game not found"}), 404
+
+    home_abbr = game["home"]["abbr"]
+    away_abbr = game["away"]["abbr"]
+
+    try:
+        home_stats = get_team_stats(home_abbr)
+        away_stats = get_team_stats(away_abbr)
+        result = simulate_game(
+            home_stats=home_stats,
+            away_stats=away_stats,
+            home_abbr=home_abbr,
+            away_abbr=away_abbr,
+            n_sims=5000,
+        )
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+    # Attach odds
+    try:
+        from data.nfl_api import get_nfl_odds
+
+        all_odds = get_nfl_odds()
+        matchup_key = f"{game['away']['name']} @ {game['home']['name']}"
+        odds_data = all_odds.get(matchup_key)
+        if odds_data:
+            result["spread_line"] = odds_data.get("spread")
+            result["over_under_line"] = odds_data.get("over_under")
+            result["away_ml"] = odds_data.get("away_ml")
+            result["home_ml"] = odds_data.get("home_ml")
+    except Exception:
+        pass
+
+    result["game_id"] = game_id
+    result["home_logo"] = game["home"].get("logo", "")
+    result["away_logo"] = game["away"].get("logo", "")
+    result["home_record"] = game["home"].get("record", "")
+    result["away_record"] = game["away"].get("record", "")
+    result["venue"] = game.get("venue", "")
+    result["game_time"] = game.get("game_time", "")
+
+    return jsonify(result)
+
+
 @app.route("/nfl/game/<game_id>")
 @login_required
 def nfl_game(game_id):
     """Simulate a single NFL game."""
-    from data.nfl_api import NFL_TEAMS, get_nfl_schedule, get_team_stats
+    from data.nfl_api import get_current_week, get_nfl_schedule, get_team_stats
     from simulation.nfl_engine import simulate_game
 
-    # Find the game in the current schedule
-    game = None
-    for st in [2, 1, 3]:
+    week = request.args.get("week", type=int)
+    if week is None:
+        week = get_current_week()
+
+    games = get_nfl_schedule(week=week, season_type=2)
+    game = next((g for g in games if str(g["game_id"]) == str(game_id)), None)
+
+    if not game:
         for wk in range(1, 23):
-            games = get_nfl_schedule(week=wk, season_type=st)
-            for g in games:
-                if str(g["game_id"]) == str(game_id):
-                    game = g
-                    break
+            if wk == week:
+                continue
+            games = get_nfl_schedule(week=wk, season_type=2)
+            game = next((g for g in games if str(g["game_id"]) == str(game_id)), None)
             if game:
                 break
-        if game:
-            break
 
     if not game:
         return "Game not found", 404
