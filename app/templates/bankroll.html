@@ -130,6 +130,34 @@
   <canvas id="br-chart" style="width:100%;height:260px;"></canvas>
 </div>
 
+<!-- Bankroll Alerts -->
+<div class="section" id="alerts-section">
+  <div class="section-title">🔔 Bankroll Alerts</div>
+  <div id="alert-banner" style="display:none;padding:12px 16px;border-radius:10px;margin-bottom:14px;font-size:0.85rem;font-weight:600;"></div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px;">
+    <label style="font-size:0.8rem;color:var(--text2);">Alert when balance drops below:</label>
+    <span style="color:var(--text2);">$</span>
+    <input id="alert-low" type="number" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:6px 10px;font-size:0.85rem;width:100px;">
+  </div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px;">
+    <label style="font-size:0.8rem;color:var(--text2);">Alert when balance exceeds:</label>
+    <span style="color:var(--text2);">$</span>
+    <input id="alert-high" type="number" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:6px 10px;font-size:0.85rem;width:100px;">
+  </div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px;">
+    <label style="font-size:0.8rem;color:var(--text2);">Alert on drawdown exceeding:</label>
+    <input id="alert-dd" type="number" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:6px 10px;font-size:0.85rem;width:80px;" placeholder="25">
+    <span style="color:var(--text2);font-size:0.8rem;">%</span>
+  </div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+    <label style="font-size:0.8rem;color:var(--text2);">Daily loss limit:</label>
+    <span style="color:var(--text2);">$</span>
+    <input id="alert-daily" type="number" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:6px 10px;font-size:0.85rem;width:100px;">
+    <button class="btn" onclick="saveAlerts()">Save Alerts</button>
+    <span id="alert-msg" style="font-size:0.78rem;color:#4caf50;"></span>
+  </div>
+</div>
+
 <!-- Projections -->
 <div class="section">
   <div class="section-title">🔮 Projected Growth (at current ROI)</div>
@@ -307,11 +335,71 @@ function recalculate(startBR) {
     if (settled.length === 0) {
       document.getElementById('br-stats').innerHTML += `<div style="grid-column:1/-1;color: var(--text3);font-size:0.82rem;padding:8px 0;">Log settled bets in the Bet Tracker to see your bankroll curve.</div>`;
     }
+
+    // Check bankroll alerts
+    const today = new Date().toISOString().slice(0, 10);
+    const todayPL = dailyPL[today] ? dailyPL[today].pl : null;
+    checkAlerts(balance, maxDrawdown, todayPL);
   });
+}
+
+function saveAlerts() {
+  const alerts = {
+    low: parseFloat(document.getElementById('alert-low').value) || null,
+    high: parseFloat(document.getElementById('alert-high').value) || null,
+    dd: parseFloat(document.getElementById('alert-dd').value) || null,
+    daily: parseFloat(document.getElementById('alert-daily').value) || null,
+  };
+  localStorage.setItem('mlb_bankroll_alerts', JSON.stringify(alerts));
+  const msg = document.getElementById('alert-msg');
+  msg.textContent = 'Saved!';
+  setTimeout(() => msg.textContent = '', 1500);
+  recalculate(loadBankroll());
+}
+
+function loadAlerts() {
+  try {
+    return JSON.parse(localStorage.getItem('mlb_bankroll_alerts')) || {};
+  } catch(e) { return {}; }
+}
+
+function checkAlerts(balance, maxDrawdown, dailyPL) {
+  const alerts = loadAlerts();
+  const banner = document.getElementById('alert-banner');
+  const messages = [];
+
+  if (alerts.low && balance <= alerts.low) {
+    messages.push('⚠️ Balance ($' + balance.toFixed(0) + ') is at or below your $' + alerts.low + ' floor');
+  }
+  if (alerts.high && balance >= alerts.high) {
+    messages.push('🎉 Balance ($' + balance.toFixed(0) + ') hit your $' + alerts.high + ' target!');
+  }
+  if (alerts.dd && maxDrawdown >= alerts.dd) {
+    messages.push('🔻 Max drawdown (' + maxDrawdown.toFixed(1) + '%) exceeds your ' + alerts.dd + '% limit');
+  }
+  if (alerts.daily && dailyPL !== null && dailyPL < 0 && Math.abs(dailyPL) >= alerts.daily) {
+    messages.push('🛑 Today\'s loss ($' + Math.abs(dailyPL).toFixed(2) + ') hit your $' + alerts.daily + ' daily limit');
+  }
+
+  if (messages.length > 0) {
+    const hasWarning = messages.some(m => m.startsWith('⚠') || m.startsWith('🔻') || m.startsWith('🛑'));
+    banner.style.display = 'block';
+    banner.style.background = hasWarning ? '#3a1a1a' : '#1b4332';
+    banner.style.border = '1px solid ' + (hasWarning ? '#c62828' : '#2e7d32');
+    banner.style.color = hasWarning ? '#ef9a9a' : '#a5d6a7';
+    banner.innerHTML = messages.join('<br>');
+  } else {
+    banner.style.display = 'none';
+  }
 }
 
 window.addEventListener('load', () => {
   const br = loadBankroll();
+  const alerts = loadAlerts();
+  if (alerts.low) document.getElementById('alert-low').value = alerts.low;
+  if (alerts.high) document.getElementById('alert-high').value = alerts.high;
+  if (alerts.dd) document.getElementById('alert-dd').value = alerts.dd;
+  if (alerts.daily) document.getElementById('alert-daily').value = alerts.daily;
   recalculate(br);
 });
 </script>

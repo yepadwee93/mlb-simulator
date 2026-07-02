@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>!function(){var t=localStorage.getItem("mlb_theme")||"dark",m={dark:{"--bg":"#141010","--bg2":"#1a1212","--bg3":"#241818","--border":"#2a1a1a","--text":"#f0ece4","--text2":"#999","--text3":"#777","--accent":"#e53935","--card-bg":"#1a1212"},medium:{"--bg":"#1c1614","--bg2":"#262020","--bg3":"#302624","--border":"#3a2e2c","--text":"#f0ece4","--text2":"#c0b0a8","--text3":"#998880","--accent":"#ffc107","--card-bg":"#262020"},light:{"--bg":"#f5f0e8","--bg2":"#faf7f2","--bg3":"#ebe4d8","--border":"#d8cfc0","--text":"#2a1a14","--text2":"#5a4a40","--text3":"#8a7a6a","--accent":"#c62828","--card-bg":"#faf7f2"}}[t]||{};Object.entries(m).forEach(function(e){document.documentElement.style.setProperty(e[0],e[1])});document.addEventListener("DOMContentLoaded",function(){document.body.style.background=m["--bg"];document.body.style.color=m["--text"]})}();</script>
+  <meta charset="UTF-8">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Model Backtesting — MLB Simulator</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', Arial, sans-serif; padding-bottom: 60px; }
+    a { color: #e53935; text-decoration: none; }
+    .page { max-width: 900px; margin: 0 auto; padding: 0 16px; }
+    h1 { font-size: 1.4rem; font-weight: 800; margin-bottom: 6px; }
+    .subtitle { color: var(--text2); font-size: 0.88rem; margin-bottom: 24px; }
+    .section { background: var(--card-bg); border: 1px solid var(--border); border-radius: 14px; padding: 20px 24px; margin-bottom: 20px; }
+    .section-title { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: var(--text2); margin-bottom: 14px; }
+    .filter-bar { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+    .filter-bar input, .filter-bar select { background: var(--card-bg); border: 1px solid var(--border); color: var(--text); padding: 7px 12px; border-radius: 8px; font-size: 0.82rem; }
+    .filter-bar button { background: var(--bg3); border: 1px solid #c62828; color: #e53935; padding: 7px 16px; border-radius: 8px; cursor: pointer; font-size: 0.82rem; font-weight: 600; }
+    .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 24px; }
+    .stat-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; text-align: center; }
+    .stat-label { font-size: 0.65rem; color: var(--text2); text-transform: uppercase; letter-spacing: .4px; margin-bottom: 4px; font-weight: 700; }
+    .stat-val { font-size: 1.4rem; font-weight: 800; }
+    .tier-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+    .tier-card { background: var(--bg); border-radius: 10px; padding: 14px; text-align: center; }
+    .tier-label { font-size: 0.72rem; color: var(--text2); font-weight: 700; margin-bottom: 6px; }
+    .tier-pct { font-size: 1.3rem; font-weight: 800; }
+    .tier-record { font-size: 0.72rem; color: var(--text3); margin-top: 2px; }
+    .tier-bar-wrap { background: var(--bg3); border-radius: 4px; height: 6px; overflow: hidden; margin-top: 8px; }
+    .tier-bar { height: 100%; border-radius: 4px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    thead th { padding: 8px 12px; text-align: left; font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; color: var(--text3); border-bottom: 1px solid var(--border); }
+    tbody td { padding: 8px 12px; border-bottom: 1px solid var(--border); }
+    tbody tr:last-child td { border-bottom: none; }
+    .green { color: #4caf50; } .red { color: #ef5350; } .gold { color: #ffd54f; }
+
+    @media (max-width: 768px) {
+      .page { padding: 0 8px; }
+      h1 { font-size: 1.2rem; }
+      .filter-bar { flex-direction: column; align-items: stretch; }
+      .stat-grid { grid-template-columns: repeat(2, 1fr); }
+      .tier-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+{% include "_navbar.html" %}
+
+<div class="page">
+  <h1>🔬 Model Backtesting</h1>
+  <p class="subtitle">Analyze how the model performed across historical predictions by confidence tier and date range.</p>
+
+  <!-- Filters -->
+  <form method="get" action="/backtest" class="filter-bar">
+    <span style="font-size:0.8rem;color:var(--text2);">From:</span>
+    <input type="date" name="from" value="{{ date_from }}">
+    <span style="font-size:0.8rem;color:var(--text2);">To:</span>
+    <input type="date" name="to" value="{{ date_to }}">
+    <span style="font-size:0.8rem;color:var(--text2);">Min Confidence:</span>
+    <select name="min_conf">
+      <option value="">All</option>
+      <option value="55" {% if min_conf == 55 %}selected{% endif %}>55%+</option>
+      <option value="60" {% if min_conf == 60 %}selected{% endif %}>60%+</option>
+      <option value="65" {% if min_conf == 65 %}selected{% endif %}>65%+</option>
+      <option value="70" {% if min_conf == 70 %}selected{% endif %}>70%+</option>
+    </select>
+    <button type="submit">Run Backtest</button>
+    {% if date_from or date_to or min_conf %}
+    <a href="/backtest" style="font-size:0.78rem;color:#ef9a9a;">Clear</a>
+    {% endif %}
+  </form>
+
+  <!-- Overall Stats -->
+  <div class="stat-grid">
+    <div class="stat-card">
+      <div class="stat-label">Total Predictions</div>
+      <div class="stat-val">{{ total }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Correct</div>
+      <div class="stat-val green">{{ correct }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Accuracy</div>
+      <div class="stat-val {% if pct >= 55 %}green{% elif pct >= 50 %}gold{% else %}red{% endif %}">{{ pct }}%</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Wrong</div>
+      <div class="stat-val red">{{ total - correct }}</div>
+    </div>
+  </div>
+
+  <!-- Confidence Tier Breakdown -->
+  <div class="section">
+    <div class="section-title">Performance by Confidence Tier</div>
+    <div class="tier-grid">
+      {% for t in tiers %}
+      {% if t.total > 0 %}
+      <div class="tier-card">
+        <div class="tier-label">{{ t.label }}</div>
+        <div class="tier-pct {% if t.pct >= 55 %}green{% elif t.pct >= 50 %}gold{% else %}red{% endif %}">{{ t.pct }}%</div>
+        <div class="tier-record">{{ t.correct }}/{{ t.total }}</div>
+        <div class="tier-bar-wrap">
+          <div class="tier-bar" style="width:{{ t.pct }}%;background:{% if t.pct >= 55 %}#4caf50{% elif t.pct >= 50 %}#ffd54f{% else %}#ef5350{% endif %};"></div>
+        </div>
+      </div>
+      {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Rolling Accuracy Chart -->
+  {% if rolling %}
+  <div class="section">
+    <div class="section-title">Rolling Accuracy Over Time</div>
+    <canvas id="rolling-chart" style="width:100%;height:260px;"></canvas>
+  </div>
+
+  <!-- Daily Breakdown Table -->
+  <div class="section" style="overflow-x:auto;">
+    <div class="section-title">Daily Breakdown</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th style="text-align:center;">Games</th>
+          <th style="text-align:center;">Correct</th>
+          <th style="text-align:center;">Day Accuracy</th>
+          <th style="text-align:center;">Cumulative</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rolling|reverse %}
+        <tr>
+          <td style="color:var(--text2);font-size:0.78rem;">{{ r.date }}</td>
+          <td style="text-align:center;">{{ r.day_total }}</td>
+          <td style="text-align:center;">{{ r.day_correct }}</td>
+          <td style="text-align:center;font-weight:700;color:{% if r.day_pct >= 55 %}#4caf50{% elif r.day_pct >= 50 %}#ffd54f{% else %}#ef5350{% endif %};">{{ r.day_pct }}%</td>
+          <td style="text-align:center;color:var(--text2);">{{ r.cum_pct }}%</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="section" style="text-align:center;padding:40px;color:var(--text3);">
+    No settled predictions found for the selected filters. Run simulations first, then come back to analyze performance.
+  </div>
+  {% endif %}
+</div>
+
+{% if rolling %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script>
+(function() {
+  var rolling = {{ rolling | tojson }};
+  var labels = rolling.map(function(r) { return r.date; });
+  var dailyPct = rolling.map(function(r) { return r.day_pct; });
+  var cumPct = rolling.map(function(r) { return r.cum_pct; });
+
+  new Chart(document.getElementById('rolling-chart'), {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Daily Accuracy',
+        data: dailyPct,
+        borderColor: '#ffd54f',
+        backgroundColor: 'rgba(255,213,79,0.05)',
+        fill: false,
+        tension: 0.3,
+        pointRadius: dailyPct.length < 30 ? 4 : 2,
+        pointBackgroundColor: '#ffd54f',
+        borderWidth: 1.5,
+      }, {
+        label: 'Cumulative Accuracy',
+        data: cumPct,
+        borderColor: '#4caf50',
+        backgroundColor: 'rgba(76,175,80,0.08)',
+        fill: true,
+        tension: 0.3,
+        pointRadius: cumPct.length < 30 ? 4 : 2,
+        pointBackgroundColor: '#4caf50',
+        borderWidth: 2,
+      }, {
+        label: '50% Baseline',
+        data: Array(labels.length).fill(50),
+        borderColor: '#555',
+        borderDash: [4, 4],
+        pointRadius: 0,
+        fill: false,
+        borderWidth: 1,
+      }]
+    },
+    options: {
+      responsive: true,
+      interaction: { mode: 'index' },
+      scales: {
+        y: {
+          min: 0, max: 100,
+          grid: { color: '#1a1d28' },
+          ticks: { color: '#999', callback: function(v) { return v + '%'; } }
+        },
+        x: {
+          ticks: { color: '#999', font: { size: 9 }, maxRotation: 45, maxTicksLimit: 12 },
+          grid: { display: false }
+        }
+      },
+      plugins: { legend: { labels: { color: '#999' } } }
+    }
+  });
+})();
+</script>
+{% endif %}
+
+<script>
+function getCsrfToken(){return document.cookie.split(';').map(function(c){return c.trim();}).find(function(c){return c.startsWith('csrf_token=');})?.split('=')[1]||'';}
+function csrfFetch(url,opts){opts=opts||{};opts.headers=Object.assign({'X-CSRFToken':getCsrfToken()},opts.headers||{});return fetch(url,opts);}
+</script>
+</body>
+</html>

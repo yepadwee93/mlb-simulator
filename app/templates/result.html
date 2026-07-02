@@ -570,6 +570,17 @@
   </div>
 </div>
 
+<!-- ── Share Pick Card ── -->
+<div style="max-width:700px;margin:0 auto 24px auto;display:flex;gap:10px;justify-content:center;">
+  <button id="share-pick-btn" onclick="sharePickCard()" style="background:var(--card-bg);border:1px solid var(--border);color:var(--text);padding:8px 20px;border-radius:10px;cursor:pointer;font-size:0.82rem;font-weight:600;display:flex;align-items:center;gap:6px;">
+    📤 Share Pick
+  </button>
+  <button id="download-pick-btn" onclick="downloadPickCard()" style="background:var(--card-bg);border:1px solid var(--border);color:var(--text);padding:8px 20px;border-radius:10px;cursor:pointer;font-size:0.82rem;font-weight:600;display:flex;align-items:center;gap:6px;">
+    💾 Download Image
+  </button>
+</div>
+<canvas id="share-canvas" style="display:none;"></canvas>
+
 <!-- ── Odds comparison card ── -->
 {% if away_implied_pct %}
 <div class="card" id="sec-odds">
@@ -1344,6 +1355,51 @@ function qbSubmit() {
   {{ lineup_table(away_team, away_batters, home_pitcher_name, home_pitcher_hand) }}
   {{ lineup_table(home_team, home_batters, away_pitcher_name, away_pitcher_hand) }}
 </div>
+
+<!-- ── Matchup Heatmap ── -->
+{% macro heatmap_grid(team_name, batters, pitcher_name) %}
+{% set has_data = [] %}
+{% for b in batters %}{% if b.vs_pitcher_pa and b.vs_pitcher_pa >= 3 %}{% if has_data.append(1) %}{% endif %}{% endif %}{% endfor %}
+{% if has_data %}
+<div style="margin-bottom:16px;">
+  <div style="font-weight:700;font-size:0.82rem;color:var(--text);margin-bottom:8px;">{{ team_name }} vs {{ pitcher_name }}</div>
+  <div style="display:grid;grid-template-columns:120px repeat(4, 1fr);gap:1px;font-size:0.72rem;">
+    <div style="padding:6px 8px;color:var(--text3);font-weight:700;font-size:0.62rem;text-transform:uppercase;">Batter</div>
+    <div style="padding:6px 4px;color:var(--text3);font-weight:700;font-size:0.62rem;text-transform:uppercase;text-align:center;">AVG</div>
+    <div style="padding:6px 4px;color:var(--text3);font-weight:700;font-size:0.62rem;text-transform:uppercase;text-align:center;">OPS</div>
+    <div style="padding:6px 4px;color:var(--text3);font-weight:700;font-size:0.62rem;text-transform:uppercase;text-align:center;">HR</div>
+    <div style="padding:6px 4px;color:var(--text3);font-weight:700;font-size:0.62rem;text-transform:uppercase;text-align:center;">PA</div>
+    {% for b in batters %}
+    {% if b.vs_pitcher_pa and b.vs_pitcher_pa >= 3 %}
+    {% set avg_val = b.vs_pitcher_avg | replace('.','') | int if b.vs_pitcher_avg != '—' else 0 %}
+    {% set avg_color = '#4caf50' if avg_val >= 300 else '#81c784' if avg_val >= 270 else '#ffa726' if avg_val >= 230 else '#ef5350' if avg_val >= 1 else 'var(--text3)' %}
+    {% set ops_str = b.vs_pitcher_ops | replace('.','') if b.vs_pitcher_ops != '—' else '0' %}
+    {% set ops_val = ops_str | int if ops_str.isdigit() else 0 %}
+    {% set ops_color = '#4caf50' if ops_val >= 850 else '#81c784' if ops_val >= 750 else '#ffa726' if ops_val >= 650 else '#ef5350' if ops_val >= 1 else 'var(--text3)' %}
+    <div style="padding:5px 8px;color:var(--text);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-bottom:1px solid var(--border);">{{ b.name.split(' ')[-1] }}</div>
+    <div style="padding:5px 4px;text-align:center;font-weight:800;color:{{ avg_color }};border-bottom:1px solid var(--border);">{{ b.vs_pitcher_avg }}</div>
+    <div style="padding:5px 4px;text-align:center;font-weight:700;color:{{ ops_color }};border-bottom:1px solid var(--border);">{{ b.vs_pitcher_ops }}</div>
+    <div style="padding:5px 4px;text-align:center;font-weight:700;color:{% if b.vs_pitcher_hr and b.vs_pitcher_hr > 0 %}#ffd54f{% else %}var(--text3){% endif %};border-bottom:1px solid var(--border);">{{ b.vs_pitcher_hr or 0 }}</div>
+    <div style="padding:5px 4px;text-align:center;color:var(--text3);border-bottom:1px solid var(--border);">{{ b.vs_pitcher_pa }}</div>
+    {% endif %}
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+{% endmacro %}
+
+{% if away_batters or home_batters %}
+{% set show_heatmap = [] %}
+{% for b in away_batters %}{% if b.vs_pitcher_pa and b.vs_pitcher_pa >= 3 %}{% if show_heatmap.append(1) %}{% endif %}{% endif %}{% endfor %}
+{% for b in home_batters %}{% if b.vs_pitcher_pa and b.vs_pitcher_pa >= 3 %}{% if show_heatmap.append(1) %}{% endif %}{% endfor %}
+{% if show_heatmap %}
+<div class="card" style="max-width:900px;margin-top:20px;">
+  <div class="section-title">⚔️ Matchup Heatmap <span style="font-size:0.72rem;font-weight:400;text-transform:none;letter-spacing:0;color:var(--text3);margin-left:8px;">Career batter vs pitcher stats (3+ PA)</span></div>
+  {{ heatmap_grid(away_team, away_batters, home_pitcher_name) }}
+  {{ heatmap_grid(home_team, home_batters, away_pitcher_name) }}
+</div>
+{% endif %}
+{% endif %}
 
 <!-- ── Batter Prop Model Predictions ── -->
 <div id="sec-props"></div>
@@ -2188,6 +2244,132 @@ function csrfFetch(url,opts){opts=opts||{};opts.headers=Object.assign({'X-CSRFTo
     });
   });
 })();
+</script>
+<script>
+function buildPickCanvas() {
+  var c = document.getElementById('share-canvas');
+  var ctx = c.getContext('2d');
+  var W = 600, H = 340;
+  c.width = W; c.height = H;
+
+  // Background gradient
+  var grad = ctx.createLinearGradient(0, 0, W, H);
+  grad.addColorStop(0, '#1a1212');
+  grad.addColorStop(1, '#241818');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  // Border
+  ctx.strokeStyle = '#e53935';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(1, 1, W - 2, H - 2);
+
+  // Header bar
+  ctx.fillStyle = '#e5393522';
+  ctx.fillRect(0, 0, W, 48);
+  ctx.fillStyle = '#e53935';
+  ctx.font = 'bold 14px Segoe UI, Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('SPORTS SIMULATOR', W / 2, 30);
+
+  // Teams
+  var away = '{{ away_team }}';
+  var home = '{{ home_team }}';
+  var awayPct = '{{ away_win_pct }}';
+  var homePct = '{{ home_win_pct }}';
+  var venue = '{{ venue }}';
+  var awayRuns = '{{ away_avg_runs }}';
+  var homeRuns = '{{ home_avg_runs }}';
+
+  // Away team
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#f0ece4';
+  ctx.font = 'bold 18px Segoe UI, Arial, sans-serif';
+  ctx.fillText(away, 150, 90);
+  ctx.fillStyle = '#e53935';
+  ctx.font = 'bold 48px Segoe UI, Arial, sans-serif';
+  ctx.fillText(awayPct + '%', 150, 150);
+  ctx.fillStyle = '#999';
+  ctx.font = '12px Segoe UI, Arial, sans-serif';
+  ctx.fillText('WIN PROBABILITY', 150, 170);
+
+  // VS
+  ctx.fillStyle = '#555';
+  ctx.font = 'bold 16px Segoe UI, Arial, sans-serif';
+  ctx.fillText('@', W / 2, 130);
+
+  // Home team
+  ctx.fillStyle = '#f0ece4';
+  ctx.font = 'bold 18px Segoe UI, Arial, sans-serif';
+  ctx.fillText(home, 450, 90);
+  ctx.fillStyle = '#81c784';
+  ctx.font = 'bold 48px Segoe UI, Arial, sans-serif';
+  ctx.fillText(homePct + '%', 450, 150);
+  ctx.fillStyle = '#999';
+  ctx.font = '12px Segoe UI, Arial, sans-serif';
+  ctx.fillText('WIN PROBABILITY', 450, 170);
+
+  // Probability bar
+  var barX = 40, barY = 200, barW = W - 80, barH = 14;
+  var awayW = barW * (parseFloat(awayPct) / 100);
+  ctx.fillStyle = '#e53935';
+  ctx.beginPath();
+  ctx.roundRect(barX, barY, awayW, barH, [7, 0, 0, 7]);
+  ctx.fill();
+  ctx.fillStyle = '#81c784';
+  ctx.beginPath();
+  ctx.roundRect(barX + awayW, barY, barW - awayW, barH, [0, 7, 7, 0]);
+  ctx.fill();
+
+  // Predicted score
+  ctx.fillStyle = '#f0ece4';
+  ctx.font = 'bold 14px Segoe UI, Arial, sans-serif';
+  ctx.fillText('Predicted Score', W / 2, 248);
+  ctx.font = 'bold 22px Segoe UI, Arial, sans-serif';
+  ctx.fillStyle = '#ffd54f';
+  ctx.fillText(away + ' ' + awayRuns + '  —  ' + homeRuns + ' ' + home, W / 2, 275);
+
+  // Venue + footer
+  ctx.fillStyle = '#777';
+  ctx.font = '11px Segoe UI, Arial, sans-serif';
+  ctx.fillText(venue, W / 2, 305);
+  ctx.fillStyle = '#444';
+  ctx.font = '10px Segoe UI, Arial, sans-serif';
+  ctx.fillText('sportssimulator.app · For entertainment only', W / 2, 330);
+
+  return c;
+}
+
+function sharePickCard() {
+  var c = buildPickCanvas();
+  c.toBlob(function(blob) {
+    if (navigator.clipboard && window.ClipboardItem) {
+      navigator.clipboard.write([new ClipboardItem({'image/png': blob})]).then(function() {
+        var btn = document.getElementById('share-pick-btn');
+        btn.textContent = 'Copied!';
+        setTimeout(function() { btn.innerHTML = '📤 Share Pick'; }, 2000);
+      }).catch(function() {
+        downloadPickCard();
+      });
+    } else if (navigator.share) {
+      var file = new File([blob], 'pick.png', {type: 'image/png'});
+      navigator.share({files: [file], title: 'My Pick'}).catch(function() {});
+    } else {
+      downloadPickCard();
+    }
+  }, 'image/png');
+}
+
+function downloadPickCard() {
+  var c = buildPickCanvas();
+  var link = document.createElement('a');
+  link.download = '{{ away_team }}_at_{{ home_team }}_pick.png';
+  link.href = c.toDataURL('image/png');
+  link.click();
+  var btn = document.getElementById('download-pick-btn');
+  btn.textContent = 'Downloaded!';
+  setTimeout(function() { btn.innerHTML = '💾 Download Image'; }, 2000);
+}
 </script>
 </body>
 </html>
