@@ -2484,8 +2484,7 @@ def backtest_page():
         settled = [
             p
             for p in settled
-            if max(p.get("away_win_pct", 0) or 0, p.get("home_win_pct", 0) or 0)
-            >= min_conf
+            if max(p.get("away_win_pct", 0) or 0, p.get("home_win_pct", 0) or 0) >= min_conf
         ]
 
     total = len(settled)
@@ -2539,14 +2538,10 @@ def backtest_page():
                 "date": d,
                 "day_total": daily[d]["total"],
                 "day_correct": daily[d]["correct"],
-                "day_pct": round(
-                    daily[d]["correct"] / daily[d]["total"] * 100, 1
-                )
+                "day_pct": round(daily[d]["correct"] / daily[d]["total"] * 100, 1)
                 if daily[d]["total"]
                 else 0,
-                "cum_pct": round(cum_correct / cum_total * 100, 1)
-                if cum_total
-                else 0,
+                "cum_pct": round(cum_correct / cum_total * 100, 1) if cum_total else 0,
             }
         )
 
