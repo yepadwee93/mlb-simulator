@@ -2958,10 +2958,138 @@ def send_daily_alerts_route():
     return jsonify({"plays_found": len(top_plays), "email_result": result})
 
 
+# ── NFL Routes ──────────────────────────────────────────────────────────────
+
+
+@app.route("/nfl")
+def nfl_schedule():
+    """NFL schedule page — browse by week."""
+    from data.nfl_api import get_current_week, get_nfl_schedule
+
+    week = request.args.get("week", type=int)
+    season_type = request.args.get("type", 2, type=int)
+
+    if week is None:
+        week = get_current_week()
+
+    today = _today_est()
+    year = today.year if today.month >= 3 else today.year - 1
+
+    games = get_nfl_schedule(week=week, season_type=season_type, year=year)
+
+    return render_template(
+        "nfl.html",
+        games=games,
+        current_week=week,
+        season_year=year,
+        season_type=season_type,
+        username=current_user.username if current_user.is_authenticated else None,
+    )
+
+
+@app.route("/nfl/game/<game_id>")
+@login_required
+def nfl_game(game_id):
+    """Simulate a single NFL game."""
+    from data.nfl_api import NFL_TEAMS, get_nfl_schedule, get_team_stats
+    from simulation.nfl_engine import simulate_game
+
+    # Find the game in the current schedule
+    game = None
+    for st in [2, 1, 3]:
+        for wk in range(1, 23):
+            games = get_nfl_schedule(week=wk, season_type=st)
+            for g in games:
+                if str(g["game_id"]) == str(game_id):
+                    game = g
+                    break
+            if game:
+                break
+        if game:
+            break
+
+    if not game:
+        return "Game not found", 404
+
+    home_abbr = game["home"]["abbr"]
+    away_abbr = game["away"]["abbr"]
+
+    home_stats = get_team_stats(home_abbr)
+    away_stats = get_team_stats(away_abbr)
+
+    result = simulate_game(
+        home_stats=home_stats,
+        away_stats=away_stats,
+        home_abbr=home_abbr,
+        away_abbr=away_abbr,
+        n_sims=10000,
+    )
+
+    # Build odds data if available
+    odds = None
+    try:
+        from data.nfl_api import get_nfl_odds
+
+        all_odds = get_nfl_odds()
+        matchup_key = f"{game['away']['name']} @ {game['home']['name']}"
+        odds_data = all_odds.get(matchup_key)
+        if odds_data:
+
+            def ml_to_implied(ml):
+                if not ml:
+                    return None
+                if ml < 0:
+                    return round(abs(ml) / (abs(ml) + 100) * 100, 1)
+                return round(100 / (ml + 100) * 100, 1)
+
+            odds = {
+                "home_ml": odds_data.get("home_ml"),
+                "away_ml": odds_data.get("away_ml"),
+                "spread": odds_data.get("spread"),
+                "over_under": odds_data.get("over_under"),
+                "home_implied": ml_to_implied(odds_data.get("home_ml")),
+                "away_implied": ml_to_implied(odds_data.get("away_ml")),
+            }
+    except Exception:
+        pass
+
+    elo_data = result["models"].get("elo", {})
+
+    return render_template(
+        "nfl_result.html",
+        home_team=home_abbr,
+        away_team=away_abbr,
+        home_win_pct=result["home_win_pct"],
+        away_win_pct=result["away_win_pct"],
+        home_avg_pts=result["home_avg_pts"],
+        away_avg_pts=result["away_avg_pts"],
+        predicted_spread=result["predicted_spread"],
+        predicted_total=result["predicted_total"],
+        n_sims=result["n_sims"],
+        models=result["models"],
+        models_agree=result["models_agree"],
+        predicted_winner=result["predicted_winner"],
+        venue=game["venue"],
+        city=game.get("city", ""),
+        state=game.get("state", ""),
+        is_dome=game.get("is_dome", False),
+        weather_temp=game.get("weather_temp"),
+        weather_condition=game.get("weather_condition", ""),
+        home_logo=game["home"].get("logo", ""),
+        away_logo=game["away"].get("logo", ""),
+        home_record=game["home"].get("record", ""),
+        away_record=game["away"].get("record", ""),
+        elo_home=elo_data.get("home_elo", ""),
+        elo_away=elo_data.get("away_elo", ""),
+        odds=odds,
+        username=current_user.username,
+    )
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     debug = os.environ.get("FLASK_ENV") == "development"
-    print("\n  MLB Simulator is running!")
+    print("\n  Sports Simulator is running!")
     if debug:
         print(f"  Open:  http://127.0.0.1:{port}\n")
     app.run(host="0.0.0.0", port=port, debug=debug)

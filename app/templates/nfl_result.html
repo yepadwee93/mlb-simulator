@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>!function(){var t=localStorage.getItem("mlb_theme")||"dark",m={dark:{"--bg":"#141010","--bg2":"#1a1212","--bg3":"#241818","--border":"#2a1a1a","--text":"#f0ece4","--text2":"#999","--text3":"#777","--accent":"#e53935","--card-bg":"#1a1212"},medium:{"--bg":"#1c1614","--bg2":"#262020","--bg3":"#302624","--border":"#3a2e2c","--text":"#f0ece4","--text2":"#c0b0a8","--text3":"#998880","--accent":"#ffc107","--card-bg":"#262020"},light:{"--bg":"#f5f0e8","--bg2":"#faf7f2","--bg3":"#ebe4d8","--border":"#d8cfc0","--text":"#2a1a14","--text2":"#5a4a40","--text3":"#8a7a6a","--accent":"#c62828","--card-bg":"#faf7f2"}}[t]||{};Object.entries(m).forEach(function(e){document.documentElement.style.setProperty(e[0],e[1])});document.addEventListener("DOMContentLoaded",function(){document.body.style.background=m["--bg"];document.body.style.color=m["--text"]})}();</script>
+  <meta charset="UTF-8">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ away_team }} @ {{ home_team }} — NFL Simulator</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', Arial, sans-serif; min-height: 100vh; padding: 40px 20px; }
+    a { color: #e53935; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .back-link { display: inline-block; margin-bottom: 28px; font-size: 0.9rem; }
+    .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 14px; padding: 28px 32px; max-width: 700px; margin: 0 auto 24px auto; }
+
+    .matchup { display: flex; justify-content: space-between; align-items: center; margin-bottom: 28px; }
+    .team-block { text-align: center; flex: 1; }
+    .team-logo-lg { width: 56px; height: 56px; object-fit: contain; margin-bottom: 8px; }
+    .team-name { font-size: 1.15rem; font-weight: 700; }
+    .team-record { font-size: 0.78rem; color: var(--text3); margin-top: 2px; }
+    .team-pct { font-size: 2.6rem; font-weight: 800; margin-top: 6px; line-height: 1; }
+    .team-pct.away { color: #e53935; }
+    .team-pct.home { color: #81c784; }
+    .win-label { font-size: 0.75rem; color: var(--text2); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .vs-divider { color: var(--text2); font-size: 1rem; font-weight: 600; padding: 0 16px; }
+
+    .prob-bar-wrap { margin-bottom: 24px; }
+    .prob-bar { display: flex; height: 10px; border-radius: 5px; overflow: hidden; }
+    .bar-away { background: #e53935; }
+    .bar-home { background: #81c784; flex: 1; }
+    .bar-labels { display: flex; justify-content: space-between; margin-top: 6px; font-size: 0.72rem; color: var(--text3); }
+
+    .score-box { text-align: center; margin: 20px 0; padding: 16px; background: var(--bg); border-radius: 10px; }
+    .score-label { font-size: 0.72rem; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+    .score-value { font-size: 1.4rem; font-weight: 800; color: #ffd54f; }
+    .spread-value { font-size: 0.88rem; color: var(--text2); margin-top: 4px; }
+    .sim-note { text-align: center; font-size: 0.75rem; color: var(--text3); margin-top: 8px; }
+
+    .section-title { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: var(--text2); margin-bottom: 14px; }
+
+    .model-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 16px; }
+    .model-card { background: var(--bg); border-radius: 10px; padding: 10px 8px; text-align: center; }
+    .model-icon { font-size: 1.1rem; }
+    .model-name { font-size: 0.65rem; color: var(--text3); margin: 4px 0 2px; font-weight: 600; }
+    .model-pct { font-size: 1.1rem; font-weight: 900; }
+    .model-team { font-size: 0.68rem; color: var(--text2); font-weight: 600; }
+    .model-weight { font-size: 0.58rem; color: var(--text3); margin-top: 2px; }
+
+    .consensus-bar { text-align: center; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+
+    .odds-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    .odds-table td { padding: 10px 0; }
+    .odds-table tr + tr { border-top: 1px solid var(--border); }
+
+    .edge-pos { color: #4caf50; font-weight: 700; }
+    .edge-neg { color: #ef5350; font-weight: 700; }
+
+    .venue-card { text-align: center; font-size: 0.82rem; color: var(--text2); }
+    .venue-name { font-size: 1rem; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+    .venue-detail { font-size: 0.75rem; color: var(--text3); }
+
+    .weather-card { display: flex; justify-content: center; gap: 20px; margin-top: 12px; flex-wrap: wrap; }
+    .weather-stat { text-align: center; }
+    .weather-val { font-size: 1.1rem; font-weight: 700; }
+    .weather-lbl { font-size: 0.65rem; color: var(--text3); text-transform: uppercase; letter-spacing: 0.3px; }
+
+    .share-bar { max-width: 700px; margin: 0 auto 24px; display: flex; gap: 10px; justify-content: center; }
+    .share-btn { background: var(--card-bg); border: 1px solid var(--border); color: var(--text); padding: 8px 20px; border-radius: 10px; cursor: pointer; font-size: 0.82rem; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+
+    @media (max-width: 600px) {
+      body { padding: 20px 10px; }
+      .card { padding: 18px 16px; }
+      .team-name { font-size: 0.95rem; }
+      .team-pct { font-size: 2rem; }
+      .model-grid { grid-template-columns: repeat(3, 1fr); }
+      .matchup { gap: 4px; }
+      .vs-divider { padding: 0 8px; }
+      .back-link { margin: 8px 10px; }
+    }
+  </style>
+</head>
+<body>
+
+{% include "_navbar.html" %}
+
+<div style="max-width:700px;margin:0 auto;">
+  <a href="/nfl" class="back-link">← Back to NFL Schedule</a>
+</div>
+
+<!-- Main prediction card -->
+<div class="card">
+  <div class="matchup">
+    <div class="team-block">
+      {% if away_logo %}<img class="team-logo-lg" src="{{ away_logo }}" alt="{{ away_team }}">{% endif %}
+      <div class="team-name">{{ away_team }}</div>
+      {% if away_record %}<div class="team-record">{{ away_record }}</div>{% endif %}
+      <div class="team-pct away">{{ away_win_pct }}%</div>
+      <div class="win-label">win probability</div>
+    </div>
+    <div class="vs-divider">@</div>
+    <div class="team-block">
+      {% if home_logo %}<img class="team-logo-lg" src="{{ home_logo }}" alt="{{ home_team }}">{% endif %}
+      <div class="team-name">{{ home_team }}</div>
+      {% if home_record %}<div class="team-record">{{ home_record }}</div>{% endif %}
+      <div class="team-pct home">{{ home_win_pct }}%</div>
+      <div class="win-label">win probability</div>
+    </div>
+  </div>
+
+  <div class="prob-bar-wrap">
+    <div class="prob-bar">
+      <div class="bar-away" style="width:{{ away_win_pct }}%"></div>
+      <div class="bar-home"></div>
+    </div>
+    <div class="bar-labels">
+      <span>{{ away_team }}</span>
+      <span>{{ home_team }}</span>
+    </div>
+  </div>
+
+  <!-- Model consensus -->
+  {% if models %}
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px 20px;margin:14px 0;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <span class="section-title" style="margin-bottom:0;">Model Consensus</span>
+      {% if models_agree >= 5 %}
+      <span style="background:#1b4332;color:#4caf50;padding:3px 10px;border-radius:6px;font-size:0.72rem;font-weight:700;">5/5 AGREE</span>
+      {% else %}
+      <span style="background:#2a2040;color:#ffc107;padding:3px 10px;border-radius:6px;font-size:0.72rem;font-weight:700;">{{ models_agree }}/5 agree</span>
+      {% endif %}
+    </div>
+    <div class="model-grid">
+      {% set model_icons = {'monte_carlo': '🎲', 'elo': '📊', 'dvoa': '📈', 'turnover': '🔄', 'log5': '📐'} %}
+      {% set model_names = {'monte_carlo': 'Monte Carlo', 'elo': 'Elo Rating', 'dvoa': 'DVOA', 'turnover': 'Turnover', 'log5': 'Log5'} %}
+      {% for mkey, mdata in models.items() %}
+      {% set m_fav = away_team if mdata.away_pct > 50 else home_team %}
+      {% set m_pct = [mdata.away_pct, mdata.home_pct]|max %}
+      {% set m_color = '#4caf50' if m_pct >= 60 else '#ffa726' if m_pct >= 55 else '#e53935' %}
+      <div class="model-card">
+        <div class="model-icon">{{ model_icons.get(mkey, '📈') }}</div>
+        <div class="model-name">{{ model_names.get(mkey, mkey) }}</div>
+        <div class="model-pct" style="color:{{ m_color }};">{{ m_pct }}%</div>
+        <div class="model-team">{{ m_fav }}</div>
+        <div class="model-weight">wt: {{ mdata.weight }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="consensus-bar">
+      <span style="font-size:0.72rem;color:var(--text3);">Consensus:</span>
+      <span style="font-size:1.1rem;font-weight:900;color:#ffd54f;margin:0 6px;">
+        {{ away_win_pct }}% — {{ home_win_pct }}%
+      </span>
+      <span style="font-size:0.72rem;color:var(--text3);">
+        ({{ away_team }} — {{ home_team }})
+      </span>
+    </div>
+    {% if elo_home is defined %}
+    <div style="display:flex;justify-content:center;gap:20px;margin-top:8px;">
+      <span style="font-size:0.68rem;color:var(--text3);">Elo: {{ away_team }} {{ elo_away }} · {{ home_team }} {{ elo_home }}</span>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <div class="score-box">
+    <div class="score-label">Predicted Score</div>
+    <div class="score-value">{{ away_team }} {{ away_avg_pts }} — {{ home_avg_pts }} {{ home_team }}</div>
+    {% if predicted_spread is defined %}
+    <div class="spread-value">
+      Predicted spread: {{ home_team }}
+      {% if predicted_spread > 0 %}-{% elif predicted_spread < 0 %}+{% endif %}{{ predicted_spread|abs }}
+    </div>
+    {% endif %}
+    {% if predicted_total is defined %}
+    <div class="spread-value">Predicted total: {{ predicted_total }}</div>
+    {% endif %}
+  </div>
+
+  <div class="sim-note">
+    Based on {{ n_sims | int }} simulated games · 5 prediction models
+  </div>
+</div>
+
+<!-- Odds comparison -->
+{% if odds %}
+<div class="card">
+  <div class="section-title">Our Model vs Vegas</div>
+  <table class="odds-table">
+    <thead>
+      <tr style="color:var(--text3);font-size:0.72rem;text-transform:uppercase;letter-spacing:0.5px;">
+        <td>Team</td>
+        <td style="text-align:center;">Model</td>
+        <td style="text-align:center;">Spread</td>
+        <td style="text-align:center;">ML</td>
+        <td style="text-align:center;">Edge</td>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="font-weight:600;">{{ away_team }}</td>
+        <td style="text-align:center;color:#e53935;font-weight:700;">{{ away_win_pct }}%</td>
+        <td style="text-align:center;color:var(--text2);">{{ odds.spread if odds.spread else '—' }}</td>
+        <td style="text-align:center;">{{ odds.away_ml if odds.away_ml else '—' }}</td>
+        <td style="text-align:center;">
+          {% if odds.away_implied %}
+            {% set edge = away_win_pct - odds.away_implied %}
+            <span class="{% if edge > 0 %}edge-pos{% else %}edge-neg{% endif %}">
+              {% if edge > 0 %}+{% endif %}{{ edge|round(1) }}%
+            </span>
+          {% else %}—{% endif %}
+        </td>
+      </tr>
+      <tr>
+        <td style="font-weight:600;">{{ home_team }}</td>
+        <td style="text-align:center;color:#81c784;font-weight:700;">{{ home_win_pct }}%</td>
+        <td style="text-align:center;color:var(--text2);">{% if odds.spread %}{{ -1 * odds.spread }}{% else %}—{% endif %}</td>
+        <td style="text-align:center;">{{ odds.home_ml if odds.home_ml else '—' }}</td>
+        <td style="text-align:center;">
+          {% if odds.home_implied %}
+            {% set edge = home_win_pct - odds.home_implied %}
+            <span class="{% if edge > 0 %}edge-pos{% else %}edge-neg{% endif %}">
+              {% if edge > 0 %}+{% endif %}{{ edge|round(1) }}%
+            </span>
+          {% else %}—{% endif %}
+        </td>
+      </tr>
+    </tbody>
+  </table>
+  {% if odds.over_under %}
+  <div style="text-align:center;margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
+    <span style="font-size:0.72rem;color:var(--text3);text-transform:uppercase;">Over/Under</span>
+    <div style="font-size:1.2rem;font-weight:800;color:#ffd54f;margin-top:4px;">{{ odds.over_under }}</div>
+    <div style="font-size:0.78rem;color:var(--text2);margin-top:2px;">Model total: {{ predicted_total }}</div>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+<!-- Venue & Weather -->
+<div class="card">
+  <div class="venue-card">
+    <div class="venue-name">🏟 {{ venue }}</div>
+    {% if city %}<div class="venue-detail">{{ city }}{% if state %}, {{ state }}{% endif %}</div>{% endif %}
+    {% if is_dome %}<div class="venue-detail" style="color:#4caf50;margin-top:4px;">Dome — no weather impact</div>{% endif %}
+  </div>
+  {% if weather_temp and not is_dome %}
+  <div class="weather-card">
+    <div class="weather-stat">
+      <div class="weather-val">{{ weather_temp }}°F</div>
+      <div class="weather-lbl">Temperature</div>
+    </div>
+    {% if weather_condition %}
+    <div class="weather-stat">
+      <div class="weather-val">{{ weather_condition }}</div>
+      <div class="weather-lbl">Conditions</div>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<!-- Share buttons -->
+<div class="share-bar">
+  <button class="share-btn" onclick="shareNflPick()">📤 Share Pick</button>
+  <button class="share-btn" onclick="downloadNflPick()">💾 Download Image</button>
+</div>
+<canvas id="share-canvas" style="display:none;"></canvas>
+
+<div style="max-width:700px;margin:0 auto;text-align:center;">
+  <a href="/nfl" style="display:inline-block;padding:10px 24px;background:var(--bg3);border:1px solid #c62828;color:#e53935;border-radius:10px;font-weight:700;font-size:0.88rem;text-decoration:none;">← Simulate Another Game</a>
+</div>
+
+<script>
+function buildNflCanvas() {
+  var c = document.getElementById('share-canvas');
+  var ctx = c.getContext('2d');
+  var W = 600, H = 340;
+  c.width = W; c.height = H;
+  var grad = ctx.createLinearGradient(0, 0, W, H);
+  grad.addColorStop(0, '#1a1212');
+  grad.addColorStop(1, '#241818');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = '#e53935';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(1, 1, W - 2, H - 2);
+  ctx.fillStyle = '#e5393522';
+  ctx.fillRect(0, 0, W, 48);
+  ctx.fillStyle = '#e53935';
+  ctx.font = 'bold 14px Segoe UI, Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('SPORTS SIMULATOR · NFL', W / 2, 30);
+  ctx.fillStyle = '#f0ece4';
+  ctx.font = 'bold 18px Segoe UI, Arial, sans-serif';
+  ctx.fillText('{{ away_team }}', 150, 90);
+  ctx.fillStyle = '#e53935';
+  ctx.font = 'bold 48px Segoe UI, Arial, sans-serif';
+  ctx.fillText('{{ away_win_pct }}%', 150, 150);
+  ctx.fillStyle = '#999';
+  ctx.font = '12px Segoe UI, Arial, sans-serif';
+  ctx.fillText('WIN PROBABILITY', 150, 170);
+  ctx.fillStyle = '#555';
+  ctx.font = 'bold 16px Segoe UI, Arial, sans-serif';
+  ctx.fillText('@', W / 2, 130);
+  ctx.fillStyle = '#f0ece4';
+  ctx.font = 'bold 18px Segoe UI, Arial, sans-serif';
+  ctx.fillText('{{ home_team }}', 450, 90);
+  ctx.fillStyle = '#81c784';
+  ctx.font = 'bold 48px Segoe UI, Arial, sans-serif';
+  ctx.fillText('{{ home_win_pct }}%', 450, 150);
+  ctx.fillStyle = '#999';
+  ctx.font = '12px Segoe UI, Arial, sans-serif';
+  ctx.fillText('WIN PROBABILITY', 450, 170);
+  var barX = 40, barY = 200, barW = W - 80, barH = 14;
+  var awayW = barW * (parseFloat('{{ away_win_pct }}') / 100);
+  ctx.fillStyle = '#e53935';
+  ctx.beginPath(); ctx.roundRect(barX, barY, awayW, barH, [7, 0, 0, 7]); ctx.fill();
+  ctx.fillStyle = '#81c784';
+  ctx.beginPath(); ctx.roundRect(barX + awayW, barY, barW - awayW, barH, [0, 7, 7, 0]); ctx.fill();
+  ctx.fillStyle = '#f0ece4';
+  ctx.font = 'bold 14px Segoe UI, Arial, sans-serif';
+  ctx.fillText('Predicted Score', W / 2, 248);
+  ctx.font = 'bold 22px Segoe UI, Arial, sans-serif';
+  ctx.fillStyle = '#ffd54f';
+  ctx.fillText('{{ away_team }} {{ away_avg_pts }}  —  {{ home_avg_pts }} {{ home_team }}', W / 2, 275);
+  ctx.fillStyle = '#777';
+  ctx.font = '11px Segoe UI, Arial, sans-serif';
+  ctx.fillText('{{ venue }}', W / 2, 305);
+  ctx.fillStyle = '#444';
+  ctx.font = '10px Segoe UI, Arial, sans-serif';
+  ctx.fillText('sportssimulator.app · For entertainment only', W / 2, 330);
+  return c;
+}
+function shareNflPick() {
+  var c = buildNflCanvas();
+  c.toBlob(function(blob) {
+    if (navigator.clipboard && window.ClipboardItem) {
+      navigator.clipboard.write([new ClipboardItem({'image/png': blob})]).catch(function() { downloadNflPick(); });
+    } else { downloadNflPick(); }
+  }, 'image/png');
+}
+function downloadNflPick() {
+  var c = buildNflCanvas();
+  var link = document.createElement('a');
+  link.download = '{{ away_team }}_at_{{ home_team }}_nfl_pick.png';
+  link.href = c.toDataURL('image/png');
+  link.click();
+}
+</script>
+
+<script>
+function getCsrfToken(){return document.cookie.split(';').map(function(c){return c.trim();}).find(function(c){return c.startsWith('csrf_token=');})?.split('=')[1]||'';}
+function csrfFetch(url,opts){opts=opts||{};opts.headers=Object.assign({'X-CSRFToken':getCsrfToken()},opts.headers||{});return fetch(url,opts);}
+</script>
+</body>
+</html>
