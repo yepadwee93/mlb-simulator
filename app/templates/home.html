@@ -223,6 +223,62 @@
       border: 1px solid var(--border);
     }
 
+    /* ── Best Bets ── */
+    .best-bets-section {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 0 20px 40px;
+    }
+    .best-bets-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 14px;
+    }
+    .best-bet-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px;
+      position: relative;
+      transition: border-color 0.2s;
+      cursor: pointer;
+      text-decoration: none;
+      display: block;
+      color: inherit;
+    }
+    .best-bet-card:hover { border-color: #e53935; }
+    .best-bet-team { font-size: 1rem; font-weight: 800; margin-bottom: 2px; }
+    .best-bet-opp { font-size: 0.78rem; color: var(--text2); margin-bottom: 10px; }
+    .best-bet-stats { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+    .best-bet-pct { font-size: 1.3rem; font-weight: 800; }
+    .best-bet-edge { font-size: 0.75rem; padding: 2px 8px; border-radius: 8px; font-weight: 600; }
+    .edge-pos { background: #1b4332; color: #4caf50; border: 1px solid #2e7d32; }
+    .edge-neg { background: #3a1a1a; color: #ef5350; border: 1px solid #c62828; }
+    .best-bet-odds { font-size: 0.78rem; color: var(--text3); }
+    .best-bet-tier {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      font-size: 0.6rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    .tier-strong { background: #e5393522; color: #ef5350; border: 1px solid #e5393544; }
+    .tier-good { background: #4caf5022; color: #4caf50; border: 1px solid #4caf5044; }
+    .tier-moderate { background: #ffd54f22; color: #ffd54f; border: 1px solid #ffd54f44; }
+    .best-bets-empty {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--text3);
+      font-size: 0.88rem;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+
     /* ── Bottom features ── */
     .features {
       max-width: 900px;
@@ -389,6 +445,11 @@ document.addEventListener('click', function(e) {
   </div>
 </div>
 
+<div class="best-bets-section" id="best-bets-section" style="display:none;">
+  <div class="section-label">Today's best bets</div>
+  <div class="best-bets-grid" id="best-bets-grid"></div>
+</div>
+
 <div class="features">
   <div class="section-label">Built for bettors</div>
   <div class="features-grid">
@@ -413,6 +474,45 @@ document.addEventListener('click', function(e) {
 <footer>
   Data: MLB Stats API · Predictions for entertainment only · Not financial advice
 </footer>
+
+<script>
+(function() {
+  fetch('/api/best-bets')
+    .then(function(r) { return r.json(); })
+    .then(function(bets) {
+      if (!bets || !bets.length) return;
+      var section = document.getElementById('best-bets-section');
+      var grid = document.getElementById('best-bets-grid');
+      if (!section || !grid) return;
+      section.style.display = '';
+      var html = '';
+      bets.forEach(function(b) {
+        var pctColor = b.win_pct >= 70 ? '#ef5350' : b.win_pct >= 65 ? '#4caf50' : '#ffd54f';
+        var tierClass = 'tier-' + b.tier;
+        var tierLabel = b.tier === 'strong' ? 'STRONG' : b.tier === 'good' ? 'GOOD' : 'LEAN';
+        var edgeHtml = '';
+        if (b.edge !== null && b.edge !== undefined) {
+          if (b.edge > 0) {
+            edgeHtml = '<span class="best-bet-edge edge-pos">+' + b.edge + '% edge</span>';
+          } else {
+            edgeHtml = '<span class="best-bet-edge edge-neg">' + b.edge + '% vs line</span>';
+          }
+        }
+        var oddsHtml = b.odds_str ? '<span class="best-bet-odds">' + b.odds_str + '</span>' : '';
+        html += '<a href="/mlb" class="best-bet-card">'
+          + '<span class="best-bet-tier ' + tierClass + '">' + tierLabel + '</span>'
+          + '<div class="best-bet-team">' + b.team + '</div>'
+          + '<div class="best-bet-opp">vs ' + b.opponent + '</div>'
+          + '<div class="best-bet-stats">'
+          + '<span class="best-bet-pct" style="color:' + pctColor + ';">' + b.win_pct + '%</span>'
+          + edgeHtml + oddsHtml
+          + '</div></a>';
+      });
+      grid.innerHTML = html;
+    })
+    .catch(function() {});
+})();
+</script>
 
 <script>
 (function() {

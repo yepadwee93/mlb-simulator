@@ -2395,10 +2395,180 @@ def api_bets():
     return jsonify(get_all_bets(user_id=_uid()))
 
 
+@app.route("/api/best-bets")
+def api_best_bets():
+    """JSON: today's top value picks based on model edge over Vegas implied probability."""
+    today = _today_est().isoformat()
+    try:
+        odds = get_odds_history(limit=50, date_from=today, date_to=today)
+    except Exception:
+        odds = []
+    try:
+        preds = get_all_predictions(date_from=today, date_to=today)
+    except Exception:
+        preds = []
+
+    pred_map = {}
+    for p in preds:
+        gpk = str(p.get("game_pk", ""))
+        if gpk:
+            pred_map[gpk] = p
+
+    bets = []
+    for o in odds:
+        gpk = str(o.get("game_pk", ""))
+        pred = pred_map.get(gpk, {})
+        model_away = o.get("model_away_pct") or pred.get("away_win_pct")
+        model_home = o.get("model_home_pct") or pred.get("home_win_pct")
+        if not model_away or not model_home:
+            continue
+
+        away_implied = o.get("away_implied_pct") or 0
+        home_implied = o.get("home_implied_pct") or 0
+
+        pick_team = o["away_team"] if model_away >= model_home else o["home_team"]
+        opp_team = o["home_team"] if pick_team == o["away_team"] else o["away_team"]
+        win_pct = max(model_away, model_home)
+        implied = away_implied if pick_team == o["away_team"] else home_implied
+        edge = round(win_pct - implied, 1) if implied else None
+        ml = o.get("away_ml") if pick_team == o["away_team"] else o.get("home_ml")
+        odds_str = ""
+        if ml:
+            odds_str = f"+{ml}" if ml > 0 else str(ml)
+
+        if win_pct < BET_THRESHOLD:
+            continue
+
+        if win_pct >= 70:
+            tier = "strong"
+        elif win_pct >= 65:
+            tier = "good"
+        else:
+            tier = "moderate"
+
+        bets.append(
+            {
+                "team": pick_team,
+                "opponent": opp_team,
+                "win_pct": round(win_pct, 1),
+                "implied_pct": round(implied, 1) if implied else None,
+                "edge": edge,
+                "odds_str": odds_str,
+                "tier": tier,
+                "game_pk": gpk,
+            }
+        )
+
+    bets.sort(key=lambda x: x["win_pct"], reverse=True)
+    return jsonify(bets[:10])
+
+
 @app.route("/bankroll")
 @login_required
 def bankroll_page():
     return render_template("bankroll.html", username=current_user.username)
+
+
+@app.route("/backtest")
+@login_required
+def backtest_page():
+    """Model backtesting — analyze historical prediction performance."""
+    date_from = request.args.get("from")
+    date_to = request.args.get("to")
+    min_conf = request.args.get("min_conf", type=float)
+
+    preds = get_all_predictions(date_from=date_from, date_to=date_to)
+    settled = [p for p in preds if p.get("correct_pick") is not None]
+
+    if min_conf:
+        settled = [
+            p
+            for p in settled
+            if max(p.get("away_win_pct", 0) or 0, p.get("home_win_pct", 0) or 0) >= min_conf
+        ]
+
+    total = len(settled)
+    correct = sum(1 for p in settled if int(p.get("correct_pick", 0)))
+    pct = round(correct / total * 100, 1) if total else 0
+
+    tiers = {
+        "70+": {"total": 0, "correct": 0},
+        "65-69": {"total": 0, "correct": 0},
+        "60-64": {"total": 0, "correct": 0},
+        "55-59": {"total": 0, "correct": 0},
+        "50-54": {"total": 0, "correct": 0},
+    }
+    daily = {}
+    rolling = []
+
+    for p in sorted(settled, key=lambda x: x.get("game_date", "")):
+        wp = max(p.get("away_win_pct", 0) or 0, p.get("home_win_pct", 0) or 0)
+        c = int(p.get("correct_pick", 0))
+
+        if wp >= 70:
+            tiers["70+"]["total"] += 1
+            tiers["70+"]["correct"] += c
+        elif wp >= 65:
+            tiers["65-69"]["total"] += 1
+            tiers["65-69"]["correct"] += c
+        elif wp >= 60:
+            tiers["60-64"]["total"] += 1
+            tiers["60-64"]["correct"] += c
+        elif wp >= 55:
+            tiers["55-59"]["total"] += 1
+            tiers["55-59"]["correct"] += c
+        else:
+            tiers["50-54"]["total"] += 1
+            tiers["50-54"]["correct"] += c
+
+        gd = p.get("game_date", "unknown")
+        if gd not in daily:
+            daily[gd] = {"total": 0, "correct": 0}
+        daily[gd]["total"] += 1
+        daily[gd]["correct"] += c
+
+    sorted_dates = sorted(daily.keys())
+    cum_total = 0
+    cum_correct = 0
+    for d in sorted_dates:
+        cum_total += daily[d]["total"]
+        cum_correct += daily[d]["correct"]
+        rolling.append(
+            {
+                "date": d,
+                "day_total": daily[d]["total"],
+                "day_correct": daily[d]["correct"],
+                "day_pct": round(daily[d]["correct"] / daily[d]["total"] * 100, 1)
+                if daily[d]["total"]
+                else 0,
+                "cum_pct": round(cum_correct / cum_total * 100, 1) if cum_total else 0,
+            }
+        )
+
+    tier_list = []
+    for label in ["70+", "65-69", "60-64", "55-59", "50-54"]:
+        t = tiers[label]
+        tier_list.append(
+            {
+                "label": label + "%",
+                "total": t["total"],
+                "correct": t["correct"],
+                "pct": round(t["correct"] / t["total"] * 100, 1) if t["total"] else 0,
+            }
+        )
+
+    return render_template(
+        "backtest.html",
+        username=current_user.username,
+        total=total,
+        correct=correct,
+        pct=pct,
+        tiers=tier_list,
+        rolling=rolling,
+        date_from=date_from or "",
+        date_to=date_to or "",
+        min_conf=min_conf or "",
+    )
 
 
 @app.route("/calculator")
